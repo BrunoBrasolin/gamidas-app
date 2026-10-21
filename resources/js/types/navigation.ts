@@ -11,4 +11,7 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    items?: NavItem[];
+    /** Path prefix that also marks the item as active, e.g. "/household". */
+    activePrefix?: string;
 };

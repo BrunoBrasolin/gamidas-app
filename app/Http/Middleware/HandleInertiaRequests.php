@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\HouseholdMember;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,7 +42,32 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'household' => fn () => $this->household($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+        ];
+    }
+
+    /**
+     * The household of the authenticated user, shared with every page.
+     *
+     * @return array{id: int, name: string, members: list<array{user_id: int, name: string, first_name: string}>}|null
+     */
+    private function household(Request $request): ?array
+    {
+        $household = $request->user()?->household();
+
+        if ($household === null) {
+            return null;
+        }
+
+        return [
+            'id' => $household->id,
+            'name' => $household->name,
+            'members' => array_values($household->members()->with('user:id,name')->get()->map(fn (HouseholdMember $member) => [
+                'user_id' => $member->user_id,
+                'name' => $member->user->name,
+                'first_name' => $member->user->firstName(),
+            ])->all()),
         ];
     }
 }

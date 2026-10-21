@@ -1,7 +1,5 @@
 import { Form, Head, usePage } from '@inertiajs/react';
-/* @chisel-email-verification */
 import { Link } from '@inertiajs/react';
-/* @end-chisel-email-verification */
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
@@ -11,38 +9,34 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/profile';
 import type { Auth } from '@/types';
-/* @chisel-email-verification */
 import { send } from '@/routes/verification';
-/* @end-chisel-email-verification */
 
 type PageProps = {
     auth: Auth;
 };
 
-export default function Profile(
-    /* @chisel-email-verification */
-    {
-        mustVerifyEmail,
-        status,
-    }: {
-        mustVerifyEmail: boolean;
-        status?: string;
-    },
-    /* @end-chisel-email-verification */
-) {
+export default function Profile({
+    mustVerifyEmail,
+    status,
+    canDeleteAccount,
+}: {
+    mustVerifyEmail: boolean;
+    status?: string;
+    canDeleteAccount: boolean;
+}) {
     const { auth } = usePage<PageProps>().props;
 
     return (
         <>
-            <Head title="Profile settings" />
+            <Head title="Perfil" />
 
-            <h1 className="sr-only">Profile settings</h1>
+            <h1 className="sr-only">Perfil</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Profile"
-                    description="Update your name and email address"
+                    title="Perfil"
+                    description="Atualize seu nome e e-mail"
                 />
 
                 <Form
@@ -55,7 +49,7 @@ export default function Profile(
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                                <Label htmlFor="name">Nome</Label>
 
                                 <Input
                                     id="name"
@@ -64,7 +58,7 @@ export default function Profile(
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    placeholder="Full name"
+                                    placeholder="Nome completo"
                                 />
 
                                 <InputError
@@ -74,7 +68,7 @@ export default function Profile(
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                                <Label htmlFor="email">E-mail</Label>
 
                                 <Input
                                     id="email"
@@ -84,7 +78,7 @@ export default function Profile(
                                     name="email"
                                     required
                                     autoComplete="username"
-                                    placeholder="Email address"
+                                    placeholder="E-mail"
                                 />
 
                                 <InputError
@@ -93,39 +87,37 @@ export default function Profile(
                                 />
                             </div>
 
-                            {/* @chisel-email-verification */}
                             {mustVerifyEmail &&
                                 auth.user.email_verified_at === null && (
                                     <div>
                                         <p className="-mt-4 text-sm text-muted-foreground">
-                                            Your email address is unverified.{' '}
+                                            Seu e-mail ainda não foi verificado.{' '}
                                             <Link
                                                 href={send()}
                                                 as="button"
                                                 className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                                             >
-                                                Click here to re-send the
-                                                verification email.
+                                                Clique aqui para reenviar o
+                                                e-mail de verificação.
                                             </Link>
                                         </p>
 
                                         {status ===
                                             'verification-link-sent' && (
                                             <div className="mt-2 text-sm font-medium text-green-600">
-                                                A new verification link has been
-                                                sent to your email address.
+                                                Um novo link de verificação foi
+                                                enviado para o seu e-mail.
                                             </div>
                                         )}
                                     </div>
                                 )}
-                            {/* @end-chisel-email-verification */}
 
                             <div className="flex items-center gap-4">
                                 <Button
                                     disabled={processing}
                                     data-test="update-profile-button"
                                 >
-                                    Save
+                                    Salvar
                                 </Button>
                             </div>
                         </>
@@ -133,7 +125,14 @@ export default function Profile(
                 </Form>
             </div>
 
-            <DeleteUser />
+            {canDeleteAccount ? (
+                <DeleteUser />
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    Contas vinculadas a uma residência não podem ser excluídas,
+                    para preservar o histórico financeiro compartilhado.
+                </p>
+            )}
         </>
     );
 }
@@ -141,7 +140,7 @@ export default function Profile(
 Profile.layout = {
     breadcrumbs: [
         {
-            title: 'Profile settings',
+            title: 'Perfil',
             href: edit(),
         },
     ],

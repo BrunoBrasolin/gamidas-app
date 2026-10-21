@@ -1,0 +1,150 @@
+name: Deploy
+
+# Laravel + Inertia monolith deployed to Hostinger shared hosting. The release is
+# built here (composer --no-dev + Vite build), uploaded as a tarball and synced
+# into place, so the server needs no access to GitHub, Composer or Node.
+#
+# Required secrets: SSH_HOST, SSH_PORT, SSH_USER, SSH_PASSWORD
+# Required variable: DEPLOY_PATH (relative to $HOME, e.g. domains/example.com.br/public_html)
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  deploy:
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up PHP
+      uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      with:
+        php-version: '8.3'
+        tools: composer:v2
+        coverage: none
+
+    - name: Set up Node
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: npm
+
+    - name: Install production dependencies
+      run: |
+        composer install \
+          --no-dev \
+          --prefer-dist \
+          --optimize-autoloader \
+          --no-scripts \
+          --no-interaction \
+          --no-progress
+
+    # The Wayfinder Vite plugin runs `php artisan wayfinder:generate`, so the
+    # app must be bootable here. This .env is build-only and never shipped.
+    - name: Prepare build environment
+      run: |
+        cp .env.example .env
+        php artisan key:generate --ansi
+
+    - name: Build frontend
+      run: |
+        npm ci
+        npm run build
+
+    - name: Package release
+      run: |
+        tar -czf ../release.tar.gz \
+          --exclude=./.git \
+          --exclude=./.github \
+          --exclude=./.claude \
+          --exclude=./.env \
+          --exclude=./node_modules \
+          --exclude=./tests \
+          --exclude=./database/database.sqlite \
+          --exclude=./bootstrap/cache/*.php \
+          .
+        mv ../release.tar.gz .
+
+    - name: Upload release
+      uses: appleboy/scp-action@v1.0.0
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        port: ${{ secrets.SSH_PORT }}
+        username: ${{ secrets.SSH_USER }}
+        password: ${{ secrets.SSH_PASSWORD }}
+        timeout: 5m
+        source: release.tar.gz
+        target: .deploy/gamidas
+
+    - name: Laravel Deploy
+      uses: appleboy/ssh-action@v1.2.2
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        port: ${{ secrets.SSH_PORT }}
+        username: ${{ secrets.SSH_USER }}
+        password: ${{ secrets.SSH_PASSWORD }}
+        script: |
+          set -Eeuo pipefail
+
+          PHP=/opt/alt/php83/usr/bin/php
+          APP="$HOME/${{ vars.DEPLOY_PATH }}"
+          STAGE="$HOME/.deploy/gamidas"
+
+          command -v rsync >/dev/null || { echo "rsync is required on the server"; exit 1; }
+          [ -n "${{ vars.DEPLOY_PATH }}" ] || { echo "DEPLOY_PATH variable is not set"; exit 1; }
+
+          rm -rf "$STAGE/release"
+          mkdir -p "$STAGE/release" "$APP"
+          tar -xzf "$STAGE/release.tar.gz" -C "$STAGE/release"
+
+          cd "$APP"
+          [ -f .env ] || { echo "$APP/.env is missing; create it on the server first"; exit 1; }
+          [ -f artisan ] && { "$PHP" artisan down --retry=15 || true; }
+          trap '"$PHP" "$APP/artisan" up || true' EXIT
+
+          # Server-only files are kept: .env, runtime storage, a SQLite database
+          # if used, compiled caches (rebuilt below) and any hand-kept
+          # .htaccess / .user.ini at the root.
+          rsync -a --delete \
+            --exclude='/.env' \
+            --exclude='/.htaccess' \
+            --exclude='/.user.ini' \
+            --exclude='/storage/' \
+            --exclude='/public/storage' \
+            --exclude='/database/*.sqlite' \
+            --exclude='/bootstrap/cache/*.php' \
+            "$STAGE/release/" "$APP/"
+
+          mkdir -p \
+            storage/app/private \
+            storage/app/public \
+            storage/framework/cache/data \
+            storage/framework/sessions \
+            storage/framework/views \
+            storage/logs \
+            bootstrap/cache
+
+          "$PHP" artisan optimize:clear
+          "$PHP" artisan package:discover --ansi
+          "$PHP" artisan migrate --force
+          "$PHP" artisan optimize
+
+          rm -rf "$STAGE/release" "$STAGE/release.tar.gz"

@@ -124,13 +124,13 @@ No servidor, o deploy coloca a aplicação em manutenção, sincroniza os arquiv
 
 Em **Settings › Secrets and variables › Actions**:
 
-| Tipo     | Nome           | Exemplo                                     |
-| -------- | -------------- | ------------------------------------------- |
-| Secret   | `SSH_HOST`     | IP do servidor (hPanel › SSH Access)        |
-| Secret   | `SSH_PORT`     | `65002`                                     |
-| Secret   | `SSH_USER`     | `u123456789`                                |
-| Secret   | `SSH_PASSWORD` | senha do SSH                                |
-| Variable | `DEPLOY_PATH`  | `domains/seudominio.com.br/public_html`     |
+| Tipo     | Nome           | Exemplo                                 |
+| -------- | -------------- | --------------------------------------- |
+| Secret   | `SSH_HOST`     | IP do servidor (hPanel › SSH Access)    |
+| Secret   | `SSH_PORT`     | `65002`                                 |
+| Secret   | `SSH_USER`     | `u123456789`                            |
+| Secret   | `SSH_PASSWORD` | senha do SSH                            |
+| Variable | `DEPLOY_PATH`  | `domains/seudominio.com.br/public_html` |
 
 `DEPLOY_PATH` é relativo à home do usuário SSH.
 

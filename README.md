@@ -6,13 +6,12 @@ Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React
 
 ## Funcionalidades
 
-- **Painel** do mês: total da casa, parte de cada membro, renda combinada e proporções, pagas × pendentes, vencidas, próximos vencimentos, composição (fixas, extras temporárias, cartão, avulsas), categorias e resumo pessoal.
-- **Despesas da casa**: tabela mensal com total, parte de cada membro, vencimento, criador, confirmação de pagamento e situação; filtros por mês, categoria, criador, situação e origem; aba de despesas pessoais.
+- **Painel** do mês: total da casa, parte de cada membro, renda combinada e proporções, pagas × pendentes, vencidas, próximos vencimentos, composição (fixas, extras temporárias, avulsas) e resumo pessoal.
+- **Despesas da casa**: tabela mensal com total, parte de cada membro, vencimento, criador, confirmação de pagamento e situação; filtros por mês, criador, situação e origem; aba de despesas pessoais.
 - **Despesas recorrentes**: fixas (sem prazo ou até um mês final) e extras temporárias (valor mensal por N meses), com geração mensal idempotente.
-- **Cartões e parcelas**: cartões, fatura do mês, compras parceladas (valor total dividido) e cobranças mensais fixas, com cada parcela acompanhada individualmente.
 - **Finanças pessoais** (privadas): receitas, despesas e investimentos; resumo mensal e anual com fluxo líquido e saldo disponível.
 - **Relatórios** anuais da casa e pessoais.
-- **Configurações da casa**: salários (com histórico), membros e categorias.
+- **Configurações da casa**: salários (com histórico) e membros.
 
 ## Requisitos
 
@@ -177,7 +176,7 @@ Em **Settings › Secrets and variables › Actions**:
 
 ### Despesas recorrentes e ocorrências
 
-- Modelos (`recurring_expenses`) são separados das ocorrências mensais (`expense_occurrences`). Os totais somam **apenas ocorrências**; modelos e compras nunca são somados, evitando contagem dupla.
+- Modelos (`recurring_expenses`) são separados das ocorrências mensais (`expense_occurrences`). Os totais somam **apenas ocorrências**; modelos nunca são somados, evitando contagem dupla.
 - Um índice único `(recurring_expense_id, billing_month)` impede meses duplicados; a geração ignora meses existentes e trata corridas concorrentes.
 - Editar um modelo pede o mês **"aplicar a partir de"** (padrão: mês atual). Só mudam ocorrências **pendentes**, **não ajustadas individualmente** e a partir desse mês. Meses pagos e anteriores ficam intactos.
 - Editar um mês individualmente o marca como **ajustado**; edições futuras do modelo não o sobrescrevem.
@@ -186,21 +185,20 @@ Em **Settings › Secrets and variables › Actions**:
 - **Extras temporárias**: valor mensal por N meses; o mês final é calculado e exibido, e nada é gerado depois dele.
 - Dia de vencimento 29–31 cai no último dia de meses mais curtos.
 
-### Cartões de crédito
+### Despesas avulsas e parcelas
 
-- **Parcelado**: o total é dividido; todas as parcelas recebem o quociente arredondado para baixo e a **última absorve a diferença** (R$ 100,00 em 3x = 33,33 + 33,33 + 33,34).
-- **Valor mensal fixo**: o valor informado é cobrado em cada um dos N meses.
-- Cada parcela é uma ocorrência com pagamento próprio, vencimento no dia do cartão e índice único `(compra, número da parcela)`.
-- Enquanto nenhuma parcela estiver paga, a compra pode ser alterada livremente (as parcelas são regeradas). Depois disso, só descrição, categoria e observações mudam (e apenas nas parcelas pendentes); a compra não pode ser excluída.
-- Parcelas não são excluídas individualmente; o valor delas é definido pela compra.
+- O **mês de referência é sempre o mês do vencimento**: vencendo em 02/10/2026, a despesa entra em outubro/2026. Editar o vencimento de uma despesa avulsa a move para o mês da nova data; o mês de uma recorrência é fixo, então o vencimento editado precisa ficar dentro dele.
+- Uma despesa avulsa pode ser cadastrada em **N parcelas** (até 120): informa-se o valor de cada parcela e o formulário mostra o valor total (parcela × N).
+- Cada parcela é uma ocorrência própria (`Parcela 2/3`), com o mesmo valor, vencimento no mesmo dia dos meses seguintes (29–31 cai no último dia de meses mais curtos) e pagamento, edição e exclusão independentes.
 
 ### Confirmação de pagamento
 
 - Uma despesa da casa é confirmada pelo **outro membro**: se Letícia cadastrou, o botão é "Pago pelo Bruno" e só Bruno pode usá-lo, e vice-versa. O servidor impõe a regra (política `confirmPayment`); o botão apenas a reflete.
-- Ocorrências geradas por recorrência ou compra herdam como criador quem cadastrou o modelo ou a compra.
+- Ocorrências geradas por recorrência herdam como criador quem cadastrou o modelo; parcelas, quem cadastrou a despesa.
 - A confirmação grava situação, data/hora e quem confirmou, além de um evento no histórico de pagamentos e na auditoria.
 - Uma despesa paga não pode ser editada nem excluída. Ela só pode ser **reaberta** por quem confirmou o pagamento, com motivo obrigatório; o histórico anterior é mantido e a despesa volta a seguir os salários atuais.
 - Despesas pessoais são marcadas como pagas ou reabertas pelo próprio dono.
+- Uma despesa pendente só fica **vencida** depois que termina o mês do vencimento: vencendo em 10/10, passa a constar como vencida a partir de 01/11.
 
 ### Finanças pessoais
 
@@ -217,16 +215,14 @@ Em **Settings › Secrets and variables › Actions**:
 - Autenticação do starter kit (Fortify) com limite de tentativas de login, 2FA e passkeys; proteção CSRF do framework.
 - Toda rota financeira exige login, e-mail verificado e participação em uma residência.
 - Políticas verificam residência e dono em toda leitura e escrita. Registros de outra residência ou de outro dono respondem **404**, e a autorização acontece antes da validação.
-- IDs enviados pelo navegador (categoria, cartão, membro) só são aceitos se pertencerem à residência do usuário.
+- IDs enviados pelo navegador (membro) só são aceitos se pertencerem à residência do usuário.
 - Escritas financeiras usam transações, bloqueio de linha (`lockForUpdate`), chaves estrangeiras e limite de 60 requisições/minuto por usuário.
-- Auditoria (`audit_logs`) de salários, pagamentos, reaberturas, criação, edição e exclusão de despesas, recorrências e compras.
+- Auditoria (`audit_logs`) de salários, pagamentos, reaberturas, criação, edição e exclusão de despesas e recorrências.
 - Membros de uma residência não podem excluir a própria conta, para preservar o histórico.
 
 ## Premissas e limitações
 
 - Cada usuário pertence a uma única residência. O modelo suporta mais de dois membros: a divisão é proporcional entre todos e qualquer membro diferente do criador pode confirmar o pagamento.
-- O mês de referência de uma despesa avulsa é escolhido no cadastro (padrão: mês exibido), independentemente do vencimento.
-- Mudar o dia de vencimento de um cartão atualiza o vencimento das parcelas pendentes.
-- Categorias em uso não podem ser excluídas (apenas renomeadas).
-- Categorias pessoais são texto livre com sugestões; as da casa são cadastradas em Configurações.
+- Não há cadastro de cartões de crédito: compras parceladas são despesas avulsas com número de parcelas. Parcelas de cartão cadastradas antes dessa mudança foram convertidas em despesas avulsas parceladas, no mês do respectivo vencimento.
+- Despesas e lançamentos não têm categoria: apenas título e observações.
 - Não há importação automática das planilhas existentes.

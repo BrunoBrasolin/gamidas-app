@@ -19,15 +19,14 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $user_id
  * @property TransactionType $type
- * @property string $category
- * @property string $description
+ * @property string $title
  * @property int $amount_cents
  * @property CarbonImmutable $transaction_date
  * @property string|null $notes
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'type', 'category', 'description', 'amount_cents', 'transaction_date', 'notes'])]
+#[Fillable(['user_id', 'type', 'title', 'amount_cents', 'transaction_date', 'notes'])]
 class PersonalTransaction extends Model
 {
     /** @use HasFactory<PersonalTransactionFactory> */

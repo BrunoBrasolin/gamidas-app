@@ -39,29 +39,4 @@ return [
 
     'upcoming_days' => 15,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Default Expense Categories
-    |--------------------------------------------------------------------------
-    |
-    | Categories created for every new household.
-    |
-    */
-
-    'default_categories' => [
-        'Casa',
-        'Água',
-        'Internet',
-        'Luz',
-        'Parcela Casa',
-        'IPTU',
-        'Mercado',
-        'Seguro Moto',
-        'Cartão de Crédito',
-        'Saúde',
-        'Educação',
-        'Lazer',
-        'Outros',
-    ],
-
 ];

@@ -10,10 +10,7 @@ import { toast } from 'sonner';
 const GLOBAL_ERROR_KEYS = [
     'expense',
     'payment',
-    'purchase',
     'recurring_expense',
-    'credit_card',
-    'category',
     'salaries',
 ];
 

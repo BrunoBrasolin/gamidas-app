@@ -1,6 +1,5 @@
 import {
     BarChart3,
-    CreditCard,
     Home,
     LayoutGrid,
     Receipt,
@@ -8,7 +7,6 @@ import {
     Wallet,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
-import creditCards from '@/routes/credit-cards';
 import expenses from '@/routes/expenses';
 import household from '@/routes/household';
 import personal from '@/routes/personal';
@@ -31,11 +29,6 @@ export const mainNavItems: NavItem[] = [
         title: 'Despesas recorrentes',
         href: recurringExpenses.index(),
         icon: Repeat,
-    },
-    {
-        title: 'Cartões e parcelas',
-        href: creditCards.index(),
-        icon: CreditCard,
     },
     {
         title: 'Finanças pessoais',

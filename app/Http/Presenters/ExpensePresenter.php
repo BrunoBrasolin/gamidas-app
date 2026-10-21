@@ -10,7 +10,6 @@ use App\Models\Household;
 use App\Models\HouseholdMember;
 use App\Models\User;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Date;
 
 /**
  * Shapes expense occurrences for the frontend, including the permissions and
@@ -24,14 +23,11 @@ final class ExpensePresenter
      * @var list<string>
      */
     public const RELATIONS = [
-        'category:id,name',
         'creator:id,name',
         'editor:id,name',
         'payer:id,name',
         'shares',
         'recurringExpense:id,kind',
-        'creditCardPurchase:id,credit_card_id',
-        'creditCardPurchase.creditCard:id,name',
     ];
 
     /**
@@ -52,8 +48,6 @@ final class ExpensePresenter
      */
     public function occurrence(ExpenseOccurrence $occurrence): array
     {
-        $today = Date::today()->toDateString();
-
         return [
             'id' => $occurrence->id,
             'title' => $occurrence->title,
@@ -62,16 +56,13 @@ final class ExpensePresenter
             'source' => $occurrence->source->value,
             'source_label' => $this->sourceLabel($occurrence),
             'recurring_expense_id' => $occurrence->recurring_expense_id,
-            'credit_card_purchase_id' => $occurrence->credit_card_purchase_id,
-            'credit_card_name' => $occurrence->creditCardPurchase?->creditCard->name,
             'installment_number' => $occurrence->installment_number,
             'installment_count' => $occurrence->installment_count,
-            'category' => $occurrence->category ? ['id' => $occurrence->category->id, 'name' => $occurrence->category->name] : null,
             'billing_month' => $occurrence->billing_month->format('Y-m'),
             'due_date' => $occurrence->due_date->toDateString(),
             'amount_cents' => $occurrence->amount_cents,
             'status' => $occurrence->status->value,
-            'is_overdue' => ! $occurrence->isPaid() && $occurrence->due_date->toDateString() < $today,
+            'is_overdue' => $occurrence->isOverdue(),
             'is_customized' => $occurrence->is_customized,
             'shares' => $occurrence->shares
                 ->map(fn (ExpenseShare $share) => [
@@ -96,7 +87,7 @@ final class ExpensePresenter
             ],
             'can' => [
                 'update' => $this->viewer->can('update', $occurrence),
-                'delete' => $this->viewer->can('delete', $occurrence) && $occurrence->source !== OccurrenceSource::CreditCard,
+                'delete' => $this->viewer->can('delete', $occurrence),
             ],
         ];
     }
@@ -138,7 +129,6 @@ final class ExpensePresenter
     {
         return match ($occurrence->source) {
             OccurrenceSource::OneOff => 'Avulsa',
-            OccurrenceSource::CreditCard => 'Cartão',
             OccurrenceSource::Recurring => $occurrence->recurringExpense?->kind === RecurringKind::Temporary ? 'Extra temporária' : 'Fixa',
         };
     }

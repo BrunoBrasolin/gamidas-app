@@ -42,7 +42,6 @@ class RecurringExpenseController extends Controller
                 ->whereNull('end_month')->orWhere('end_month', '>=', $current)))
             ->when($filters['status'] === 'ended', fn (Builder $query) => $query->where('end_month', '<', $current))
             ->with([
-                'category:id,name',
                 'creator:id,name',
                 'editor:id,name',
                 'occurrences' => fn ($query) => $query
@@ -67,7 +66,6 @@ class RecurringExpenseController extends Controller
                 'scope' => $template->scope->value,
                 'title' => $template->title,
                 'notes' => $template->notes,
-                'category' => $template->category ? ['id' => $template->category->id, 'name' => $template->category->name] : null,
                 'amount_cents' => $template->amount_cents,
                 'due_day' => $template->due_day,
                 'start_month' => Month::key($template->start_month),
@@ -89,7 +87,6 @@ class RecurringExpenseController extends Controller
                     'is_customized' => $occurrence->is_customized,
                 ])->all(),
             ]),
-            'categories' => $household->categories()->get(['id', 'name']),
         ]);
     }
 

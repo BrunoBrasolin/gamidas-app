@@ -28,7 +28,6 @@ import { formatDate, formatMonth } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import expenses from '@/routes/expenses';
 import type {
-    Category,
     HouseholdMonthSummary,
     Member,
     Occurrence,
@@ -39,10 +38,9 @@ import type {
 type Filters = {
     month: string;
     scope: Scope;
-    category: number | null;
     creator: number | null;
     status: 'paid' | 'pending' | 'overdue' | null;
-    source: 'one_off' | 'fixed' | 'temporary' | 'credit_card' | null;
+    source: 'one_off' | 'fixed' | 'temporary' | null;
 };
 
 type Props = {
@@ -56,7 +54,6 @@ type Props = {
     };
     summary: HouseholdMonthSummary;
     members: Member[];
-    categories: Category[];
 };
 
 export default function ExpensesIndex({
@@ -64,12 +61,10 @@ export default function ExpensesIndex({
     occurrences,
     totals,
     members,
-    categories,
 }: Props) {
     const apply = useQueryFilters(expenses.index.url(), filters);
     const isHousehold = filters.scope === 'household';
     const hasFilters =
-        filters.category !== null ||
         filters.creator !== null ||
         filters.status !== null ||
         filters.source !== null;
@@ -95,7 +90,6 @@ export default function ExpensesIndex({
                         onChange={(month) => apply({ month })}
                     />
                     <ExpenseFormDialog
-                        categories={categories}
                         month={filters.month}
                         scope={filters.scope}
                         trigger={
@@ -138,25 +132,7 @@ export default function ExpensesIndex({
                     ))}
                 </nav>
 
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-                    <FilterSelect
-                        id="filter-category"
-                        label="Categoria"
-                        value={filters.category ?? ''}
-                        onChange={(value) =>
-                            apply({ category: value ? Number(value) : null })
-                        }
-                        options={[
-                            ['', 'Todas'],
-                            ...categories.map(
-                                (category) =>
-                                    [String(category.id), category.name] as [
-                                        string,
-                                        string,
-                                    ],
-                            ),
-                        ]}
-                    />
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {isHousehold && (
                         <FilterSelect
                             id="filter-creator"
@@ -206,7 +182,6 @@ export default function ExpensesIndex({
                             ['', 'Todas'],
                             ['fixed', 'Fixas recorrentes'],
                             ['temporary', 'Extras temporárias'],
-                            ['credit_card', 'Parcelas de cartão'],
                             ['one_off', 'Avulsas'],
                         ]}
                     />
@@ -216,7 +191,6 @@ export default function ExpensesIndex({
                                 variant="ghost"
                                 onClick={() =>
                                     apply({
-                                        category: null,
                                         creator: null,
                                         status: null,
                                         source: null,
@@ -259,7 +233,6 @@ export default function ExpensesIndex({
                                             <TableHead className="pl-4">
                                                 Despesa
                                             </TableHead>
-                                            <TableHead>Categoria</TableHead>
                                             <TableHead className="text-right">
                                                 Total
                                             </TableHead>
@@ -295,10 +268,6 @@ export default function ExpensesIndex({
                                                     <ExpenseTitle
                                                         occurrence={occurrence}
                                                     />
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {occurrence.category
-                                                        ?.name ?? '—'}
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">
                                                     <Money
@@ -361,7 +330,6 @@ export default function ExpensesIndex({
                                                     <RowActions
                                                         occurrence={occurrence}
                                                         members={members}
-                                                        categories={categories}
                                                     />
                                                 </TableCell>
                                             </TableRow>
@@ -369,10 +337,7 @@ export default function ExpensesIndex({
                                     </TableBody>
                                     <TableFooter>
                                         <TableRow>
-                                            <TableCell
-                                                className="pl-4"
-                                                colSpan={2}
-                                            >
+                                            <TableCell className="pl-4">
                                                 Total{' '}
                                                 {hasFilters && 'filtrado '}
                                                 do mês
@@ -475,7 +440,6 @@ export default function ExpensesIndex({
                                             <RowActions
                                                 occurrence={occurrence}
                                                 members={members}
-                                                categories={categories}
                                             />
                                         </div>
                                     </CardContent>
@@ -516,10 +480,8 @@ function ExpenseTitle({ occurrence }: { occurrence: Occurrence }) {
                 <Badge variant="outline">{occurrence.source_label}</Badge>
                 {occurrence.installment_number && (
                     <Badge variant="outline">
-                        {occurrence.installment_number}/
+                        Parcela {occurrence.installment_number}/
                         {occurrence.installment_count}
-                        {occurrence.credit_card_name &&
-                            ` · ${occurrence.credit_card_name}`}
                     </Badge>
                 )}
                 {occurrence.is_customized && (
@@ -533,11 +495,9 @@ function ExpenseTitle({ occurrence }: { occurrence: Occurrence }) {
 function RowActions({
     occurrence,
     members,
-    categories,
 }: {
     occurrence: Occurrence;
     members: Member[];
-    categories: Category[];
 }) {
     return (
         <div className="flex items-center justify-end gap-0.5">
@@ -545,7 +505,6 @@ function RowActions({
             {occurrence.can.update && (
                 <ExpenseFormDialog
                     occurrence={occurrence}
-                    categories={categories}
                     month={occurrence.billing_month}
                     trigger={
                         <Button

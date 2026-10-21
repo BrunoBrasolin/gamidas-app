@@ -6,6 +6,7 @@ use App\Casts\DateOnly;
 use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceSource;
 use App\Enums\OccurrenceStatus;
+use App\Support\Month;
 use Carbon\CarbonImmutable;
 use Database\Factories\ExpenseOccurrenceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -19,7 +20,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * A single monthly charge: a one-off expense, one month of a recurring
- * expense, or one installment of a credit card purchase. Every total in the
+ * expense, or one installment of an expense split into installments. Every total in the
  * application is computed from these rows.
  *
  * @property int $id
@@ -28,10 +29,8 @@ use Illuminate\Support\Carbon;
  * @property int|null $owner_user_id
  * @property OccurrenceSource $source
  * @property int|null $recurring_expense_id
- * @property int|null $credit_card_purchase_id
  * @property int|null $installment_number
  * @property int|null $installment_count
- * @property int|null $expense_category_id
  * @property string $title
  * @property string|null $notes
  * @property CarbonImmutable $billing_month
@@ -48,16 +47,14 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $deleted_at
  * @property-read Household $household
  * @property-read User|null $owner
- * @property-read ExpenseCategory|null $category
  * @property-read RecurringExpense|null $recurringExpense
- * @property-read CreditCardPurchase|null $creditCardPurchase
  * @property-read User $creator
  * @property-read User|null $editor
  * @property-read User|null $payer
  */
 #[Fillable([
-    'household_id', 'scope', 'owner_user_id', 'source', 'recurring_expense_id', 'credit_card_purchase_id',
-    'installment_number', 'installment_count', 'expense_category_id', 'title', 'notes', 'billing_month',
+    'household_id', 'scope', 'owner_user_id', 'source', 'recurring_expense_id',
+    'installment_number', 'installment_count', 'title', 'notes', 'billing_month',
     'due_date', 'amount_cents', 'status', 'paid_at', 'paid_by_user_id', 'is_customized',
     'created_by_user_id', 'updated_by_user_id',
 ])]
@@ -98,6 +95,15 @@ class ExpenseOccurrence extends Model
         return $this->status === OccurrenceStatus::Paid;
     }
 
+    /**
+     * A pending occurrence only becomes overdue once its due month is over:
+     * one due on 10/10 is overdue from 01/11 on.
+     */
+    public function isOverdue(): bool
+    {
+        return ! $this->isPaid() && $this->due_date->lt(Month::current());
+    }
+
     public function isHousehold(): bool
     {
         return $this->scope === ExpenseScope::Household;
@@ -136,6 +142,17 @@ class ExpenseOccurrence extends Model
     }
 
     /**
+     * Pending occurrences due before the current month (see {@see isOverdue()}).
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeOverdue(Builder $query): void
+    {
+        $query->where($query->qualifyColumn('status'), OccurrenceStatus::Pending)
+            ->where($query->qualifyColumn('due_date'), '<', Month::current()->toDateString());
+    }
+
+    /**
      * @param  Builder<self>  $query
      */
     public function scopeForMonth(Builder $query, CarbonImmutable $month): void
@@ -160,27 +177,11 @@ class ExpenseOccurrence extends Model
     }
 
     /**
-     * @return BelongsTo<ExpenseCategory, $this>
-     */
-    public function category(): BelongsTo
-    {
-        return $this->belongsTo(ExpenseCategory::class, 'expense_category_id');
-    }
-
-    /**
      * @return BelongsTo<RecurringExpense, $this>
      */
     public function recurringExpense(): BelongsTo
     {
         return $this->belongsTo(RecurringExpense::class);
-    }
-
-    /**
-     * @return BelongsTo<CreditCardPurchase, $this>
-     */
-    public function creditCardPurchase(): BelongsTo
-    {
-        return $this->belongsTo(CreditCardPurchase::class);
     }
 
     /**

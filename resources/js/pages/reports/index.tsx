@@ -39,7 +39,6 @@ type Props = {
         paid_cents: number;
         pending_cents: number;
         by_member: MemberTotals[];
-        by_category: { category: string; total_cents: number }[];
     };
     personal: PersonalYearSummary;
 };
@@ -249,124 +248,69 @@ export default function ReportsIndex({
                     </CardContent>
                 </Card>
 
-                <div className="grid gap-4 lg:grid-cols-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                Despesas da casa por categoria
-                            </CardTitle>
-                            <CardDescription>
-                                Acumulado de {year}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {household.by_category.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    Nenhuma despesa no ano.
-                                </p>
-                            ) : (
-                                <ul className="space-y-2 text-sm">
-                                    {household.by_category.map((row) => (
-                                        <li key={row.category}>
-                                            <div className="flex justify-between gap-2">
-                                                <span>{row.category}</span>
-                                                <span className="text-muted-foreground">
-                                                    {formatPercent(
-                                                        Math.round(
-                                                            (row.total_cents *
-                                                                10000) /
-                                                                Math.max(
-                                                                    household.total_cents,
-                                                                    1,
-                                                                ),
-                                                        ),
-                                                    )}{' '}
-                                                    ·{' '}
-                                                    <Money
-                                                        cents={row.total_cents}
-                                                        className="text-foreground"
-                                                    />
-                                                </span>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Suas finanças em {year}</CardTitle>
-                            <CardDescription>
-                                Visível somente para você
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <dl className="space-y-2 text-sm">
-                                {(
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Suas finanças em {year}</CardTitle>
+                        <CardDescription>
+                            Visível somente para você
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <dl className="space-y-2 text-sm">
+                            {(
+                                [
+                                    ['Receitas', personal.totals.income_cents],
                                     [
-                                        [
-                                            'Receitas',
-                                            personal.totals.income_cents,
-                                        ],
-                                        [
-                                            'Despesas lançadas',
-                                            personal.totals
-                                                .ledger_expense_cents,
-                                        ],
-                                        [
-                                            'Contas pessoais',
-                                            personal.totals
-                                                .personal_bills_cents,
-                                        ],
-                                        [
-                                            'Sua parte da casa',
-                                            personal.totals
-                                                .household_share_cents,
-                                        ],
-                                        [
-                                            'Investimentos',
-                                            personal.totals.investment_cents,
-                                        ],
-                                    ] as const
-                                ).map(([label, cents]) => (
-                                    <div
-                                        key={label}
-                                        className="flex justify-between gap-2"
-                                    >
-                                        <dt className="text-muted-foreground">
-                                            {label}
-                                        </dt>
-                                        <dd>
-                                            <Money cents={cents} />
-                                        </dd>
-                                    </div>
-                                ))}
-                                <div className="flex justify-between gap-2 border-t pt-2 font-medium">
-                                    <dt>Fluxo líquido</dt>
+                                        'Despesas lançadas',
+                                        personal.totals.ledger_expense_cents,
+                                    ],
+                                    [
+                                        'Contas pessoais',
+                                        personal.totals.personal_bills_cents,
+                                    ],
+                                    [
+                                        'Sua parte da casa',
+                                        personal.totals.household_share_cents,
+                                    ],
+                                    [
+                                        'Investimentos',
+                                        personal.totals.investment_cents,
+                                    ],
+                                ] as const
+                            ).map(([label, cents]) => (
+                                <div
+                                    key={label}
+                                    className="flex justify-between gap-2"
+                                >
+                                    <dt className="text-muted-foreground">
+                                        {label}
+                                    </dt>
                                     <dd>
-                                        <Money
-                                            cents={personal.totals.net_cents}
-                                            signed
-                                        />
+                                        <Money cents={cents} />
                                     </dd>
                                 </div>
-                                <div className="flex justify-between gap-2 font-medium">
-                                    <dt>Saldo disponível em dezembro</dt>
-                                    <dd>
-                                        <Money
-                                            cents={
-                                                personal.closing_balance_cents
-                                            }
-                                            signed
-                                        />
-                                    </dd>
-                                </div>
-                            </dl>
-                        </CardContent>
-                    </Card>
-                </div>
+                            ))}
+                            <div className="flex justify-between gap-2 border-t pt-2 font-medium">
+                                <dt>Fluxo líquido</dt>
+                                <dd>
+                                    <Money
+                                        cents={personal.totals.net_cents}
+                                        signed
+                                    />
+                                </dd>
+                            </div>
+                            <div className="flex justify-between gap-2 font-medium">
+                                <dt>Saldo disponível em dezembro</dt>
+                                <dd>
+                                    <Money
+                                        cents={personal.closing_balance_cents}
+                                        signed
+                                    />
+                                </dd>
+                            </div>
+                        </dl>
+                    </CardContent>
+                </Card>
             </div>
         </>
     );

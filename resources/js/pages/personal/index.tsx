@@ -41,7 +41,6 @@ import type {
     OccurrenceStatus,
     PersonalMonthSummary,
     PersonalYearSummary,
-    TransactionType,
 } from '@/types';
 
 type Props = {
@@ -50,25 +49,13 @@ type Props = {
     year: number;
     summary: PersonalMonthSummary | null;
     yearly: PersonalYearSummary | null;
-    byCategory: {
-        type: TransactionType;
-        category: string;
-        total_cents: number;
-    }[];
     bills: {
         id: number;
         title: string;
-        category: string | null;
         due_date: string;
         amount_cents: number;
         status: OccurrenceStatus;
     }[];
-};
-
-const TYPE_LABELS: Record<TransactionType, string> = {
-    income: 'Receitas',
-    expense: 'Despesas lançadas',
-    investment: 'Investimentos',
 };
 
 export default function PersonalIndex({
@@ -77,7 +64,6 @@ export default function PersonalIndex({
     year,
     summary,
     yearly,
-    byCategory,
     bills,
 }: Props) {
     const visit = (query: Record<string, string | number>) =>
@@ -209,8 +195,8 @@ export default function PersonalIndex({
                     <AlertDescription>
                         <p>
                             <strong>Despesas</strong> somam seus lançamentos de
-                            despesa, suas contas pessoais (recorrentes, avulsas
-                            e de cartão) e{' '}
+                            despesa, suas contas pessoais (recorrentes e
+                            avulsas) e{' '}
                             <strong>sua parte nas despesas da casa</strong>,
                             calculada automaticamente pela proporção dos
                             salários — não lance a contribuição para a casa
@@ -284,8 +270,6 @@ export default function PersonalIndex({
                                                         {formatDate(
                                                             bill.due_date,
                                                         )}
-                                                        {bill.category &&
-                                                            ` · ${bill.category}`}
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -469,57 +453,6 @@ export default function PersonalIndex({
                         </CardContent>
                     </Card>
                 )}
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Lançamentos por categoria</CardTitle>
-                        <CardDescription>
-                            {view === 'month'
-                                ? formatMonth(month)
-                                : `Ano de ${year}`}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {byCategory.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                Nenhum lançamento no período.
-                            </p>
-                        ) : (
-                            <div className="grid gap-6 md:grid-cols-3">
-                                {(
-                                    ['income', 'expense', 'investment'] as const
-                                ).map((type) => (
-                                    <div key={type}>
-                                        <h3 className="mb-2 text-sm font-medium">
-                                            {TYPE_LABELS[type]}
-                                        </h3>
-                                        <ul className="space-y-1 text-sm">
-                                            {byCategory
-                                                .filter(
-                                                    (row) => row.type === type,
-                                                )
-                                                .map((row) => (
-                                                    <li
-                                                        key={row.category}
-                                                        className="flex justify-between gap-2"
-                                                    >
-                                                        <span>
-                                                            {row.category}
-                                                        </span>
-                                                        <Money
-                                                            cents={
-                                                                row.total_cents
-                                                            }
-                                                        />
-                                                    </li>
-                                                ))}
-                                        </ul>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
             </div>
         </>
     );

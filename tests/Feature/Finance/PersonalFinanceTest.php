@@ -32,14 +32,13 @@ class PersonalFinanceTest extends TestCase
         parent::tearDown();
     }
 
-    private function transaction(User $user, TransactionType $type, int $cents, string $date, string $category = 'Outros'): PersonalTransaction
+    private function transaction(User $user, TransactionType $type, int $cents, string $date): PersonalTransaction
     {
         return PersonalTransaction::factory()->create([
             'user_id' => $user->id,
             'type' => $type,
             'amount_cents' => $cents,
             'transaction_date' => $date,
-            'category' => $category,
         ]);
     }
 
@@ -47,8 +46,7 @@ class PersonalFinanceTest extends TestCase
     {
         $this->actingAs($this->bruno)
             ->post(route('personal.transactions.store', 'income'), [
-                'description' => 'Salário outubro',
-                'category' => 'Salário',
+                'title' => 'Salário outubro',
                 'amount' => '8000.00',
                 'transaction_date' => '2026-10-05',
                 'user_id' => $this->leticia->id,
@@ -72,7 +70,7 @@ class PersonalFinanceTest extends TestCase
 
         $this->actingAs($this->leticia)
             ->put(route('personal.transactions.update', $brunos), [
-                'description' => 'x', 'category' => 'x', 'amount' => '1.00', 'transaction_date' => '2026-10-10',
+                'title' => 'x', 'amount' => '1.00', 'transaction_date' => '2026-10-10',
             ])
             ->assertNotFound();
         $this->actingAs($this->leticia)->delete(route('personal.transactions.destroy', $brunos))->assertNotFound();
@@ -89,7 +87,7 @@ class PersonalFinanceTest extends TestCase
 
         $this->actingAs($this->bruno)
             ->put(route('personal.transactions.update', $transaction), [
-                'description' => 'Tesouro Selic', 'category' => 'Tesouro Direto', 'amount' => '1500.50', 'transaction_date' => '2026-10-12',
+                'title' => 'Tesouro Selic', 'amount' => '1500.50', 'transaction_date' => '2026-10-12',
             ])
             ->assertSessionHasNoErrors();
 
@@ -183,17 +181,16 @@ class PersonalFinanceTest extends TestCase
     {
         $this->actingAs($this->bruno)
             ->post(route('personal.transactions.store', 'expenses'), [
-                'description' => '',
-                'category' => str_repeat('a', 61),
+                'title' => '',
                 'amount' => '0',
                 'transaction_date' => '2026-02-30',
             ])
-            ->assertSessionHasErrors(['description', 'category', 'amount', 'transaction_date']);
+            ->assertSessionHasErrors(['title', 'amount', 'transaction_date']);
 
         foreach (['-10.00', '1,50', '10.999', 'abc', '10000000.00'] as $amount) {
             $this->actingAs($this->bruno)
                 ->post(route('personal.transactions.store', 'expenses'), [
-                    'description' => 'Teste', 'category' => 'Teste', 'amount' => $amount, 'transaction_date' => '2026-10-01',
+                    'title' => 'Teste', 'amount' => $amount, 'transaction_date' => '2026-10-01',
                 ])
                 ->assertSessionHasErrors('amount');
         }

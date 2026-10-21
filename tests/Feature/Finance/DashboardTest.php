@@ -3,10 +3,8 @@
 namespace Tests\Feature\Finance;
 
 use App\Enums\ExpenseScope;
-use App\Enums\PurchaseMode;
 use App\Enums\RecurringKind;
-use App\Models\CreditCard;
-use App\Services\CreditCardPurchaseService;
+use App\Services\ExpenseService;
 use App\Services\PaymentService;
 use App\Services\RecurringExpenseService;
 use App\Support\Month;
@@ -40,21 +38,18 @@ class DashboardTest extends TestCase
     {
         app(RecurringExpenseService::class)->create($this->household, $this->bruno, [
             'scope' => ExpenseScope::Household, 'kind' => RecurringKind::Fixed, 'title' => 'Internet', 'notes' => null,
-            'expense_category_id' => $this->category('Internet')->id, 'amount_cents' => 10_000, 'due_day' => 25,
+            'amount_cents' => 10_000, 'due_day' => 25,
             'start_month' => Month::parse('2026-10'), 'end_month' => null, 'total_months' => null,
         ]);
         app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
             'scope' => ExpenseScope::Household, 'kind' => RecurringKind::Temporary, 'title' => 'Sofá', 'notes' => null,
-            'expense_category_id' => null, 'amount_cents' => 30_000, 'due_day' => 5,
+            'amount_cents' => 30_000, 'due_day' => 5,
             'start_month' => Month::parse('2026-10'), 'end_month' => null, 'total_months' => 4,
         ]);
-        $card = CreditCard::create(['household_id' => $this->household->id, 'name' => 'Visa', 'due_day' => 15, 'created_by_user_id' => $this->bruno->id]);
-        app(CreditCardPurchaseService::class)->create($this->household, $this->leticia, [
-            'credit_card_id' => $card->id, 'scope' => ExpenseScope::Household, 'expense_category_id' => null,
-            'description' => 'Notebook', 'notes' => null, 'purchase_date' => CarbonImmutable::parse('2026-10-01'),
-            'mode' => PurchaseMode::Installments, 'amount_cents' => 120_000, 'installment_count' => 6,
-            'first_billing_month' => Month::parse('2026-10'),
-        ]);
+        app(ExpenseService::class)->create($this->household, $this->leticia, [
+            'scope' => ExpenseScope::Household, 'title' => 'Notebook', 'notes' => null,
+            'amount_cents' => 20_000, 'due_date' => CarbonImmutable::parse('2026-10-15'),
+        ], 6);
         $paid = $this->createExpense($this->leticia, 50_000, Month::parse('2026-10'));
         app(PaymentService::class)->confirm($paid, $this->bruno);
         $this->createExpense($this->bruno, 7_700, Month::parse('2026-10'), ExpenseScope::Personal);
@@ -73,14 +68,13 @@ class DashboardTest extends TestCase
                 ->where('combinedSalaryCents', 1_000_000)
                 ->where('proportions.'.$this->bruno->id, 8_000)
                 ->where('proportions.'.$this->leticia->id, 2_000)
-                // 100 (internet) + 300 (extra) + 200 (1/6 of the notebook) + 500 (one-off); personal bills excluded.
+                // 100 (internet) + 300 (extra) + 200 (notebook installment) + 500 (one-off); personal bills excluded.
                 ->where('household.total_cents', 110_000)
                 ->where('household.paid_cents', 50_000)
                 ->where('household.pending_cents', 60_000)
                 ->where('household.by_source.fixed', 10_000)
                 ->where('household.by_source.temporary', 30_000)
-                ->where('household.by_source.credit_card', 20_000)
-                ->where('household.by_source.one_off', 50_000)
+                ->where('household.by_source.one_off', 70_000)
                 ->where('household.by_member.0.total_cents', 88_000)
                 ->where('household.by_member.1.total_cents', 22_000)
                 ->where('personal.personal_bills_cents', 7_700)
@@ -104,7 +98,7 @@ class DashboardTest extends TestCase
                 // Internet is generated on demand for January; the extra is in its last month.
                 ->where('household.by_source.fixed', 10_000)
                 ->where('household.by_source.temporary', 30_000)
-                ->where('household.by_source.credit_card', 20_000)
+                ->where('household.by_source.one_off', 20_000)
                 ->where('household.total_cents', 60_000)
             );
 

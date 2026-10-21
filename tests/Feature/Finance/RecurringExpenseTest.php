@@ -48,7 +48,6 @@ class RecurringExpenseTest extends TestCase
             'kind' => RecurringKind::Fixed,
             'title' => 'Internet',
             'notes' => null,
-            'expense_category_id' => $this->category('Internet')->id,
             'amount_cents' => 12_000,
             'due_day' => 10,
             'start_month' => Month::parse('2026-09'),
@@ -147,7 +146,6 @@ class RecurringExpenseTest extends TestCase
         app(RecurringExpenseService::class)->update($template, $this->leticia, [
             'title' => 'Internet fibra',
             'notes' => null,
-            'expense_category_id' => $this->category('Internet')->id,
             'amount_cents' => 15_000,
             'due_day' => 15,
             'end_month' => null,
@@ -167,6 +165,22 @@ class RecurringExpenseTest extends TestCase
         $this->assertSame($this->leticia->id, $november->updated_by_user_id);
     }
 
+    public function test_a_recurring_month_must_stay_due_within_its_month(): void
+    {
+        $template = $this->createTemplate();
+        $november = $template->occurrences()->where('billing_month', '2026-11-01')->sole();
+
+        $this->actingAs($this->bruno)
+            ->put(route('expenses.update', $november), [
+                'title' => 'Internet',
+                'amount' => '100.00',
+                'due_date' => '2026-12-02',
+            ])
+            ->assertSessionHasErrors('due_date');
+
+        $this->assertSame('2026-11-10', $november->fresh()->due_date->toDateString());
+    }
+
     public function test_template_edits_do_not_override_individually_edited_months(): void
     {
         $template = $this->createTemplate();
@@ -175,9 +189,7 @@ class RecurringExpenseTest extends TestCase
         app(ExpenseService::class)->update($november, $this->bruno, [
             'title' => 'Internet (mês com desconto)',
             'notes' => null,
-            'expense_category_id' => $this->category('Internet')->id,
             'amount_cents' => 6_000,
-            'billing_month' => Month::parse('2027-05'),
             'due_date' => CarbonImmutable::parse('2026-11-12'),
         ]);
 
@@ -188,7 +200,6 @@ class RecurringExpenseTest extends TestCase
         app(RecurringExpenseService::class)->update($template, $this->bruno, [
             'title' => 'Internet',
             'notes' => null,
-            'expense_category_id' => $this->category('Internet')->id,
             'amount_cents' => 20_000,
             'due_day' => 10,
             'end_month' => null,
@@ -268,7 +279,7 @@ class RecurringExpenseTest extends TestCase
         ]);
 
         $data = [
-            'title' => 'Sofá novo', 'notes' => null, 'expense_category_id' => null,
+            'title' => 'Sofá novo', 'notes' => null,
             'amount_cents' => 30_000, 'due_day' => 10, 'end_month' => null,
         ];
 
@@ -315,7 +326,6 @@ class RecurringExpenseTest extends TestCase
                 'kind' => 'temporary',
                 'scope' => 'household',
                 'title' => 'Geladeira',
-                'expense_category_id' => $this->category('Casa')->id,
                 'amount' => '300.00',
                 'due_day' => 31,
                 'start_month' => '2027-01',

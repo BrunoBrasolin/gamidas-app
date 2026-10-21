@@ -22,15 +22,7 @@ final class HouseholdService
 
     public function create(string $name): Household
     {
-        return DB::transaction(function () use ($name) {
-            $household = Household::create(['name' => $name]);
-
-            foreach ((array) config('finance.default_categories') as $category) {
-                $household->categories()->create(['name' => $category]);
-            }
-
-            return $household;
-        });
+        return Household::create(['name' => $name]);
     }
 
     /**

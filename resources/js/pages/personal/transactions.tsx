@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
-import { FilterSelect } from '@/components/finance/filter-select';
 import { FormField } from '@/components/finance/form-field';
 import { Money } from '@/components/finance/money';
 import { MoneyInput } from '@/components/finance/money-input';
@@ -45,8 +44,7 @@ import type { Paginated, TransactionType } from '@/types';
 
 type Transaction = {
     id: number;
-    category: string;
-    description: string;
+    title: string;
     amount_cents: number;
     transaction_date: string;
     notes: string | null;
@@ -57,7 +55,6 @@ type Transaction = {
 type Filters = {
     period: 'month' | 'year';
     month: string;
-    category: string | null;
 };
 
 type Props = {
@@ -66,8 +63,6 @@ type Props = {
     filters: Filters;
     total_cents: number;
     transactions: Paginated<Transaction>;
-    categories: string[];
-    suggestedCategories: string[];
 };
 
 const COPY: Record<
@@ -83,7 +78,7 @@ const COPY: Record<
     expense: {
         title: 'Despesas pessoais',
         empty: 'Registre uma despesa para acompanhar seu fluxo de caixa.',
-        description: 'Gastos pessoais como academia, educação e cartão.',
+        description: 'Gastos pessoais como academia e educação.',
         note: 'Não lance sua contribuição para as despesas da casa: sua parte proporcional já é somada automaticamente ao resumo pessoal. Contas com vencimento e pagamento podem ser cadastradas em Despesas da casa › Pessoais.',
     },
     investment: {
@@ -100,8 +95,6 @@ export default function PersonalTransactions({
     filters,
     total_cents,
     transactions,
-    categories,
-    suggestedCategories,
 }: Props) {
     const copy = COPY[type];
     const url = personal.transactions.index.url(slug);
@@ -113,7 +106,6 @@ export default function PersonalTransactions({
             {
                 period: next.period === 'year' ? 'year' : undefined,
                 month: next.month,
-                category: next.category ?? undefined,
             },
             { preserveScroll: true, preserveState: true, replace: true },
         );
@@ -167,7 +159,6 @@ export default function PersonalTransactions({
                         type={type}
                         slug={slug}
                         month={filters.month}
-                        suggestions={suggestedCategories}
                         trigger={
                             <Button>
                                 <Plus />
@@ -186,27 +177,7 @@ export default function PersonalTransactions({
                     </Alert>
                 )}
 
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                    <div className="w-56">
-                        <FilterSelect
-                            id="filter-category"
-                            label="Categoria"
-                            value={filters.category ?? ''}
-                            onChange={(value) =>
-                                visit({ category: value || null })
-                            }
-                            options={[
-                                ['', 'Todas'],
-                                ...categories.map(
-                                    (category) =>
-                                        [category, category] as [
-                                            string,
-                                            string,
-                                        ],
-                                ),
-                            ]}
-                        />
-                    </div>
+                <div className="flex flex-wrap items-end justify-end gap-4">
                     <div className="text-right">
                         <div className="text-sm text-muted-foreground">
                             Total{' '}
@@ -235,8 +206,7 @@ export default function PersonalTransactions({
                                         <TableHead className="pl-4">
                                             Data
                                         </TableHead>
-                                        <TableHead>Descrição</TableHead>
-                                        <TableHead>Categoria</TableHead>
+                                        <TableHead>Título</TableHead>
                                         <TableHead className="text-right">
                                             Valor
                                         </TableHead>
@@ -257,16 +227,13 @@ export default function PersonalTransactions({
                                             </TableCell>
                                             <TableCell>
                                                 <div className="font-medium">
-                                                    {transaction.description}
+                                                    {transaction.title}
                                                 </div>
                                                 {transaction.notes && (
                                                     <div className="text-xs whitespace-pre-line text-muted-foreground">
                                                         {transaction.notes}
                                                     </div>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">
-                                                {transaction.category}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
                                                 <Money
@@ -281,9 +248,6 @@ export default function PersonalTransactions({
                                                         type={type}
                                                         slug={slug}
                                                         month={filters.month}
-                                                        suggestions={
-                                                            suggestedCategories
-                                                        }
                                                         transaction={
                                                             transaction
                                                         }
@@ -292,7 +256,7 @@ export default function PersonalTransactions({
                                                                 size="icon"
                                                                 variant="ghost"
                                                                 className="size-8"
-                                                                aria-label={`Editar ${transaction.description}`}
+                                                                aria-label={`Editar ${transaction.title}`}
                                                             >
                                                                 <Pencil className="size-4" />
                                                             </Button>
@@ -303,14 +267,14 @@ export default function PersonalTransactions({
                                                             transaction.id,
                                                         )}
                                                         title="Excluir lançamento?"
-                                                        description={`“${transaction.description}” será excluído.`}
+                                                        description={`“${transaction.title}” será excluído.`}
                                                         confirmLabel="Excluir"
                                                         trigger={
                                                             <Button
                                                                 size="icon"
                                                                 variant="ghost"
                                                                 className="size-8 text-destructive"
-                                                                aria-label={`Excluir ${transaction.description}`}
+                                                                aria-label={`Excluir ${transaction.title}`}
                                                             >
                                                                 <Trash2 className="size-4" />
                                                             </Button>
@@ -347,14 +311,12 @@ function TransactionFormDialog({
     type,
     slug,
     month,
-    suggestions,
     transaction,
     trigger,
 }: {
     type: TransactionType;
     slug: Props['slug'];
     month: string;
-    suggestions: string[];
     transaction?: Transaction;
     trigger: ReactNode;
 }) {
@@ -364,7 +326,6 @@ function TransactionFormDialog({
         : personal.transactions.store.form(slug);
     const now = today();
     const defaultDate = now.startsWith(month) ? now : `${month}-01`;
-    const listId = `categories-${type}`;
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -390,41 +351,19 @@ function TransactionFormDialog({
                     {({ errors, processing }) => (
                         <>
                             <FormField
-                                id="transaction-description"
-                                label="Descrição"
-                                error={errors.description}
+                                id="transaction-title"
+                                label="Título"
+                                error={errors.title}
                             >
                                 <Input
-                                    id="transaction-description"
-                                    name="description"
+                                    id="transaction-title"
+                                    name="title"
                                     required
                                     maxLength={120}
-                                    defaultValue={transaction?.description}
+                                    defaultValue={transaction?.title}
                                 />
                             </FormField>
                             <div className="grid gap-4 sm:grid-cols-2">
-                                <FormField
-                                    id="transaction-category"
-                                    label="Categoria"
-                                    error={errors.category}
-                                >
-                                    <Input
-                                        id="transaction-category"
-                                        name="category"
-                                        required
-                                        maxLength={60}
-                                        list={listId}
-                                        defaultValue={transaction?.category}
-                                    />
-                                    <datalist id={listId}>
-                                        {suggestions.map((suggestion) => (
-                                            <option
-                                                key={suggestion}
-                                                value={suggestion}
-                                            />
-                                        ))}
-                                    </datalist>
-                                </FormField>
                                 <FormField
                                     id="transaction-amount"
                                     label="Valor"
@@ -437,23 +376,23 @@ function TransactionFormDialog({
                                         defaultCents={transaction?.amount_cents}
                                     />
                                 </FormField>
-                            </div>
-                            <FormField
-                                id="transaction-date"
-                                label="Data"
-                                error={errors.transaction_date}
-                            >
-                                <Input
+                                <FormField
                                     id="transaction-date"
-                                    name="transaction_date"
-                                    type="date"
-                                    required
-                                    defaultValue={
-                                        transaction?.transaction_date ??
-                                        defaultDate
-                                    }
-                                />
-                            </FormField>
+                                    label="Data"
+                                    error={errors.transaction_date}
+                                >
+                                    <Input
+                                        id="transaction-date"
+                                        name="transaction_date"
+                                        type="date"
+                                        required
+                                        defaultValue={
+                                            transaction?.transaction_date ??
+                                            defaultDate
+                                        }
+                                    />
+                                </FormField>
+                            </div>
                             <FormField
                                 id="transaction-notes"
                                 label="Observações"

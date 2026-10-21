@@ -55,7 +55,7 @@ export function OccurrenceDetails({
                 </DialogHeader>
 
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                    <dt className="text-muted-foreground">Valor total</dt>
+                    <dt className="text-muted-foreground">Valor</dt>
                     <dd>
                         <Money cents={occurrence.amount_cents} />
                     </dd>
@@ -68,19 +68,12 @@ export function OccurrenceDetails({
                             overdue={occurrence.is_overdue}
                         />
                     </dd>
-                    {occurrence.category && (
-                        <>
-                            <dt className="text-muted-foreground">Categoria</dt>
-                            <dd>{occurrence.category.name}</dd>
-                        </>
-                    )}
                     {occurrence.installment_number && (
                         <>
                             <dt className="text-muted-foreground">Parcela</dt>
                             <dd>
                                 {occurrence.installment_number}/
-                                {occurrence.installment_count} ·{' '}
-                                {occurrence.credit_card_name}
+                                {occurrence.installment_count}
                             </dd>
                         </>
                     )}

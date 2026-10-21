@@ -35,7 +35,6 @@ import {
     formatPercent,
 } from '@/lib/format';
 import { dashboard } from '@/routes';
-import creditCards from '@/routes/credit-cards';
 import expenses from '@/routes/expenses';
 import household from '@/routes/household';
 import personal from '@/routes/personal';
@@ -88,11 +87,6 @@ export default function Dashboard({
             label: 'Extras temporárias',
             cents: summary.by_source.temporary,
             href: recurringExpenses.index({ query: { kind: 'temporary' } }),
-        },
-        {
-            label: 'Parcelas de cartão',
-            cents: summary.by_source.credit_card,
-            href: creditCards.index({ query: { month } }),
         },
         {
             label: 'Avulsas',
@@ -178,7 +172,7 @@ export default function Dashboard({
                     />
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div className="grid gap-4 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
                             <CardTitle>Pagas e pendentes</CardTitle>
@@ -259,45 +253,6 @@ export default function Dashboard({
                                     </li>
                                 ))}
                             </ul>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Por categoria</CardTitle>
-                            <CardDescription>
-                                Maiores gastos da casa no mês
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {summary.by_category.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    Nenhuma despesa neste mês.
-                                </p>
-                            ) : (
-                                <ul className="space-y-2 text-sm">
-                                    {summary.by_category
-                                        .slice(0, 6)
-                                        .map((row) => (
-                                            <li key={row.category}>
-                                                <div className="flex justify-between gap-2">
-                                                    <span>{row.category}</span>
-                                                    <Money
-                                                        cents={row.total_cents}
-                                                    />
-                                                </div>
-                                                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                                                    <div
-                                                        className="h-full bg-primary/70"
-                                                        style={{
-                                                            width: `${Math.round((row.total_cents / Math.max(summary.total_cents, 1)) * 100)}%`,
-                                                        }}
-                                                    />
-                                                </div>
-                                            </li>
-                                        ))}
-                                </ul>
-                            )}
                         </CardContent>
                     </Card>
                 </div>

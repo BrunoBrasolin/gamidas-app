@@ -40,35 +40,11 @@ class Household extends Model
     }
 
     /**
-     * @return HasMany<ExpenseCategory, $this>
-     */
-    public function categories(): HasMany
-    {
-        return $this->hasMany(ExpenseCategory::class)->orderBy('name');
-    }
-
-    /**
      * @return HasMany<RecurringExpense, $this>
      */
     public function recurringExpenses(): HasMany
     {
         return $this->hasMany(RecurringExpense::class);
-    }
-
-    /**
-     * @return HasMany<CreditCard, $this>
-     */
-    public function creditCards(): HasMany
-    {
-        return $this->hasMany(CreditCard::class)->orderBy('name');
-    }
-
-    /**
-     * @return HasMany<CreditCardPurchase, $this>
-     */
-    public function creditCardPurchases(): HasMany
-    {
-        return $this->hasMany(CreditCardPurchase::class);
     }
 
     /**

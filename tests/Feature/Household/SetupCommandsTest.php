@@ -13,14 +13,12 @@ class SetupCommandsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_a_household_is_created_with_default_categories(): void
+    public function test_a_household_is_created(): void
     {
         $this->artisan('household:create', ['--name' => 'Casa Bruno & Letícia'])->assertSuccessful();
 
         $household = Household::query()->sole();
         $this->assertSame('Casa Bruno & Letícia', $household->name);
-        $this->assertTrue($household->categories()->where('name', 'Parcela Casa')->exists());
-        $this->assertSame(count(config('finance.default_categories')), $household->categories()->count());
     }
 
     public function test_members_are_created_with_hashed_passwords_and_verified_emails(): void

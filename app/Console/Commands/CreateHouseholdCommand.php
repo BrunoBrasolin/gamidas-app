@@ -17,7 +17,7 @@ class CreateHouseholdCommand extends Command
     /**
      * @var string
      */
-    protected $description = 'Create a household with the default expense categories';
+    protected $description = 'Create a household';
 
     public function handle(HouseholdService $households): int
     {

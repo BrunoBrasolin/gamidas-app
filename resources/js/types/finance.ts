@@ -2,7 +2,7 @@ export type Scope = 'household' | 'personal';
 
 export type OccurrenceStatus = 'pending' | 'paid';
 
-export type OccurrenceSource = 'one_off' | 'recurring' | 'credit_card';
+export type OccurrenceSource = 'one_off' | 'recurring';
 
 export type Member = {
     user_id: number;
@@ -10,11 +10,6 @@ export type Member = {
     first_name: string;
     salary_cents: number;
     payment_label: string;
-};
-
-export type Category = {
-    id: number;
-    name: string;
 };
 
 export type UserRef = {
@@ -46,11 +41,8 @@ export type Occurrence = {
     source: OccurrenceSource;
     source_label: string;
     recurring_expense_id: number | null;
-    credit_card_purchase_id: number | null;
-    credit_card_name: string | null;
     installment_number: number | null;
     installment_count: number | null;
-    category: Category | null;
     billing_month: string;
     due_date: string;
     amount_cents: number;
@@ -96,10 +88,8 @@ export type HouseholdMonthSummary = {
         one_off: number;
         fixed: number;
         temporary: number;
-        credit_card: number;
     };
     by_member: MemberTotals[];
-    by_category: { category: string; total_cents: number }[];
 };
 
 export type PersonalFlows = {

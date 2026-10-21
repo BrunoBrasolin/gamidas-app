@@ -31,7 +31,6 @@ class RecurringExpenseRequest extends FinanceRequest
             'kind' => [Rule::requiredIf($this->isCreating()), Rule::enum(RecurringKind::class)],
             'scope' => [Rule::requiredIf($this->isCreating()), Rule::enum(ExpenseScope::class)],
             'title' => ['required', 'string', 'max:120'],
-            'expense_category_id' => ['nullable', 'integer', $this->existsInHousehold('expense_categories')],
             'amount' => ['required', new MoneyAmount],
             'due_day' => ['required', 'integer', 'between:1,31'],
             'start_month' => $this->isCreating() ? $this->monthRules() : ['prohibited'],
@@ -53,7 +52,6 @@ class RecurringExpenseRequest extends FinanceRequest
             'kind' => 'tipo',
             'scope' => 'responsabilidade',
             'title' => 'descrição',
-            'expense_category_id' => 'categoria',
             'amount' => 'valor mensal',
             'due_day' => 'dia de vencimento',
             'start_month' => 'mês de início',
@@ -65,14 +63,13 @@ class RecurringExpenseRequest extends FinanceRequest
     }
 
     /**
-     * @return array{title: string, notes: ?string, expense_category_id: ?int, amount_cents: int, due_day: int, end_month: ?CarbonImmutable, total_months: ?int}
+     * @return array{title: string, notes: ?string, amount_cents: int, due_day: int, end_month: ?CarbonImmutable, total_months: ?int}
      */
     public function toData(): array
     {
         return [
             'title' => trim((string) $this->validated('title')),
             'notes' => $this->nullableText('notes'),
-            'expense_category_id' => $this->nullableInt('expense_category_id'),
             'amount_cents' => $this->cents('amount'),
             'due_day' => (int) $this->validated('due_day'),
             'end_month' => $this->month('end_month'),
@@ -81,7 +78,7 @@ class RecurringExpenseRequest extends FinanceRequest
     }
 
     /**
-     * @return array{scope: ExpenseScope, kind: RecurringKind, title: string, notes: ?string, expense_category_id: ?int, amount_cents: int, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}
+     * @return array{scope: ExpenseScope, kind: RecurringKind, title: string, notes: ?string, amount_cents: int, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}
      */
     public function toCreateData(): array
     {

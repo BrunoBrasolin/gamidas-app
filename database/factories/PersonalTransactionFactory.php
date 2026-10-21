@@ -21,8 +21,7 @@ class PersonalTransactionFactory extends Factory
         return [
             'user_id' => User::factory(),
             'type' => TransactionType::Expense,
-            'category' => 'Outras despesas',
-            'description' => fake()->words(2, true),
+            'title' => fake()->words(2, true),
             'amount_cents' => 5_000,
             'transaction_date' => Date::today(),
         ];

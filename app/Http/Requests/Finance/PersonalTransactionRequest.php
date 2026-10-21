@@ -13,8 +13,7 @@ class PersonalTransactionRequest extends FinanceRequest
     public function rules(): array
     {
         return [
-            'category' => ['required', 'string', 'max:60'],
-            'description' => ['required', 'string', 'max:120'],
+            'title' => ['required', 'string', 'max:120'],
             'amount' => ['required', new MoneyAmount],
             'transaction_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:2100-12-31'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -27,8 +26,7 @@ class PersonalTransactionRequest extends FinanceRequest
     public function attributes(): array
     {
         return [
-            'category' => 'categoria',
-            'description' => 'descrição',
+            'title' => 'título',
             'amount' => 'valor',
             'transaction_date' => 'data',
             'notes' => 'observações',
@@ -36,13 +34,12 @@ class PersonalTransactionRequest extends FinanceRequest
     }
 
     /**
-     * @return array{category: string, description: string, amount_cents: int, transaction_date: CarbonImmutable, notes: ?string}
+     * @return array{title: string, amount_cents: int, transaction_date: CarbonImmutable, notes: ?string}
      */
     public function toData(): array
     {
         return [
-            'category' => trim((string) $this->validated('category')),
-            'description' => trim((string) $this->validated('description')),
+            'title' => trim((string) $this->validated('title')),
             'amount_cents' => $this->cents('amount'),
             'transaction_date' => $this->day('transaction_date'),
             'notes' => $this->nullableText('notes'),

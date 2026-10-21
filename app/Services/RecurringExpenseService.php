@@ -32,7 +32,7 @@ final class RecurringExpenseService
     }
 
     /**
-     * @param  array{scope: ExpenseScope, kind: RecurringKind, title: string, notes: ?string, expense_category_id: ?int, amount_cents: int, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}  $data
+     * @param  array{scope: ExpenseScope, kind: RecurringKind, title: string, notes: ?string, amount_cents: int, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}  $data
      */
     public function create(Household $household, User $actor, array $data): RecurringExpense
     {
@@ -54,7 +54,7 @@ final class RecurringExpenseService
     }
 
     /**
-     * @param  array{title: string, notes: ?string, expense_category_id: ?int, amount_cents: int, due_day: int, end_month: ?CarbonImmutable, total_months: ?int}  $data
+     * @param  array{title: string, notes: ?string, amount_cents: int, due_day: int, end_month: ?CarbonImmutable, total_months: ?int}  $data
      */
     public function update(RecurringExpense $template, User $actor, array $data, CarbonImmutable $effectiveFrom): RecurringExpense
     {
@@ -240,7 +240,6 @@ final class RecurringExpenseService
             'scope' => $template->scope->value,
             'amount_cents' => $template->amount_cents,
             'due_day' => $template->due_day,
-            'expense_category_id' => $template->expense_category_id,
             'start_month' => Month::key($template->start_month),
             'end_month' => $template->end_month ? Month::key($template->end_month) : null,
             'total_months' => $template->total_months,

@@ -11,21 +11,19 @@ use App\Models\ExpenseShare;
 use App\Models\Household;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Date;
 
 /**
  * Aggregates household expenses for the dashboard and reports.
  *
  * Every figure comes from persisted occurrences and their stored shares.
- * Recurring templates and credit card purchases are never summed, so nothing
- * is counted twice.
+ * Recurring templates are never summed, so nothing is counted twice.
  */
 final class HouseholdSummary
 {
     /**
      * Totals of the household's shared expenses for one month.
      *
-     * @return array{total_cents: int, paid_cents: int, pending_cents: int, count: int, paid_count: int, pending_count: int, overdue_count: int, by_source: array<string, int>, by_member: array<int, array{user_id: int, total_cents: int, paid_cents: int, pending_cents: int}>, by_category: list<array{category: string, total_cents: int}>}
+     * @return array{total_cents: int, paid_cents: int, pending_cents: int, count: int, paid_count: int, pending_count: int, overdue_count: int, by_source: array<string, int>, by_member: array<int, array{user_id: int, total_cents: int, paid_cents: int, pending_cents: int}>}
      */
     public function month(Household $household, CarbonImmutable $month): array
     {
@@ -47,10 +45,7 @@ final class HouseholdSummary
         $paidCount = (int) ($paid?->getAttribute('aggregate_count') ?? 0);
         $pendingCount = (int) ($pending?->getAttribute('aggregate_count') ?? 0);
 
-        $overdueCount = $base()
-            ->where('status', OccurrenceStatus::Pending)
-            ->where('due_date', '<', Date::today()->toDateString())
-            ->count();
+        $overdueCount = $base()->overdue()->count();
 
         return [
             'total_cents' => $paidCents + $pendingCents,
@@ -62,14 +57,13 @@ final class HouseholdSummary
             'overdue_count' => $overdueCount,
             'by_source' => $this->bySource($household, $month),
             'by_member' => $this->byMember($household, $month, $month),
-            'by_category' => $this->byCategory($household, $month, $month),
         ];
     }
 
     /**
      * Month-by-month totals of a year plus yearly totals.
      *
-     * @return array{months: list<array{month: string, total_cents: int, paid_cents: int, pending_cents: int, members: array<int, int>}>, total_cents: int, paid_cents: int, pending_cents: int, by_member: array<int, array{user_id: int, total_cents: int, paid_cents: int, pending_cents: int}>, by_category: list<array{category: string, total_cents: int}>}
+     * @return array{months: list<array{month: string, total_cents: int, paid_cents: int, pending_cents: int, members: array<int, int>}>, total_cents: int, paid_cents: int, pending_cents: int, by_member: array<int, array{user_id: int, total_cents: int, paid_cents: int, pending_cents: int}>}
      */
     public function year(Household $household, int $year): array
     {
@@ -133,7 +127,6 @@ final class HouseholdSummary
             'paid_cents' => array_sum(array_column($months, 'paid_cents')),
             'pending_cents' => array_sum(array_column($months, 'pending_cents')),
             'by_member' => $this->byMember($household, $from, $to),
-            'by_category' => $this->byCategory($household, $from, $to),
         ];
     }
 
@@ -144,7 +137,7 @@ final class HouseholdSummary
      */
     private function bySource(Household $household, CarbonImmutable $month): array
     {
-        $totals = ['one_off' => 0, 'fixed' => 0, 'temporary' => 0, 'credit_card' => 0];
+        $totals = ['one_off' => 0, 'fixed' => 0, 'temporary' => 0];
 
         $rows = ExpenseOccurrence::query()
             ->household($household->id)
@@ -157,7 +150,6 @@ final class HouseholdSummary
         foreach ($rows as $row) {
             $key = match ($row->source) {
                 OccurrenceSource::OneOff => 'one_off',
-                OccurrenceSource::CreditCard => 'credit_card',
                 OccurrenceSource::Recurring => $row->getAttribute('kind') === RecurringKind::Temporary->value ? 'temporary' : 'fixed',
             };
 
@@ -194,26 +186,6 @@ final class HouseholdSummary
         }
 
         return array_values($members);
-    }
-
-    /**
-     * @return list<array{category: string, total_cents: int}>
-     */
-    private function byCategory(Household $household, CarbonImmutable $from, CarbonImmutable $to): array
-    {
-        return array_values(ExpenseOccurrence::query()
-            ->household($household->id)
-            ->whereBetween('billing_month', [$from->toDateString(), $to->toDateString()])
-            ->leftJoin('expense_categories', 'expense_categories.id', '=', 'expense_occurrences.expense_category_id')
-            ->selectRaw('expense_categories.name as category_name, SUM(expense_occurrences.amount_cents) as aggregate_total')
-            ->groupBy('expense_categories.name')
-            ->orderByDesc('aggregate_total')
-            ->get()
-            ->map(fn ($row) => [
-                'category' => (string) ($row->getAttribute('category_name') ?? 'Sem categoria'),
-                'total_cents' => (int) $row->getAttribute('aggregate_total'),
-            ])
-            ->all());
     }
 
     /**

@@ -19,11 +19,6 @@ const sidebarNavItems: NavItem[] = [
         href: household.members.index(),
         icon: null,
     },
-    {
-        title: 'Categorias',
-        href: household.categories.index(),
-        icon: null,
-    },
 ];
 
 export default function HouseholdLayout({ children }: PropsWithChildren) {
@@ -33,7 +28,7 @@ export default function HouseholdLayout({ children }: PropsWithChildren) {
         <div className="px-4 py-6">
             <Heading
                 title="Configurações da casa"
-                description="Salários, membros e categorias compartilhados pela residência"
+                description="Salários e membros da residência"
             />
 
             <div className="flex flex-col lg:flex-row lg:space-x-12">

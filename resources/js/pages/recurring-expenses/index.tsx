@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { CategorySelect } from '@/components/finance/category-select';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
 import { FormField } from '@/components/finance/form-field';
@@ -50,7 +49,7 @@ import {
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import recurringExpenses from '@/routes/recurring-expenses';
-import type { Category, OccurrenceStatus, Paginated, Scope } from '@/types';
+import type { OccurrenceStatus, Paginated, Scope } from '@/types';
 
 type Kind = 'fixed' | 'temporary';
 
@@ -60,7 +59,6 @@ type Template = {
     scope: Scope;
     title: string;
     notes: string | null;
-    category: Category | null;
     amount_cents: number;
     due_day: number;
     start_month: string;
@@ -87,14 +85,12 @@ type Props = {
     filters: { kind: Kind | null; status: 'active' | 'ended' };
     currentMonth: string;
     templates: Paginated<Template>;
-    categories: Category[];
 };
 
 export default function RecurringExpensesIndex({
     filters,
     currentMonth,
     templates,
-    categories,
 }: Props) {
     const tabs: { label: string; kind: Kind | null }[] = [
         { label: 'Todas', kind: null },
@@ -112,7 +108,6 @@ export default function RecurringExpensesIndex({
                 >
                     <RecurringFormDialog
                         kind="fixed"
-                        categories={categories}
                         currentMonth={currentMonth}
                         trigger={
                             <Button>
@@ -123,7 +118,6 @@ export default function RecurringExpensesIndex({
                     />
                     <RecurringFormDialog
                         kind="temporary"
-                        categories={categories}
                         currentMonth={currentMonth}
                         trigger={
                             <Button variant="outline">
@@ -142,8 +136,8 @@ export default function RecurringExpensesIndex({
                             mês, sem prazo ou até um mês final.{' '}
                             <strong>Extras temporárias</strong> cobram um valor
                             mensal fixo por um número de meses. Compras
-                            parceladas no cartão (valor total dividido em
-                            parcelas) ficam em <em>Cartões e parcelas</em>.
+                            parceladas são cadastradas como despesa avulsa,
+                            informando o número de parcelas.
                         </p>
                     </AlertDescription>
                 </Alert>
@@ -225,7 +219,6 @@ export default function RecurringExpensesIndex({
                             <TemplateCard
                                 key={template.id}
                                 template={template}
-                                categories={categories}
                                 currentMonth={currentMonth}
                             />
                         ))}
@@ -239,11 +232,9 @@ export default function RecurringExpensesIndex({
 
 function TemplateCard({
     template,
-    categories,
     currentMonth,
 }: {
     template: Template;
-    categories: Category[];
     currentMonth: string;
 }) {
     const [open, setOpen] = useState(false);
@@ -275,8 +266,6 @@ function TemplateCard({
                             <p className="text-sm text-muted-foreground">
                                 <Money cents={template.amount_cents} /> por mês
                                 · vence todo dia {template.due_day}
-                                {template.category &&
-                                    ` · ${template.category.name}`}
                             </p>
                             <p className="text-sm text-muted-foreground">
                                 {periodLabel(template)}
@@ -296,7 +285,6 @@ function TemplateCard({
                             <RecurringFormDialog
                                 kind={template.kind}
                                 template={template}
-                                categories={categories}
                                 currentMonth={currentMonth}
                                 trigger={
                                     <Button size="sm" variant="outline">
@@ -405,13 +393,11 @@ function periodLabel(template: Template): string {
 function RecurringFormDialog({
     kind,
     template,
-    categories,
     currentMonth,
     trigger,
 }: {
     kind: Kind;
     template?: Template;
-    categories: Category[];
     currentMonth: string;
     trigger: ReactNode;
 }) {
@@ -471,7 +457,7 @@ function RecurringFormDialog({
 
                             <FormField
                                 id="recurring-title"
-                                label="Descrição"
+                                label="Título"
                                 error={errors.title}
                             >
                                 <Input
@@ -488,31 +474,18 @@ function RecurringFormDialog({
                                 />
                             </FormField>
 
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <FormField
+                            <FormField
+                                id="recurring-amount"
+                                label="Valor mensal"
+                                error={errors.amount}
+                            >
+                                <MoneyInput
                                     id="recurring-amount"
-                                    label="Valor mensal"
-                                    error={errors.amount}
-                                >
-                                    <MoneyInput
-                                        id="recurring-amount"
-                                        name="amount"
-                                        required
-                                        defaultCents={template?.amount_cents}
-                                    />
-                                </FormField>
-                                <FormField
-                                    id="recurring-category"
-                                    label="Categoria"
-                                    error={errors.expense_category_id}
-                                >
-                                    <CategorySelect
-                                        id="recurring-category"
-                                        categories={categories}
-                                        defaultValue={template?.category?.id}
-                                    />
-                                </FormField>
-                            </div>
+                                    name="amount"
+                                    required
+                                    defaultCents={template?.amount_cents}
+                                />
+                            </FormField>
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <FormField

@@ -19,7 +19,6 @@ use App\Support\Month;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,10 +38,9 @@ class HouseholdExpenseController extends Controller
         $filters = [
             'month' => Month::key($month),
             'scope' => $request->query('scope') === ExpenseScope::Personal->value ? ExpenseScope::Personal->value : ExpenseScope::Household->value,
-            'category' => $request->integer('category') ?: null,
             'creator' => $request->integer('creator') ?: null,
             'status' => in_array($request->query('status'), ['paid', 'pending', 'overdue'], true) ? $request->query('status') : null,
-            'source' => in_array($request->query('source'), ['one_off', 'fixed', 'temporary', 'credit_card'], true) ? $request->query('source') : null,
+            'source' => in_array($request->query('source'), ['one_off', 'fixed', 'temporary'], true) ? $request->query('source') : null,
         ];
 
         $query = $this->filteredQuery($user, $filters);
@@ -84,7 +82,6 @@ class HouseholdExpenseController extends Controller
             'totals' => $totals,
             'summary' => $summary->month($household, $month),
             'members' => $presenter->members(),
-            'categories' => $household->categories()->get(['id', 'name']),
         ]);
     }
 
@@ -93,9 +90,9 @@ class HouseholdExpenseController extends Controller
         $expenses->create($request->household(), $this->user($request), [
             ...$request->toData(),
             'scope' => $request->scope(),
-        ]);
+        ], $request->installments());
 
-        $this->toast('Despesa cadastrada.');
+        $this->toast($request->installments() > 1 ? 'Despesa parcelada cadastrada.' : 'Despesa cadastrada.');
 
         return back();
     }
@@ -123,7 +120,7 @@ class HouseholdExpenseController extends Controller
     }
 
     /**
-     * @param  array{month: string, scope: string, category: ?int, creator: ?int, status: ?string, source: ?string}  $filters
+     * @param  array{month: string, scope: string, creator: ?int, status: ?string, source: ?string}  $filters
      * @return Builder<ExpenseOccurrence>
      */
     private function filteredQuery(User $user, array $filters): Builder
@@ -136,19 +133,17 @@ class HouseholdExpenseController extends Controller
             $query->household((int) $user->householdId());
         }
 
-        $query->when($filters['category'], fn (Builder $query, int $category) => $query->where('expense_category_id', $category))
-            ->when($filters['creator'], fn (Builder $query, int $creator) => $query->where('created_by_user_id', $creator));
+        $query->when($filters['creator'], fn (Builder $query, int $creator) => $query->where('created_by_user_id', $creator));
 
         match ($filters['status']) {
             'paid' => $query->where('status', OccurrenceStatus::Paid),
             'pending' => $query->where('status', OccurrenceStatus::Pending),
-            'overdue' => $query->where('status', OccurrenceStatus::Pending)->where('due_date', '<', Date::today()->toDateString()),
+            'overdue' => $query->overdue(),
             default => null,
         };
 
         match ($filters['source']) {
             'one_off' => $query->where('source', OccurrenceSource::OneOff),
-            'credit_card' => $query->where('source', OccurrenceSource::CreditCard),
             'fixed', 'temporary' => $query->where('source', OccurrenceSource::Recurring)
                 ->whereHas('recurringExpense', fn (Builder $query) => $query->where('kind', RecurringKind::from($filters['source']))),
             default => null,

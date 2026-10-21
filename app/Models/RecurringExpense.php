@@ -24,7 +24,6 @@ use Illuminate\Support\Carbon;
  * @property int $household_id
  * @property ExpenseScope $scope
  * @property int|null $owner_user_id
- * @property int|null $expense_category_id
  * @property RecurringKind $kind
  * @property string $title
  * @property string|null $notes
@@ -40,12 +39,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Household $household
  * @property-read User|null $owner
- * @property-read ExpenseCategory|null $category
  * @property-read User $creator
  * @property-read User|null $editor
  */
 #[Fillable([
-    'household_id', 'scope', 'owner_user_id', 'expense_category_id', 'kind', 'title', 'notes',
+    'household_id', 'scope', 'owner_user_id', 'kind', 'title', 'notes',
     'amount_cents', 'due_day', 'start_month', 'end_month', 'total_months', 'ended_at',
     'created_by_user_id', 'updated_by_user_id',
 ])]
@@ -113,14 +111,6 @@ class RecurringExpense extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
-    }
-
-    /**
-     * @return BelongsTo<ExpenseCategory, $this>
-     */
-    public function category(): BelongsTo
-    {
-        return $this->belongsTo(ExpenseCategory::class, 'expense_category_id');
     }
 
     /**

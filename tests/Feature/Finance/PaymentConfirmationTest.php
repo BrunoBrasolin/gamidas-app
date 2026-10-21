@@ -103,7 +103,7 @@ class PaymentConfirmationTest extends TestCase
 
         $this->actingAs($this->leticia)
             ->put(route('expenses.update', $expense), [
-                'title' => 'Alterado', 'amount' => '1.00', 'billing_month' => now()->format('Y-m'), 'due_date' => now()->toDateString(),
+                'title' => 'Alterado', 'amount' => '1.00', 'due_date' => now()->toDateString(),
             ])
             ->assertForbidden();
 

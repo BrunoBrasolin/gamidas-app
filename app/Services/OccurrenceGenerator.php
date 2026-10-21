@@ -125,7 +125,6 @@ final class OccurrenceGenerator
     {
         return [
             'title' => $template->title,
-            'expense_category_id' => $template->expense_category_id,
             'amount_cents' => $template->amount_cents,
             'due_date' => Month::dueDate($month, $template->due_day),
         ];

@@ -3,7 +3,6 @@
 namespace Tests\Concerns;
 
 use App\Enums\ExpenseScope;
-use App\Models\ExpenseCategory;
 use App\Models\ExpenseOccurrence;
 use App\Models\Household;
 use App\Models\User;
@@ -44,11 +43,6 @@ trait CreatesHousehold
         return $service->addMember($other, 'Carlos Outro', 'carlos@example.test', 'password', 'pelo', 300_000)->user;
     }
 
-    protected function category(string $name = 'Internet'): ExpenseCategory
-    {
-        return $this->household->categories()->where('name', $name)->firstOrFail();
-    }
-
     protected function createExpense(User $creator, int $amountCents, ?CarbonImmutable $month = null, ExpenseScope $scope = ExpenseScope::Household): ExpenseOccurrence
     {
         $month ??= Month::current();
@@ -57,9 +51,7 @@ trait CreatesHousehold
             'scope' => $scope,
             'title' => 'Conta de luz',
             'notes' => null,
-            'expense_category_id' => $this->category('Luz')->id,
             'amount_cents' => $amountCents,
-            'billing_month' => $month,
             'due_date' => $month->addDays(9),
         ]);
     }

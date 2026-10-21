@@ -3,14 +3,10 @@
 namespace Tests\Feature\Household;
 
 use App\Enums\ExpenseScope;
-use App\Enums\PurchaseMode;
 use App\Enums\RecurringKind;
-use App\Models\CreditCard;
 use App\Models\User;
-use App\Services\CreditCardPurchaseService;
 use App\Services\RecurringExpenseService;
 use App\Support\Month;
-use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\CreatesHousehold;
@@ -58,7 +54,6 @@ class AccessControlTest extends TestCase
         yield 'dashboard' => ['/dashboard'];
         yield 'expenses' => ['/expenses'];
         yield 'recurring expenses' => ['/recurring-expenses'];
-        yield 'credit cards' => ['/credit-cards'];
         yield 'personal summary' => ['/personal'];
         yield 'personal income' => ['/personal/income'];
         yield 'personal expenses' => ['/personal/expenses'];
@@ -66,7 +61,6 @@ class AccessControlTest extends TestCase
         yield 'reports' => ['/reports'];
         yield 'household members' => ['/household/members'];
         yield 'household salaries' => ['/household/salaries'];
-        yield 'household categories' => ['/household/categories'];
     }
 
     #[DataProvider('pages')]
@@ -104,16 +98,9 @@ class AccessControlTest extends TestCase
         $expense = $this->createExpense($this->bruno, 10_000);
         $template = app(RecurringExpenseService::class)->create($this->household, $this->bruno, [
             'scope' => ExpenseScope::Household, 'kind' => RecurringKind::Fixed, 'title' => 'Internet', 'notes' => null,
-            'expense_category_id' => null, 'amount_cents' => 10_000, 'due_day' => 10,
+            'amount_cents' => 10_000, 'due_day' => 10,
             'start_month' => Month::current(), 'end_month' => null, 'total_months' => null,
         ]);
-        $card = CreditCard::create(['household_id' => $this->household->id, 'name' => 'Visa', 'due_day' => 5, 'created_by_user_id' => $this->bruno->id]);
-        $purchase = app(CreditCardPurchaseService::class)->create($this->household, $this->bruno, [
-            'credit_card_id' => $card->id, 'scope' => ExpenseScope::Household, 'expense_category_id' => null,
-            'description' => 'TV', 'notes' => null, 'purchase_date' => CarbonImmutable::today(), 'mode' => PurchaseMode::Installments,
-            'amount_cents' => 60_000, 'installment_count' => 3, 'first_billing_month' => Month::current(),
-        ]);
-        $category = $this->category('Mercado');
         $member = $this->bruno->membership;
 
         $this->actingAs($outsider);
@@ -123,17 +110,9 @@ class AccessControlTest extends TestCase
         $this->put(route('recurring-expenses.update', $template), ['title' => 'x'])->assertNotFound();
         $this->post(route('recurring-expenses.end', $template), ['end_month' => '2030-01'])->assertNotFound();
         $this->delete(route('recurring-expenses.destroy', $template))->assertNotFound();
-        $this->put(route('credit-cards.update', $card), ['name' => 'x'])->assertNotFound();
-        $this->delete(route('credit-cards.destroy', $card))->assertNotFound();
-        $this->put(route('credit-card-purchases.update', $purchase), ['description' => 'x'])->assertNotFound();
-        $this->delete(route('credit-card-purchases.destroy', $purchase))->assertNotFound();
-        $this->put(route('household.categories.update', $category), ['name' => 'x'])->assertNotFound();
-        $this->delete(route('household.categories.destroy', $category))->assertNotFound();
         $this->put(route('household.members.update', $member), ['payment_label_preposition' => 'por'])->assertNotFound();
 
         $this->assertModelExists($template);
-        $this->assertModelExists($purchase);
-        $this->assertSame('Mercado', $category->fresh()->name);
     }
 
     public function test_listings_never_include_another_households_data(): void

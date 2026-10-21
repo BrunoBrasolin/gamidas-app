@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\ExpensePresenter;
 use App\Models\ExpenseOccurrence;
+use App\Services\CalendarService;
 use App\Services\HouseholdSummary;
 use App\Services\PersonalSummary;
 use App\Services\ProportionalSplitter;
@@ -20,11 +21,17 @@ class DashboardController extends Controller
 {
     use InteractsWithHousehold;
 
+    /**
+     * Number of days ahead that the dashboard lists calendar events.
+     */
+    private const UPCOMING_EVENT_DAYS = 30;
+
     public function __invoke(
         Request $request,
         HouseholdSummary $householdSummary,
         PersonalSummary $personalSummary,
         ProportionalSplitter $splitter,
+        CalendarService $calendar,
     ): Response {
         $user = $this->user($request);
         $household = $this->household($request);
@@ -45,6 +52,8 @@ class DashboardController extends Controller
             ->limit(12)
             ->get();
 
+        $events = array_slice($calendar->between($household, Date::today(), Date::today()->addDays(self::UPCOMING_EVENT_DAYS)), 0, 6);
+
         return Inertia::render('dashboard', [
             'month' => Month::key($month),
             'members' => $presenter->members(),
@@ -53,6 +62,7 @@ class DashboardController extends Controller
             'household' => $householdSummary->month($household, $month),
             'personal' => $personalSummary->month($user, $month),
             'upcoming' => $presenter->occurrences($upcoming),
+            'events' => $events,
         ]);
     }
 }

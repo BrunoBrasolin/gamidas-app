@@ -6,7 +6,8 @@ Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React
 
 ## Funcionalidades
 
-- **Painel** do mês: total da casa, parte de cada membro, renda combinada e proporções, pagas × pendentes, vencidas, próximos vencimentos, composição (fixas, extras temporárias, avulsas) e resumo pessoal.
+- **Painel** do mês: total da casa, parte de cada membro, renda combinada e proporções, pagas × pendentes, vencidas, próximos vencimentos, composição (fixas, extras temporárias, avulsas), resumo pessoal e próximos eventos da agenda.
+- **Agenda** (`/dashboard/calendar`): eventos da casa em visão de calendário mensal ou lista, com título, data, horário opcional, descrição, cor e ícone; eventos recorrentes (diários, semanais, mensais, anuais ou personalizados); criação clicando no dia e impressão do mês em paisagem.
 - **Despesas da casa**: tabela mensal com total, parte de cada membro, vencimento, criador, confirmação de pagamento e situação; filtros por mês, criador, situação e origem; aba de despesas pessoais.
 - **Despesas recorrentes**: fixas (sem prazo ou até um mês final) e extras temporárias (valor mensal por N meses), com geração mensal idempotente.
 - **Finanças pessoais** (privadas): receitas, despesas e investimentos; resumo mensal e anual com fluxo líquido e saldo disponível.
@@ -86,17 +87,17 @@ Ou, separadamente, `php artisan serve` e `npm run dev`. Acesse `http://localhost
 
 ## Tarefas agendadas
 
-Despesas fixas sem prazo são geradas até `FINANCE_GENERATION_MONTHS_AHEAD` meses à frente (padrão 2). O comando é agendado diariamente às 00:10:
+Despesas fixas sem prazo são geradas até `FINANCE_GENERATION_MONTHS_AHEAD` meses à frente (padrão 2). O comando é agendado diariamente às 00:20:
 
 ```bash
 php artisan expenses:generate                 # manual, idempotente
 php artisan expenses:generate --through=2027-06
 ```
 
-Configure o agendador no servidor com a entrada de cron padrão do Laravel:
+Configure o agendador no servidor para rodar a cada 20 minutos (economiza conexões no MySQL da hospedagem compartilhada). Os horários das tarefas precisam cair nessa grade (`:00`, `:20`, `:40`):
 
 ```cron
-* * * * * cd /caminho/do/projeto && php artisan schedule:run >> /dev/null 2>&1
+*/20 * * * * cd /caminho/do/projeto && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Mesmo sem o agendador, abrir um mês no painel ou na lista de despesas gera os meses que faltarem (até 24 meses à frente), de forma idempotente.
@@ -147,7 +148,7 @@ Em **Settings › Secrets and variables › Actions**:
     ```
 
 4. Depois do primeiro deploy, crie a residência e as contas pelo SSH (veja [Criação da residência e das contas](#criação-da-residência-e-das-contas)), usando `/opt/alt/php83/usr/bin/php artisan ...`.
-5. Em hPanel › Avançado › Cron Jobs, agende a cada minuto:
+5. Em hPanel › Avançado › Cron Jobs, agende a cada 20 minutos (`*/20 * * * *`):
 
     ```cron
     /opt/alt/php83/usr/bin/php /home/<usuario>/<DEPLOY_PATH>/artisan schedule:run >> /dev/null 2>&1
@@ -209,6 +210,18 @@ Em **Settings › Secrets and variables › Actions**:
     - **Fluxo líquido** = receitas − despesas − investimentos.
     - **Saldo disponível** = fluxo líquido acumulado de todos os meses até o fim do período.
 - Como a parte da casa entra automaticamente, a contribuição para a casa **não deve** ser lançada manualmente como despesa pessoal (a interface avisa isso).
+
+### Agenda
+
+- Os eventos pertencem à residência: todos os membros veem, editam e excluem qualquer evento; quem criou e quem editou por último ficam registrados.
+- Eventos sem horário valem para o dia todo e aparecem antes dos com horário no mesmo dia.
+- O painel lista os eventos de hoje até 30 dias à frente (no máximo 6).
+- Cores e ícones são opções fixas (`App\Enums\EventColor` / `EventIcon`), espelhadas em `resources/js/lib/calendar.ts`.
+- **Eventos recorrentes**: a série guarda só a regra (frequência diária, semanal, mensal ou anual, intervalo "a cada N", dias da semana quando semanal, data de início e término opcional). As ocorrências são calculadas ao abrir a agenda ou o painel (`App\Services\CalendarService`), sem gerar registros nem depender do agendador.
+    - Semanal sem dias escolhidos repete no dia da semana da data de início; a data de início sempre faz parte da série.
+    - Mensal e anual usam o dia da data de início; em meses mais curtos caem no último dia (31 → 30/04, 29/02 → 28/02).
+    - Editar ou excluir **somente este evento** grava uma exceção (`calendar_event_exceptions`) pela data original da ocorrência; a ocorrência alterada pode mudar de data e deixa de acompanhar edições da série.
+    - Editar **toda a série** mantém as exceções, a menos que mude a data de início, a frequência, o intervalo ou os dias da semana — aí elas são descartadas. Encurtar o término descarta só as exceções depois da nova data. Excluir a série exclui todas as ocorrências.
 
 ### Segurança e integridade
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Calendar\CalendarEventController;
 use App\Http\Controllers\Finance\DashboardController;
 use App\Http\Controllers\Finance\ExpensePaymentController;
 use App\Http\Controllers\Finance\HouseholdExpenseController;
@@ -15,6 +16,7 @@ Route::redirect('/', '/dashboard')->name('home');
 
 Route::middleware(['auth', 'verified', 'household'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('dashboard/calendar', [CalendarEventController::class, 'index'])->name('calendar.index');
     Route::get('expenses', [HouseholdExpenseController::class, 'index'])->name('expenses.index');
     Route::get('recurring-expenses', [RecurringExpenseController::class, 'index'])->name('recurring-expenses.index');
     Route::get('personal', PersonalFinanceController::class)->name('personal.index');
@@ -44,6 +46,10 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             ->name('personal.transactions.store');
         Route::put('personal/transactions/{transaction}', [PersonalTransactionController::class, 'update'])->name('personal.transactions.update');
         Route::delete('personal/transactions/{transaction}', [PersonalTransactionController::class, 'destroy'])->name('personal.transactions.destroy');
+
+        Route::post('dashboard/calendar/events', [CalendarEventController::class, 'store'])->name('calendar.events.store');
+        Route::put('dashboard/calendar/events/{event}', [CalendarEventController::class, 'update'])->name('calendar.events.update');
+        Route::delete('dashboard/calendar/events/{event}', [CalendarEventController::class, 'destroy'])->name('calendar.events.destroy');
 
         Route::put('household/members/{member}', [MemberController::class, 'update'])->name('household.members.update');
         Route::put('household/salaries', [SalaryController::class, 'update'])->name('household.salaries.update');

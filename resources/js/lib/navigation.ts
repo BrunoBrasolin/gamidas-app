@@ -1,5 +1,6 @@
 import {
     BarChart3,
+    CalendarDays,
     Home,
     LayoutGrid,
     Receipt,
@@ -7,6 +8,7 @@ import {
     Wallet,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
+import calendar from '@/routes/calendar';
 import expenses from '@/routes/expenses';
 import household from '@/routes/household';
 import personal from '@/routes/personal';
@@ -19,6 +21,12 @@ export const mainNavItems: NavItem[] = [
         title: 'Painel',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Agenda',
+        href: calendar.index(),
+        icon: CalendarDays,
+        activePrefix: '/dashboard/calendar',
     },
     {
         title: 'Despesas da casa',

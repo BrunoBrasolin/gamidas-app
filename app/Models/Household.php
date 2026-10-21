@@ -56,6 +56,14 @@ class Household extends Model
     }
 
     /**
+     * @return HasMany<CalendarEvent, $this>
+     */
+    public function calendarEvents(): HasMany
+    {
+        return $this->hasMany(CalendarEvent::class);
+    }
+
+    /**
      * Whether the given user is a member of this household.
      */
     public function hasMember(User|int $user): bool

@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     CalendarClock,
+    CalendarDays,
     CheckCircle2,
     Home,
     PiggyBank,
@@ -12,6 +13,7 @@ import {
     Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { EventIcon } from '@/components/calendar/event-badge';
 import { EmptyState } from '@/components/finance/empty-state';
 import { Money } from '@/components/finance/money';
 import { MonthNavigator } from '@/components/finance/month-navigator';
@@ -21,6 +23,7 @@ import { StatCard } from '@/components/finance/stat-card';
 import { StatusBadge } from '@/components/finance/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -28,6 +31,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { eventKey, formatEventWhen } from '@/lib/calendar';
 import {
     capitalize,
     formatDate,
@@ -35,11 +39,13 @@ import {
     formatPercent,
 } from '@/lib/format';
 import { dashboard } from '@/routes';
+import calendar from '@/routes/calendar';
 import expenses from '@/routes/expenses';
 import household from '@/routes/household';
 import personal from '@/routes/personal';
 import recurringExpenses from '@/routes/recurring-expenses';
 import type {
+    CalendarEvent,
     HouseholdMonthSummary,
     Member,
     Occurrence,
@@ -54,6 +60,7 @@ type Props = {
     household: HouseholdMonthSummary;
     personal: PersonalMonthSummary;
     upcoming: Occurrence[];
+    events: CalendarEvent[];
 };
 
 export default function Dashboard({
@@ -64,6 +71,7 @@ export default function Dashboard({
     household: summary,
     personal: mine,
     upcoming,
+    events,
 }: Props) {
     const goTo = (next: string) =>
         router.get(
@@ -371,6 +379,60 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
                 </div>
+
+                <Card>
+                    <CardHeader className="flex-row items-start justify-between gap-4">
+                        <div className="space-y-1.5">
+                            <CardTitle>Próximos eventos</CardTitle>
+                            <CardDescription>
+                                Agenda da casa nos próximos 30 dias
+                            </CardDescription>
+                        </div>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={calendar.index()}>
+                                <CalendarDays />
+                                Ver agenda
+                            </Link>
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        {events.length === 0 ? (
+                            <EmptyState
+                                icon={CalendarDays}
+                                title="Nenhum evento próximo"
+                                description="Aniversários, consultas e outros compromissos da casa aparecem aqui."
+                            />
+                        ) : (
+                            <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
+                                {events.map((event) => (
+                                    <li key={eventKey(event)}>
+                                        <Link
+                                            href={calendar.index({
+                                                query: {
+                                                    month: event.date.slice(
+                                                        0,
+                                                        7,
+                                                    ),
+                                                },
+                                            })}
+                                            className="flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-accent/50"
+                                        >
+                                            <EventIcon event={event} />
+                                            <div className="min-w-0">
+                                                <div className="truncate font-medium">
+                                                    {event.title}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {formatEventWhen(event)}
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
         </>
     );

@@ -24,6 +24,7 @@ export function ConfirmDialog({
     destructive = true,
     method = 'delete',
     url,
+    onSuccess,
 }: {
     trigger: ReactNode;
     title: string;
@@ -32,6 +33,7 @@ export function ConfirmDialog({
     destructive?: boolean;
     method?: 'delete' | 'post';
     url: string;
+    onSuccess?: () => void;
 }) {
     const [open, setOpen] = useState(false);
     const [processing, setProcessing] = useState(false);
@@ -41,6 +43,7 @@ export function ConfirmDialog({
             method,
             preserveScroll: true,
             onStart: () => setProcessing(true),
+            onSuccess: () => onSuccess?.(),
             onFinish: () => {
                 setProcessing(false);
                 setOpen(false);

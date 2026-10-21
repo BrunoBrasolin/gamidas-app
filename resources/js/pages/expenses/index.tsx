@@ -246,12 +246,6 @@ export default function ExpensesIndex({
                                                         {member.first_name}
                                                     </TableHead>
                                                 ))}
-                                            <TableHead>Vencimento</TableHead>
-                                            {isHousehold && (
-                                                <TableHead>
-                                                    Criado por
-                                                </TableHead>
-                                            )}
                                             <TableHead>Pagamento</TableHead>
                                             <TableHead>Situação</TableHead>
                                             <TableHead className="pr-4 text-right">
@@ -297,20 +291,6 @@ export default function ExpensesIndex({
                                                             />
                                                         </TableCell>
                                                     ))}
-                                                <TableCell>
-                                                    {formatDate(
-                                                        occurrence.due_date,
-                                                    )}
-                                                </TableCell>
-                                                {isHousehold && (
-                                                    <TableCell>
-                                                        {
-                                                            occurrence.created_by.name.split(
-                                                                ' ',
-                                                            )[0]
-                                                        }
-                                                    </TableCell>
-                                                )}
                                                 <TableCell>
                                                     <PaymentActions
                                                         occurrence={occurrence}
@@ -377,9 +357,7 @@ export default function ExpensesIndex({
                                                         />
                                                     </TableCell>
                                                 ))}
-                                            <TableCell
-                                                colSpan={isHousehold ? 5 : 4}
-                                            />
+                                            <TableCell colSpan={3} />
                                         </TableRow>
                                     </TableFooter>
                                 </Table>

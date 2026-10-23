@@ -14,6 +14,7 @@ use App\Http\Controllers\Time\TimeCategoryController;
 use App\Http\Controllers\Time\TimeLogController;
 use App\Http\Controllers\Time\TimeReportController;
 use App\Http\Controllers\Time\TimeSheetController;
+use App\Http\Controllers\Time\TimeTimerController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
@@ -71,6 +72,11 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             Route::delete('categories/{category}', [TimeCategoryController::class, 'destroy'])->name('categories.destroy');
             Route::post('categories/{category}/archive', [TimeCategoryController::class, 'archive'])->name('categories.archive');
             Route::delete('categories/{category}/archive', [TimeCategoryController::class, 'restore'])->name('categories.restore');
+
+            Route::post('categories/{category}/timer/start', [TimeTimerController::class, 'start'])->name('timer.start');
+            Route::post('categories/{category}/timer/pause', [TimeTimerController::class, 'pause'])->name('timer.pause');
+            Route::post('categories/{category}/timer/commit', [TimeTimerController::class, 'commit'])->name('timer.commit');
+            Route::delete('categories/{category}/timer', [TimeTimerController::class, 'reset'])->name('timer.reset');
 
             Route::put('logs', [TimeLogController::class, 'update'])->name('logs.update');
         });

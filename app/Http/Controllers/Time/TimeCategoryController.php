@@ -36,6 +36,7 @@ class TimeCategoryController extends Controller
             'categories' => $all->map(fn (TimeCategory $category) => [
                 'id' => $category->id,
                 'name' => $category->name,
+                'daily_goal_seconds' => $category->daily_goal_seconds,
                 'archived' => $category->isArchived(),
                 'has_history' => $category->getAttribute('logs_count') > 0,
                 'month_seconds' => $month[$category->id] ?? 0,
@@ -45,7 +46,7 @@ class TimeCategoryController extends Controller
 
     public function store(TimeCategoryRequest $request): RedirectResponse
     {
-        $this->categories->create($this->user($request), (string) $request->validated('name'));
+        $this->categories->create($this->user($request), (string) $request->validated('name'), $request->validated('daily_goal_seconds'));
 
         $this->toast('Categoria criada.');
 
@@ -54,7 +55,7 @@ class TimeCategoryController extends Controller
 
     public function update(TimeCategoryRequest $request, TimeCategory $category): RedirectResponse
     {
-        $this->categories->rename($category, (string) $request->validated('name'));
+        $this->categories->rename($category, (string) $request->validated('name'), $request->validated('daily_goal_seconds'));
 
         $this->toast('Categoria atualizada.');
 

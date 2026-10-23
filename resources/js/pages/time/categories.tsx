@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
-import { formatDuration } from '@/lib/time';
+import { formatClock, formatDuration, parseClock } from '@/lib/time';
 import time from '@/routes/time';
 import type { TimeCategory } from '@/types';
 
@@ -39,6 +39,12 @@ function CategoryFormDialog({
     trigger: ReactNode;
 }) {
     const [open, setOpen] = useState(false);
+    const [goal, setGoal] = useState(
+        category?.daily_goal_seconds
+            ? formatClock(category.daily_goal_seconds)
+            : '',
+    );
+    const goalSeconds = parseClock(goal);
     const form = category
         ? time.categories.update.form(category.id)
         : time.categories.store.form();
@@ -49,11 +55,13 @@ function CategoryFormDialog({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {category ? 'Renomear categoria' : 'Nova categoria'}
+                        {category ? 'Editar categoria' : 'Nova categoria'}
                     </DialogTitle>
                     <DialogDescription>
                         Uma categoria é um trabalho ou projeto, como o nome de
                         um cliente. Renomear não altera as horas já lançadas.
+                        Com meta diária, a planilha pinta de verde o dia que a
+                        atinge e de vermelho o que fica abaixo.
                     </DialogDescription>
                 </DialogHeader>
                 <Form
@@ -79,8 +87,38 @@ function CategoryFormDialog({
                                     defaultValue={category?.name}
                                 />
                             </FormField>
+                            <FormField
+                                id="category-goal"
+                                label="Meta diária (opcional)"
+                                error={
+                                    errors.daily_goal_seconds ??
+                                    (goalSeconds === null
+                                        ? 'Use um formato como 6:00, 6h ou 1h30.'
+                                        : undefined)
+                                }
+                            >
+                                <Input
+                                    id="category-goal"
+                                    inputMode="text"
+                                    placeholder="Ex.: 6:00"
+                                    value={goal}
+                                    onChange={(event) =>
+                                        setGoal(event.target.value)
+                                    }
+                                />
+                                <input
+                                    type="hidden"
+                                    name="daily_goal_seconds"
+                                    value={goalSeconds ? goalSeconds : ''}
+                                />
+                            </FormField>
                             <DialogFooter>
-                                <Button type="submit" disabled={processing}>
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        processing || goalSeconds === null
+                                    }
+                                >
                                     {processing && <Spinner />}
                                     Salvar
                                 </Button>
@@ -148,6 +186,16 @@ export default function TimeCategories({
                                                 )}{' '}
                                                 neste mês
                                             </p>
+                                            {category.daily_goal_seconds !==
+                                                null && (
+                                                <p className="text-sm text-muted-foreground">
+                                                    Meta:{' '}
+                                                    {formatDuration(
+                                                        category.daily_goal_seconds,
+                                                    )}{' '}
+                                                    por dia
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="flex shrink-0 gap-1">
                                             <CategoryFormDialog
@@ -156,7 +204,7 @@ export default function TimeCategories({
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        aria-label={`Renomear ${category.name}`}
+                                                        aria-label={`Editar ${category.name}`}
                                                     >
                                                         <Pencil />
                                                     </Button>

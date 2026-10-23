@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Models\TimeCategory;
 use App\Models\TimeLog;
+use App\Models\TimeTimer;
 use App\Models\User;
 use App\Support\Day;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -72,6 +74,37 @@ class TimeSummary
     }
 
     /**
+     * The stopwatch of every active category (plus archived ones that still
+     * have one), with the server clock so the browser can count from it.
+     *
+     * @return array{now: int, items: list<array<string, mixed>>}
+     */
+    public function timers(User $user): array
+    {
+        $categories = $user->timeCategories()
+            ->where(fn ($query) => $query->whereNull('archived_at')->orWhereHas('timer'))
+            ->orderBy('name')
+            ->get();
+
+        $timers = TimeTimer::query()->where('user_id', $user->id)->get()->keyBy('time_category_id');
+
+        return [
+            'now' => Date::now()->getTimestampMs(),
+            'items' => array_values($categories->map(function (TimeCategory $category) use ($timers) {
+                $timer = $timers->get($category->id);
+
+                return [
+                    'category_id' => $category->id,
+                    'name' => $category->name,
+                    'archived' => $category->isArchived(),
+                    'accumulated_seconds' => $timer === null ? 0 : $timer->accumulated_seconds,
+                    'started_at' => $timer?->started_at?->getTimestampMs(),
+                ];
+            })->all()),
+        ];
+    }
+
+    /**
      * The time sheet of a period: one row per date, one column per category.
      *
      * Columns are the active categories plus archived ones that have a cell
@@ -119,6 +152,7 @@ class TimeSummary
                 'id' => $category->id,
                 'name' => $category->name,
                 'archived' => $category->isArchived(),
+                'daily_goal_seconds' => $category->daily_goal_seconds,
                 'total_seconds' => $byCategory[$category->id] ?? 0,
             ])->all()),
             'cells' => (object) $cells,

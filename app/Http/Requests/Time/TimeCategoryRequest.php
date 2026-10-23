@@ -23,6 +23,7 @@ class TimeCategoryRequest extends TimeRequest
                     ->where('user_id', $this->user()?->id)
                     ->ignore($current instanceof TimeCategory ? $current->id : null),
             ],
+            'daily_goal_seconds' => ['nullable', 'integer', 'min:1', 'max:86400'],
         ];
     }
 
@@ -31,7 +32,7 @@ class TimeCategoryRequest extends TimeRequest
      */
     public function attributes(): array
     {
-        return ['name' => 'nome'];
+        return ['name' => 'nome', 'daily_goal_seconds' => 'meta diária'];
     }
 
     /**
@@ -44,6 +45,9 @@ class TimeCategoryRequest extends TimeRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge(['name' => trim((string) $this->input('name'))]);
+        $this->merge([
+            'name' => trim((string) $this->input('name')),
+            'daily_goal_seconds' => $this->input('daily_goal_seconds') ?: null,
+        ]);
     }
 }

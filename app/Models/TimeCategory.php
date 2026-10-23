@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * A job or project whose hours the user tracks day by day (for example one
@@ -17,11 +18,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property int $user_id
  * @property string $name
+ * @property int|null $daily_goal_seconds
  * @property CarbonImmutable|null $archived_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'archived_at'])]
+#[Fillable(['user_id', 'name', 'daily_goal_seconds', 'archived_at'])]
 class TimeCategory extends Model
 {
     /** @use HasFactory<TimeCategoryFactory> */
@@ -32,7 +34,7 @@ class TimeCategory extends Model
      */
     protected function casts(): array
     {
-        return ['archived_at' => 'datetime'];
+        return ['archived_at' => 'datetime', 'daily_goal_seconds' => 'integer'];
     }
 
     /**
@@ -49,6 +51,14 @@ class TimeCategory extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(TimeLog::class);
+    }
+
+    /**
+     * @return HasOne<TimeTimer, $this>
+     */
+    public function timer(): HasOne
+    {
+        return $this->hasOne(TimeTimer::class);
     }
 
     public function isArchived(): bool

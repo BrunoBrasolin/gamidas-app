@@ -9,14 +9,14 @@ use Illuminate\Validation\ValidationException;
 
 class TimeCategoryService
 {
-    public function create(User $user, string $name): TimeCategory
+    public function create(User $user, string $name, ?int $dailyGoalSeconds = null): TimeCategory
     {
-        return $user->timeCategories()->create(['name' => $name]);
+        return $user->timeCategories()->create(['name' => $name, 'daily_goal_seconds' => $dailyGoalSeconds]);
     }
 
-    public function rename(TimeCategory $category, string $name): TimeCategory
+    public function rename(TimeCategory $category, string $name, ?int $dailyGoalSeconds = null): TimeCategory
     {
-        $category->update(['name' => $name]);
+        $category->update(['name' => $name, 'daily_goal_seconds' => $dailyGoalSeconds]);
 
         return $category;
     }

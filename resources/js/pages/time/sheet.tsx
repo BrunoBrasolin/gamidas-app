@@ -6,13 +6,14 @@ import { FilterSelect } from '@/components/finance/filter-select';
 import { PageHeader } from '@/components/finance/page-header';
 import { CellDialog } from '@/components/time/cell-dialog';
 import type { CellTarget } from '@/components/time/cell-dialog';
+import { Timers } from '@/components/time/timers';
 import { Button } from '@/components/ui/button';
 import { useQueryFilters } from '@/hooks/use-query-filters';
 import { capitalize, formatMonth, formatShortDate, today } from '@/lib/format';
 import { formatClock, shortWeekday, weekdayIndex } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import time from '@/routes/time';
-import type { CategoryOption, TimeCell } from '@/types';
+import type { CategoryOption, TimeCell, TimerList } from '@/types';
 
 type Props = {
     filters: {
@@ -28,12 +29,14 @@ type Props = {
             id: number;
             name: string;
             archived: boolean;
+            daily_goal_seconds: number | null;
             total_seconds: number;
         }[];
         cells: Record<string, Record<number, TimeCell>>;
         total_seconds: number;
     };
     category_options: CategoryOption[];
+    timers: TimerList;
 };
 
 function query(filters: Props['filters']) {
@@ -50,6 +53,7 @@ export default function TimeSheet({
     period,
     sheet,
     category_options,
+    timers,
 }: Props) {
     const filter = useQueryFilters(time.index.url(), filters);
     const [target, setTarget] = useState<CellTarget | null>(null);
@@ -135,6 +139,8 @@ export default function TimeSheet({
                         </Button>
                     </div>
                 </PageHeader>
+
+                <Timers timers={timers} />
 
                 <div className="flex flex-wrap items-end gap-3">
                     <FilterSelect
@@ -251,10 +257,36 @@ export default function TimeSheet({
                                                             category.id
                                                         ];
 
+                                                    const goal =
+                                                        category.daily_goal_seconds;
+                                                    const tracked =
+                                                        cell?.seconds ?? 0;
+                                                    // Future days have no verdict yet.
+                                                    const verdict =
+                                                        goal !== null &&
+                                                        day.date <= today()
+                                                            ? tracked >= goal
+                                                                ? 'met'
+                                                                : 'missed'
+                                                            : null;
+
                                                     return (
                                                         <td
                                                             key={category.id}
-                                                            className="p-0"
+                                                            className={cn(
+                                                                'p-0',
+                                                                verdict ===
+                                                                    'met' &&
+                                                                    'bg-green-500/20 text-green-800 dark:text-green-300',
+                                                                verdict ===
+                                                                    'missed' &&
+                                                                    'bg-red-500/20 text-red-800 dark:text-red-300',
+                                                            )}
+                                                            title={
+                                                                goal !== null
+                                                                    ? `Meta: ${formatClock(goal)}`
+                                                                    : undefined
+                                                            }
                                                         >
                                                             <button
                                                                 type="button"

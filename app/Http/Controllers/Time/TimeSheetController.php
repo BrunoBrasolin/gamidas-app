@@ -54,6 +54,7 @@ class TimeSheetController extends Controller
             ],
             'sheet' => $summary->sheet($user, $from, $to, $categoryId, $sort),
             'category_options' => $summary->categoryOptions($user),
+            'timers' => $summary->timers($user),
         ]);
     }
 }

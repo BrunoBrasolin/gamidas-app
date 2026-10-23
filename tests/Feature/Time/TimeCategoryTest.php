@@ -93,4 +93,27 @@ class TimeCategoryTest extends TestCase
         $this->assertModelExists($used);
         $this->assertModelMissing($empty);
     }
+
+    public function test_the_daily_goal_is_optional_and_can_be_set_and_cleared(): void
+    {
+        $this->actingAs($this->bruno)
+            ->post(route('time.categories.store'), ['name' => 'MegaZap', 'daily_goal_seconds' => 21_600])
+            ->assertSessionHasNoErrors();
+
+        $category = TimeCategory::query()->sole();
+        $this->assertSame(21_600, $category->daily_goal_seconds);
+
+        $this->actingAs($this->bruno)
+            ->put(route('time.categories.update', $category), ['name' => 'MegaZap', 'daily_goal_seconds' => ''])
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull($category->fresh()->daily_goal_seconds);
+    }
+
+    public function test_the_daily_goal_must_fit_in_a_day(): void
+    {
+        $this->actingAs($this->bruno)
+            ->post(route('time.categories.store'), ['name' => 'MegaZap', 'daily_goal_seconds' => 86_401])
+            ->assertSessionHasErrors('daily_goal_seconds');
+    }
 }

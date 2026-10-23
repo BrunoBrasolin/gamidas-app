@@ -13,7 +13,7 @@ Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React
 - **Finanças pessoais** (privadas): receitas, despesas e investimentos; resumo mensal e anual com fluxo líquido e saldo disponível.
 - **Relatórios** anuais da casa e pessoais.
 - **Configurações da casa**: salários (com histórico) e membros.
-- **Tarefas e tempo** (`/time`, privado de cada usuário): tarefas com metas de tempo e/ou de resultado, cronômetro (iniciar, pausar, retomar, parar), planilha manual de tempo por dia × tarefa (semana e mês), visão detalhada do dia, notas diárias em Markdown com salvamento automático e relatórios de tempo registrado.
+- **Tempo** (`/time`, privado de cada usuário): categorias (um trabalho ou cliente por categoria), planilha de horas por dia × categoria (semana e mês) com tempo em h:mm:ss e nota em Markdown em cada célula, e relatórios de tempo registrado.
 
 ## Requisitos
 
@@ -224,17 +224,13 @@ Em **Settings › Secrets and variables › Actions**:
     - Editar ou excluir **somente este evento** grava uma exceção (`calendar_event_exceptions`) pela data original da ocorrência; a ocorrência alterada pode mudar de data e deixa de acompanhar edições da série.
     - Editar **toda a série** mantém as exceções, a menos que mude a data de início, a frequência, o intervalo ou os dias da semana — aí elas são descartadas. Encurtar o término descarta só as exceções depois da nova data. Excluir a série exclui todas as ocorrências.
 
-### Tarefas e tempo
+### Tempo
 
-- Tudo no módulo (tarefas, sessões do cronômetro, lançamentos e notas) pertence a **um usuário** e é invisível para os demais, inclusive para o outro membro da casa. Políticas respondem **404** para registros alheios, e IDs de tarefa enviados pelo navegador só são aceitos se forem do próprio usuário.
-- **Planilha × cronômetro**: são registros separados. As **sessões do cronômetro** (`timer_sessions`) são medições; os **lançamentos manuais** (`time_entries`) são o registro de tempo trabalhado. Parar o cronômetro **nunca** cria nem altera lançamentos. A única ponte é o botão “Lançar na planilha” de uma sessão, que só pré-preenche um formulário editável que o usuário precisa salvar.
-- Totais da planilha, metas de tempo, painel e relatórios usam **somente** os lançamentos manuais. Estatísticas do cronômetro aparecem à parte, rotuladas como “medido (cronômetro)”.
-- **Tarefas**: título, descrição, meta (`sem meta`, `tempo`, `resultado` ou `tempo e resultado`), meta de tempo em minutos, resultado esperado e prazo opcionais. A situação deriva de `completed_at` e `archived_at` (arquivada prevalece). Meta de tempo = tempo lançado em toda a história da tarefa ÷ meta; meta de resultado é alcançada ao concluir a tarefa.
-- Renomear, concluir ou arquivar não altera o histórico (lançamentos e sessões apontam para a tarefa pelo id). Tarefas arquivadas não recebem novos lançamentos nem cronômetro, mas lançamentos antigos podem ser corrigidos. Arquivar para o cronômetro aberto da tarefa. Só é possível **excluir** uma tarefa sem lançamentos nem sessões; caso contrário é preciso arquivar (as chaves estrangeiras também restringem a exclusão).
-- **Cronômetro**: no máximo **um em andamento por usuário**, garantido por índice único (`user_id`, `running_lock`); pode haver várias sessões pausadas. Iniciar outro exige escolher pausar ou parar o atual; iniciar uma tarefa com sessão pausada a retoma. Ações repetidas (duplo clique, duas abas) não mudam nada. O tempo decorrido é `accumulated_seconds` + (agora − `last_resumed_at`) quando em andamento, sempre calculado no servidor; o navegador só soma o tempo passado desde que recebeu o valor. Atualizar a página, trocar de aba ou fechar o navegador não perde o cronômetro. Os instantes são gravados em **UTC** (`App\Casts\UtcDateTime`). Uma sessão que atravessa a meia-noite continua sendo uma única sessão, datada pelo início.
-- **Lançamentos**: tarefa, data local (`Y-m-d`, sem conversão de fuso), duração em minutos inteiros (1 a 1440 por lançamento) e descrição opcional. Várias entradas da mesma tarefa no mesmo dia são somadas. Na planilha, digitar numa célula vazia cria um lançamento; numa célula com um lançamento, altera-o (0 o remove); células com vários lançamentos são editadas um a um. Datas passadas e futuras são permitidas (2000–2100). “Copiar do dia anterior” copia o último dia com lançamentos (até 60 dias antes) sem duplicar lançamentos idênticos já existentes.
-- A semana vai de **segunda a domingo**; as colunas da planilha são as tarefas ativas mais as que têm tempo no período (assim tarefas concluídas e arquivadas continuam aparecendo no histórico).
-- **Notas diárias**: uma por usuário e dia (índice único), Markdown guardado como texto (até 200.000 caracteres). O salvamento automático envia a revisão de origem; se a nota mudou em outra aba, o servidor responde 409 e o usuário escolhe qual versão manter. O rascunho fica no navegador até o servidor confirmar o salvamento. A renderização (`react-markdown` + GFM) descarta HTML bruto, neutraliza links `javascript:` e não carrega imagens externas. Nota em branco é removida.
+- Categorias e lançamentos pertencem a **um usuário** e são invisíveis para os demais, inclusive para o outro membro da casa. Políticas respondem **404** para categorias alheias, e IDs de categoria enviados pelo navegador só são aceitos se forem do próprio usuário.
+- **Categorias** (`time_categories`): um nome por trabalho ou cliente (ex.: MegaZap, Find Motors), único por usuário. Renomear não altera o histórico (os lançamentos apontam pelo id). Arquivar esconde a coluna da planilha sem apagar o histórico; categorias arquivadas só aceitam edição de células já existentes. Só é possível **excluir** uma categoria sem nenhum lançamento.
+- **Células** (`time_logs`): uma por categoria e dia (índice único), com duração em **segundos** (0 a 86.400) e uma nota em Markdown opcional (até 200.000 caracteres), editáveis quando quiser. Digita-se `7:42:14`, `1:30` (horas e minutos), `1h30`, `45m` ou `1,5h`. Uma célula sem tempo e sem nota é removida; salvar só o tempo mantém a nota. A data é local (`Y-m-d`, sem conversão de fuso), de 2000 a 2100.
+- A planilha mostra semana (segunda a domingo) ou mês, uma coluna por categoria ativa mais as arquivadas com lançamentos no período, totais por dia e por categoria. Os relatórios somam as mesmas células (total, médias, comparação com o período anterior, tempo por dia e por categoria, mapa de calor).
+- A renderização do Markdown (`react-markdown` + GFM) descarta HTML bruto, neutraliza links `javascript:` e não carrega imagens externas.
 
 ### Segurança e integridade
 
@@ -252,5 +248,4 @@ Em **Settings › Secrets and variables › Actions**:
 - Não há cadastro de cartões de crédito: compras parceladas são despesas avulsas com número de parcelas. Parcelas de cartão cadastradas antes dessa mudança foram convertidas em despesas avulsas parceladas, no mês do respectivo vencimento.
 - Despesas e lançamentos não têm categoria: apenas título e observações.
 - Não há importação automática das planilhas existentes.
-- O módulo de tarefas e tempo fica na mesma área autenticada (exige participação em uma residência), mas os dados são individuais. O fuso de referência é o da aplicação (`America/Sao_Paulo`).
-- Excluir uma sessão encerrada do cronômetro é permitido (medições erradas); isso não afeta a planilha.
+- O módulo de tempo fica na mesma área autenticada (exige participação em uma residência), mas os dados são individuais. O fuso de referência é o da aplicação (`America/Sao_Paulo`).

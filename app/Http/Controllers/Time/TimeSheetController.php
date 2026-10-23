@@ -11,8 +11,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The weekly or monthly time sheet: dates × tasks, built from manual time
- * entries only.
+ * The weekly or monthly time sheet: dates × categories, each cell holding
+ * the time worked and a Markdown note.
  */
 class TimeSheetController extends Controller
 {
@@ -23,9 +23,9 @@ class TimeSheetController extends Controller
         $user = $this->user($request);
         $view = $request->query('view') === 'month' ? 'month' : 'week';
         $anchor = Day::fromInput($request->query('date'));
-        $sort = $request->query('sort') === 'total' ? 'total' : 'title';
-        $taskId = $request->integer('task') ?: null;
-        $taskId = $taskId !== null && $user->tasks()->whereKey($taskId)->exists() ? $taskId : null;
+        $sort = $request->query('sort') === 'total' ? 'total' : 'name';
+        $categoryId = $request->integer('category') ?: null;
+        $categoryId = $categoryId !== null && $user->timeCategories()->whereKey($categoryId)->exists() ? $categoryId : null;
 
         if ($view === 'month') {
             $from = $anchor->startOfMonth();
@@ -43,7 +43,7 @@ class TimeSheetController extends Controller
             'filters' => [
                 'view' => $view,
                 'date' => $anchor->toDateString(),
-                'task' => $taskId,
+                'category' => $categoryId,
                 'sort' => $sort,
             ],
             'period' => [
@@ -52,8 +52,8 @@ class TimeSheetController extends Controller
                 'previous' => $previous->toDateString(),
                 'next' => $next->toDateString(),
             ],
-            'sheet' => $summary->sheet($user, $from, $to, $taskId, $sort),
-            'task_options' => $summary->taskOptions($user),
+            'sheet' => $summary->sheet($user, $from, $to, $categoryId, $sort),
+            'category_options' => $summary->categoryOptions($user),
         ]);
     }
 }

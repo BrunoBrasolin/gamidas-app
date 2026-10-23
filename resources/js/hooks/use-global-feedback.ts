@@ -12,8 +12,7 @@ const GLOBAL_ERROR_KEYS = [
     'payment',
     'recurring_expense',
     'salaries',
-    'task',
-    'timer',
+    'category',
     'from',
 ];
 

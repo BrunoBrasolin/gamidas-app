@@ -2,206 +2,110 @@
 
 namespace App\Services;
 
-use App\Enums\TaskStatus;
-use App\Models\DailyNote;
-use App\Models\Task;
-use App\Models\TimeEntry;
+use App\Models\TimeCategory;
+use App\Models\TimeLog;
 use App\Models\User;
 use App\Support\Day;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Read-side aggregations of the time-tracking module: the time sheet, task
- * goal progress and reports. Every total here is computed from manual time
- * entries only; timer sessions are never counted as recorded time.
+ * Read-side aggregations of the time-tracking module: the time sheet and the
+ * reports. Every total is a sum of the seconds recorded in the sheet cells.
  */
 class TimeSummary
 {
     /**
-     * Minutes recorded per day ("Y-m-d" => minutes), only for days with entries.
+     * Seconds per day ("Y-m-d" => seconds), only for days with time.
      *
      * @return array<string, int>
      */
-    public function minutesByDay(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $taskId = null): array
+    public function secondsByDay(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $categoryId = null): array
     {
-        return $this->entries($user, $from, $to, $taskId)
-            ->groupBy('entry_date')
-            ->select('entry_date', DB::raw('sum(duration_minutes) as minutes'))
+        return $this->logs($user, $from, $to, $categoryId)
+            ->where('seconds', '>', 0)
+            ->groupBy('log_date')
+            ->select('log_date', DB::raw('sum(seconds) as seconds'))
             ->get()
-            ->mapWithKeys(fn (TimeEntry $row) => [$row->entry_date->toDateString() => (int) $row->getAttribute('minutes')])
+            ->mapWithKeys(fn (TimeLog $row) => [$row->log_date->toDateString() => (int) $row->getAttribute('seconds')])
             ->all();
     }
 
     /**
-     * Minutes recorded per task (task id => minutes) in a period.
+     * Seconds per category (category id => seconds) in a period.
      *
      * @return array<int, int>
      */
-    public function minutesByTask(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $taskId = null): array
+    public function secondsByCategory(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $categoryId = null): array
     {
-        return $this->entries($user, $from, $to, $taskId)
-            ->groupBy('task_id')
-            ->select('task_id', DB::raw('sum(duration_minutes) as minutes'))
-            ->pluck('minutes', 'task_id')
-            ->map(fn ($minutes) => (int) $minutes)
-            ->all();
+        return array_filter($this->logs($user, $from, $to, $categoryId)
+            ->groupBy('time_category_id')
+            ->select('time_category_id', DB::raw('sum(seconds) as seconds'))
+            ->pluck('seconds', 'time_category_id')
+            ->map(fn ($seconds) => (int) $seconds)
+            ->all());
     }
 
-    public function total(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $taskId = null): int
+    public function total(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $categoryId = null): int
     {
-        return (int) $this->entries($user, $from, $to, $taskId)->sum('duration_minutes');
+        return (int) $this->logs($user, $from, $to, $categoryId)->sum('seconds');
     }
 
     /**
-     * Every task of the user for selects and filters, archived ones last.
+     * Every category of the user for selects and filters, archived ones last.
      *
-     * @return list<array{id: int, title: string, status: string}>
+     * @return list<array{id: int, name: string, archived: bool}>
      */
-    public function taskOptions(User $user): array
+    public function categoryOptions(User $user): array
     {
-        return array_values(Task::query()
-            ->ownedBy($user)
+        return array_values($user->timeCategories()
             ->orderByRaw('archived_at is not null')
-            ->orderBy('title')
+            ->orderBy('name')
             ->get()
-            ->map(fn (Task $task) => ['id' => $task->id, 'title' => $task->title, 'status' => $task->status()->value])
+            ->map(fn (TimeCategory $category) => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'archived' => $category->isArchived(),
+            ])
             ->all());
     }
 
     /**
-     * The page payload of tasks with their goal progress, computed from all
-     * the time ever recorded for them, in two grouped queries.
+     * The time sheet of a period: one row per date, one column per category.
      *
-     * @param  Collection<int, Task>  $tasks
-     * @return list<array<string, mixed>>
-     */
-    public function tasks(Collection $tasks): array
-    {
-        $ids = $tasks->modelKeys();
-
-        $recorded = TimeEntry::query()
-            ->whereIn('task_id', $ids)
-            ->groupBy('task_id')
-            ->select('task_id', DB::raw('sum(duration_minutes) as minutes'), DB::raw('count(*) as entries'))
-            ->get()
-            ->keyBy('task_id');
-
-        $sessions = DB::table('timer_sessions')
-            ->whereIn('task_id', $ids)
-            ->groupBy('task_id')
-            ->selectRaw('task_id, count(*) as aggregate')
-            ->pluck('aggregate', 'task_id');
-
-        return array_values($tasks->map(function (Task $task) use ($recorded, $sessions) {
-            $row = $recorded->get($task->id);
-
-            return $this->task(
-                $task,
-                (int) $row?->getAttribute('minutes'),
-                (int) $row?->getAttribute('entries') > 0 || (int) ($sessions[$task->id] ?? 0) > 0,
-            );
-        })->all());
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function task(Task $task, int $recordedMinutes, bool $hasHistory): array
-    {
-        return [
-            'id' => $task->id,
-            'title' => $task->title,
-            'description' => $task->description,
-            'goal_type' => $task->goal_type->value,
-            'target_minutes' => $task->target_minutes,
-            'outcome' => $task->outcome,
-            'deadline' => $task->deadline?->toDateString(),
-            'status' => $task->status()->value,
-            'completed_at' => $task->completed_at?->toIso8601String(),
-            'archived_at' => $task->archived_at?->toIso8601String(),
-            'created_at' => $task->created_at?->toIso8601String(),
-            'has_history' => $hasHistory,
-            'progress' => $this->progress($task, $recordedMinutes),
-        ];
-    }
-
-    /**
-     * Goal progress of a task. Time goals compare the recorded minutes with
-     * the target; outcome goals are reached when the task is completed.
-     *
-     * @return array{recorded_minutes: int, percent: ?int, remaining_minutes: ?int, outcome_done: ?bool, overdue: bool, days_left: ?int}
-     */
-    public function progress(Task $task, int $recordedMinutes): array
-    {
-        $target = $task->goal_type->hasTimeTarget() ? $task->target_minutes : null;
-        $done = $task->completed_at !== null;
-        $percent = match (true) {
-            $target !== null && $target > 0 => intdiv($recordedMinutes * 100, $target),
-            $task->goal_type->hasOutcome() => $done ? 100 : 0,
-            default => null,
-        };
-        $today = Day::today();
-
-        return [
-            'recorded_minutes' => $recordedMinutes,
-            'percent' => $percent,
-            'remaining_minutes' => $target === null ? null : max(0, $target - $recordedMinutes),
-            'outcome_done' => $task->goal_type->hasOutcome() ? $done : null,
-            'overdue' => $task->deadline !== null && ! $done && $task->deadline->lt($today),
-            'days_left' => $task->deadline === null ? null : (int) $today->diffInDays($task->deadline, false),
-        ];
-    }
-
-    /**
-     * The time sheet of a period: one row per date, one column per task, and
-     * the recorded entries of every cell.
-     *
-     * Columns are the tasks with entries in the period plus the active tasks,
-     * so archived and completed tasks still show their history.
+     * Columns are the active categories plus archived ones that have a cell
+     * in the period, so history stays visible.
      *
      * @return array<string, mixed>
      */
-    public function sheet(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $taskId, string $sort): array
+    public function sheet(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $categoryId, string $sort): array
     {
-        $entries = $this->entries($user, $from, $to, $taskId)
-            ->orderBy('id')
-            ->get(['id', 'task_id', 'entry_date', 'duration_minutes', 'description', 'updated_at']);
+        $logs = $this->logs($user, $from, $to, $categoryId)
+            ->get(['id', 'time_category_id', 'log_date', 'seconds', 'note']);
 
-        $taskIds = $entries->pluck('task_id')->unique()->all();
-
-        $columns = Task::query()
-            ->ownedBy($user)
-            ->when($taskId !== null, fn (Builder $query) => $query->whereKey($taskId))
+        $columns = $user->timeCategories()
+            ->when($categoryId !== null, fn (Builder $query) => $query->whereKey($categoryId))
             ->where(fn (Builder $query) => $query
-                ->whereIn('id', $taskIds)
-                ->orWhere(fn (Builder $query) => $query->withStatus(TaskStatus::Active)))
-            ->orderBy('title')
+                ->whereNull('archived_at')
+                ->orWhereIn('id', $logs->pluck('time_category_id')->unique()->all()))
+            ->orderBy('name')
             ->get();
 
         $cells = [];
         $byDay = [];
-        $byTask = [];
+        $byCategory = [];
 
-        foreach ($entries as $entry) {
-            $date = $entry->entry_date->toDateString();
-            $cells[$date][$entry->task_id]['minutes'] = ($cells[$date][$entry->task_id]['minutes'] ?? 0) + $entry->duration_minutes;
-            $cells[$date][$entry->task_id]['entries'][] = $entry->toPage();
-            $byDay[$date] = ($byDay[$date] ?? 0) + $entry->duration_minutes;
-            $byTask[$entry->task_id] = ($byTask[$entry->task_id] ?? 0) + $entry->duration_minutes;
+        foreach ($logs as $log) {
+            $date = $log->log_date->toDateString();
+            $cells[$date][$log->time_category_id] = ['seconds' => $log->seconds, 'note' => $log->note];
+            $byDay[$date] = ($byDay[$date] ?? 0) + $log->seconds;
+            $byCategory[$log->time_category_id] = ($byCategory[$log->time_category_id] ?? 0) + $log->seconds;
         }
 
         if ($sort === 'total') {
-            $columns = $columns->sortByDesc(fn (Task $task) => $byTask[$task->id] ?? 0)->values();
+            $columns = $columns->sortByDesc(fn (TimeCategory $category) => $byCategory[$category->id] ?? 0)->values();
         }
-
-        $notes = DailyNote::query()
-            ->where('user_id', $user->id)
-            ->whereBetween('note_date', [$from->toDateString(), $to->toDateString()])
-            ->get()
-            ->keyBy(fn (DailyNote $note) => $note->note_date->toDateString());
 
         $today = Day::today()->toDateString();
 
@@ -209,27 +113,26 @@ class TimeSummary
             'days' => array_map(fn (string $date) => [
                 'date' => $date,
                 'is_today' => $date === $today,
-                'total_minutes' => $byDay[$date] ?? 0,
-                'note' => $notes->has($date) ? $notes->get($date)?->preview() : null,
+                'total_seconds' => $byDay[$date] ?? 0,
             ], Day::range($from, $to)),
-            'tasks' => array_values($columns->map(fn (Task $task) => [
-                'id' => $task->id,
-                'title' => $task->title,
-                'status' => $task->status()->value,
-                'total_minutes' => $byTask[$task->id] ?? 0,
+            'categories' => array_values($columns->map(fn (TimeCategory $category) => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'archived' => $category->isArchived(),
+                'total_seconds' => $byCategory[$category->id] ?? 0,
             ])->all()),
             'cells' => (object) $cells,
-            'total_minutes' => array_sum($byDay),
+            'total_seconds' => array_sum($byDay),
         ];
     }
 
     /**
-     * Recorded minutes for every day of the 53 weeks ending on the week of
-     * $today (a calendar heatmap), only for days with entries.
+     * Seconds for every day of the 53 weeks ending on the week of $today (a
+     * calendar heatmap), only for days with time.
      *
      * @return array{from: string, to: string, days: array<string, int>}
      */
-    public function heatmap(User $user, CarbonImmutable $today, ?int $taskId = null): array
+    public function heatmap(User $user, CarbonImmutable $today, ?int $categoryId = null): array
     {
         $to = $today->endOfWeek(CarbonImmutable::SUNDAY)->startOfDay();
         $from = Day::startOfWeek($today)->subWeeks(52);
@@ -237,18 +140,18 @@ class TimeSummary
         return [
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
-            'days' => $this->minutesByDay($user, $from, $to, $taskId),
+            'days' => $this->secondsByDay($user, $from, $to, $categoryId),
         ];
     }
 
     /**
-     * @return Builder<TimeEntry>
+     * @return Builder<TimeLog>
      */
-    private function entries(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $taskId = null): Builder
+    private function logs(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $categoryId = null): Builder
     {
-        return TimeEntry::query()
+        return TimeLog::query()
             ->where('user_id', $user->id)
-            ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
-            ->when($taskId !== null, fn (Builder $query) => $query->where('task_id', $taskId));
+            ->whereBetween('log_date', [$from->toDateString(), $to->toDateString()])
+            ->when($categoryId !== null, fn (Builder $query) => $query->where('time_category_id', $categoryId));
     }
 }

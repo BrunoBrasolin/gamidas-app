@@ -70,35 +70,19 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
-     * @return HasMany<Task, $this>
+     * @return HasMany<TimeCategory, $this>
      */
-    public function tasks(): HasMany
+    public function timeCategories(): HasMany
     {
-        return $this->hasMany(Task::class);
+        return $this->hasMany(TimeCategory::class);
     }
 
     /**
-     * @return HasMany<TimerSession, $this>
+     * @return HasMany<TimeLog, $this>
      */
-    public function timerSessions(): HasMany
+    public function timeLogs(): HasMany
     {
-        return $this->hasMany(TimerSession::class);
-    }
-
-    /**
-     * @return HasMany<TimeEntry, $this>
-     */
-    public function timeEntries(): HasMany
-    {
-        return $this->hasMany(TimeEntry::class);
-    }
-
-    /**
-     * @return HasMany<DailyNote, $this>
-     */
-    public function dailyNotes(): HasMany
-    {
-        return $this->hasMany(DailyNote::class);
+        return $this->hasMany(TimeLog::class);
     }
 
     /**

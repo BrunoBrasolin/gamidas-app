@@ -2,11 +2,8 @@
 
 namespace App\Http\Controllers\Time;
 
-use App\Enums\TaskGoalType;
-use App\Enums\TaskStatus;
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
-use App\Models\Task;
 use App\Services\TimeSummary;
 use App\Support\Day;
 use Illuminate\Http\Request;
@@ -14,7 +11,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Reports of recorded time. Every number comes from manual time entries.
+ * Reports of recorded time, summed from the time sheet cells.
  */
 class TimeReportController extends Controller
 {
@@ -38,68 +35,54 @@ class TimeReportController extends Controller
             $to = $today;
         }
 
-        $taskId = $request->integer('task') ?: null;
-        $taskId = $taskId !== null && $user->tasks()->whereKey($taskId)->exists() ? $taskId : null;
+        $categoryId = $request->integer('category') ?: null;
+        $categoryId = $categoryId !== null && $user->timeCategories()->whereKey($categoryId)->exists() ? $categoryId : null;
 
         $days = (int) $from->diffInDays($to) + 1;
         $previousTo = $from->subDay();
         $previousFrom = $previousTo->subDays($days - 1);
 
-        $byDay = $summary->minutesByDay($user, $from, $to, $taskId);
-        $byTask = $summary->minutesByTask($user, $from, $to, $taskId);
+        $byDay = $summary->secondsByDay($user, $from, $to, $categoryId);
+        $byCategory = $summary->secondsByCategory($user, $from, $to, $categoryId);
         $total = array_sum($byDay);
-        $tasks = $user->tasks()->get()->keyBy('id');
+        $categories = $user->timeCategories()->get()->keyBy('id');
 
-        $goalTasks = $user->tasks()
-            ->where('goal_type', '!=', TaskGoalType::None)
-            ->when($taskId !== null, fn ($query) => $query->whereKey($taskId))
-            ->orderByRaw('archived_at is not null')
-            ->orderByRaw('completed_at is not null')
-            ->orderBy('title')
-            ->get();
-
-        arsort($byTask);
+        arsort($byCategory);
 
         return Inertia::render('time/reports', [
             'filters' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
-                'task' => $taskId,
+                'category' => $categoryId,
             ],
             'fixed' => [
-                'today_minutes' => $summary->total($user, $today, $today, $taskId),
-                'week_minutes' => $summary->total($user, Day::startOfWeek($today), $today, $taskId),
-                'month_minutes' => $summary->total($user, $today->startOfMonth(), $today, $taskId),
+                'today_seconds' => $summary->total($user, $today, $today, $categoryId),
+                'week_seconds' => $summary->total($user, Day::startOfWeek($today), $today, $categoryId),
+                'month_seconds' => $summary->total($user, $today->startOfMonth(), $today, $categoryId),
             ],
             'period' => [
                 'days' => $days,
-                'days_with_entries' => count($byDay),
-                'total_minutes' => $total,
-                'average_minutes' => intdiv($total, $days),
-                'average_active_minutes' => $byDay === [] ? 0 : intdiv($total, count($byDay)),
+                'days_with_time' => count($byDay),
+                'total_seconds' => $total,
+                'average_seconds' => intdiv($total, $days),
+                'average_active_seconds' => $byDay === [] ? 0 : intdiv($total, count($byDay)),
                 'previous' => [
                     'from' => $previousFrom->toDateString(),
                     'to' => $previousTo->toDateString(),
-                    'total_minutes' => $summary->total($user, $previousFrom, $previousTo, $taskId),
+                    'total_seconds' => $summary->total($user, $previousFrom, $previousTo, $categoryId),
                 ],
             ],
-            'by_day' => array_map(fn (string $date) => ['date' => $date, 'minutes' => $byDay[$date] ?? 0], Day::range($from, $to)),
-            'by_task' => array_map(fn (int $id, int $minutes) => [
-                'task_id' => $id,
-                'title' => $tasks->get($id)->title ?? '',
-                'status' => $tasks->get($id)?->status()->value,
-                'minutes' => $minutes,
+            'by_day' => array_map(fn (string $date) => ['date' => $date, 'seconds' => $byDay[$date] ?? 0], Day::range($from, $to)),
+            'by_category' => array_map(fn (int $id, int $seconds) => [
+                'category_id' => $id,
+                'name' => $categories->get($id)->name ?? '',
+                'archived' => $categories->get($id)?->isArchived() ?? false,
+                'seconds' => $seconds,
                 // Basis points of the period total (2500 = 25%).
-                'share' => $total > 0 ? intdiv($minutes * 10_000, $total) : 0,
-            ], array_keys($byTask), $byTask),
-            'goals' => $summary->tasks($goalTasks),
-            'task_counts' => [
-                TaskStatus::Active->value => $tasks->filter(fn (Task $task) => $task->status() === TaskStatus::Active)->count(),
-                TaskStatus::Completed->value => $tasks->filter(fn (Task $task) => $task->status() === TaskStatus::Completed)->count(),
-                TaskStatus::Archived->value => $tasks->filter(fn (Task $task) => $task->status() === TaskStatus::Archived)->count(),
-            ],
-            'heatmap' => $summary->heatmap($user, $today, $taskId),
-            'task_options' => $summary->taskOptions($user),
+                'share' => $total > 0 ? intdiv($seconds * 10_000, $total) : 0,
+            ], array_keys($byCategory), $byCategory),
+            'heatmap' => $summary->heatmap($user, $today, $categoryId),
+            'category_options' => $summary->categoryOptions($user),
         ]);
     }
 }

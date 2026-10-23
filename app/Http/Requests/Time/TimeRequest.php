@@ -3,21 +3,21 @@
 namespace App\Http\Requests\Time;
 
 use App\Http\Requests\Finance\FinanceRequest;
-use App\Models\Task;
+use App\Models\TimeCategory;
 use App\Support\Day;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 
 /**
  * Shared helpers for the time-tracking requests. Like finance requests, the
- * routed record is authorized before validation; task ids in the payload are
- * only accepted when the task belongs to the user.
+ * routed record is authorized before validation; category ids in the payload
+ * are only accepted when the category belongs to the user.
  */
 abstract class TimeRequest extends FinanceRequest
 {
-    protected function ownedTask(): Exists
+    protected function ownedCategory(): Exists
     {
-        return Rule::exists('tasks', 'id')->where('user_id', $this->user()?->id);
+        return Rule::exists('time_categories', 'id')->where('user_id', $this->user()?->id);
     }
 
     /**
@@ -28,8 +28,8 @@ abstract class TimeRequest extends FinanceRequest
         return ['required', 'date_format:Y-m-d', 'after_or_equal:'.Day::MIN, 'before_or_equal:'.Day::MAX];
     }
 
-    public function task(): Task
+    public function category(): TimeCategory
     {
-        return Task::query()->where('user_id', $this->user()?->id)->findOrFail((int) $this->validated('task_id'));
+        return TimeCategory::query()->where('user_id', $this->user()?->id)->findOrFail((int) $this->validated('category_id'));
     }
 }

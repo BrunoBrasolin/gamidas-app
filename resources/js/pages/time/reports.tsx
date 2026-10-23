@@ -1,10 +1,9 @@
 import { Head, Link } from '@inertiajs/react';
-import { BarChart3, Target } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 import { EmptyState } from '@/components/finance/empty-state';
 import { FilterSelect } from '@/components/finance/filter-select';
 import { PageHeader } from '@/components/finance/page-header';
 import { StatCard } from '@/components/finance/stat-card';
-import { ProgressBar, TaskProgress } from '@/components/time/task-progress';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -22,39 +21,55 @@ import {
     formatShortDate,
     today,
 } from '@/lib/format';
-import { formatMinutes, shiftDay, weekday, weekdayIndex } from '@/lib/time';
+import { formatDuration, shiftDay, weekday, weekdayIndex } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import time from '@/routes/time';
-import type { Task, TaskOption, TaskStatus } from '@/types';
+import type { CategoryOption } from '@/types';
 
 type Props = {
-    filters: { from: string; to: string; task: number | null };
+    filters: { from: string; to: string; category: number | null };
     fixed: {
-        today_minutes: number;
-        week_minutes: number;
-        month_minutes: number;
+        today_seconds: number;
+        week_seconds: number;
+        month_seconds: number;
     };
     period: {
         days: number;
-        days_with_entries: number;
-        total_minutes: number;
-        average_minutes: number;
-        average_active_minutes: number;
-        previous: { from: string; to: string; total_minutes: number };
+        days_with_time: number;
+        total_seconds: number;
+        average_seconds: number;
+        average_active_seconds: number;
+        previous: { from: string; to: string; total_seconds: number };
     };
-    by_day: { date: string; minutes: number }[];
-    by_task: {
-        task_id: number;
-        title: string;
-        status: TaskStatus | null;
-        minutes: number;
+    by_day: { date: string; seconds: number }[];
+    by_category: {
+        category_id: number;
+        name: string;
+        archived: boolean;
+        seconds: number;
         share: number;
     }[];
-    goals: Task[];
-    task_counts: Record<TaskStatus, number>;
     heatmap: { from: string; to: string; days: Record<string, number> };
-    task_options: TaskOption[];
+    category_options: CategoryOption[];
 };
+
+function ProgressBar({ percent, label }: { percent: number; label: string }) {
+    return (
+        <div
+            role="progressbar"
+            aria-label={label}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(percent)}
+            className="h-2 overflow-hidden rounded-full bg-muted"
+        >
+            <div
+                className="h-full rounded-full bg-primary"
+                style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
+            />
+        </div>
+    );
+}
 
 function presets(): [string, string, string][] {
     const now = today();
@@ -73,15 +88,13 @@ export default function TimeReports({
     fixed,
     period,
     by_day,
-    by_task,
-    goals,
-    task_counts,
+    by_category,
     heatmap,
-    task_options,
+    category_options,
 }: Props) {
     const filter = useQueryFilters(time.reports.index.url(), filters);
-    const max = Math.max(60, ...by_day.map((day) => day.minutes));
-    const difference = period.total_minutes - period.previous.total_minutes;
+    const max = Math.max(3600, ...by_day.map((day) => day.seconds));
+    const difference = period.total_seconds - period.previous.total_seconds;
 
     return (
         <>
@@ -89,7 +102,7 @@ export default function TimeReports({
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <PageHeader
                     title="Relatórios de tempo"
-                    description="Calculados só com o tempo lançado manualmente. Medem o tempo registrado, não a produtividade."
+                    description="Somam as horas lançadas na planilha. Medem o tempo registrado, não a produtividade."
                 />
 
                 <div className="flex flex-wrap items-end gap-3">
@@ -120,19 +133,21 @@ export default function TimeReports({
                         />
                     </div>
                     <FilterSelect
-                        id="report-task"
-                        label="Tarefa"
-                        value={filters.task ?? ''}
+                        id="report-category"
+                        label="Categoria"
+                        value={filters.category ?? ''}
                         options={[
                             ['', 'Todas'],
-                            ...task_options.map((task): [string, string] => [
-                                String(task.id),
-                                task.title,
-                            ]),
+                            ...category_options.map(
+                                (category): [string, string] => [
+                                    String(category.id),
+                                    category.name,
+                                ],
+                            ),
                         ]}
                         onChange={(value) =>
                             filter({
-                                task: value === '' ? null : Number(value),
+                                category: value === '' ? null : Number(value),
                             })
                         }
                     />
@@ -157,58 +172,53 @@ export default function TimeReports({
                 <div className="grid gap-4 sm:grid-cols-3">
                     <StatCard
                         title="Hoje"
-                        value={formatMinutes(fixed.today_minutes)}
+                        value={formatDuration(fixed.today_seconds)}
                     />
                     <StatCard
                         title="Nesta semana"
-                        value={formatMinutes(fixed.week_minutes)}
+                        value={formatDuration(fixed.week_seconds)}
                     />
                     <StatCard
                         title="Neste mês"
-                        value={formatMinutes(fixed.month_minutes)}
+                        value={formatDuration(fixed.month_seconds)}
                     />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-3">
                     <StatCard
                         title={`Total de ${formatShortDate(filters.from)} a ${formatShortDate(filters.to)}`}
-                        value={formatMinutes(period.total_minutes)}
+                        value={formatDuration(period.total_seconds)}
                         hint={
                             <>
                                 Período anterior (
                                 {formatShortDate(period.previous.from)}–
                                 {formatShortDate(period.previous.to)}):{' '}
-                                {formatMinutes(period.previous.total_minutes)}
+                                {formatDuration(period.previous.total_seconds)}
                                 {difference !== 0 &&
-                                    ` (${difference > 0 ? '+' : '−'}${formatMinutes(Math.abs(difference))})`}
+                                    ` (${difference > 0 ? '+' : '−'}${formatDuration(Math.abs(difference))})`}
                             </>
                         }
                     />
                     <StatCard
                         title="Média por dia"
-                        value={formatMinutes(period.average_minutes)}
+                        value={formatDuration(period.average_seconds)}
                         hint={`Em ${period.days} dia(s) do período.`}
                     />
                     <StatCard
                         title="Média nos dias com registro"
-                        value={formatMinutes(period.average_active_minutes)}
-                        hint={`${period.days_with_entries} de ${period.days} dia(s) com tempo lançado.`}
-                    />
-                    <StatCard
-                        title="Tarefas"
-                        value={`${task_counts.active} ativas`}
-                        hint={`${task_counts.completed} concluídas · ${task_counts.archived} arquivadas`}
+                        value={formatDuration(period.average_active_seconds)}
+                        hint={`${period.days_with_time} de ${period.days} dia(s) com tempo lançado.`}
                     />
                 </div>
 
-                {period.total_minutes === 0 ? (
+                {period.total_seconds === 0 ? (
                     <EmptyState
                         icon={BarChart3}
                         title="Nenhum tempo lançado no período"
-                        description="Lance tempo na planilha ou escolha outro período."
+                        description="Lance horas na planilha ou escolha outro período."
                     >
                         <Button asChild>
-                            <Link href={time.sheet()}>Abrir a planilha</Link>
+                            <Link href={time.index()}>Abrir a planilha</Link>
                         </Button>
                     </EmptyState>
                 ) : (
@@ -230,15 +240,20 @@ export default function TimeReports({
                                             className="h-full flex-1"
                                         >
                                             <Link
-                                                href={time.days.show(day.date)}
+                                                href={time.index({
+                                                    query: {
+                                                        view: 'week',
+                                                        date: day.date,
+                                                    },
+                                                })}
                                                 className="flex h-full items-end rounded-sm hover:bg-muted"
-                                                title={`${formatDate(day.date)}: ${formatMinutes(day.minutes)}`}
-                                                aria-label={`${weekday(day.date)}, ${formatDate(day.date)}: ${formatMinutes(day.minutes)}`}
+                                                title={`${formatDate(day.date)}: ${formatDuration(day.seconds)}`}
+                                                aria-label={`${weekday(day.date)}, ${formatDate(day.date)}: ${formatDuration(day.seconds)}`}
                                             >
                                                 <span
                                                     className="w-full rounded-sm bg-primary/80"
                                                     style={{
-                                                        height: `${(day.minutes / max) * 100}%`,
+                                                        height: `${(day.seconds / max) * 100}%`,
                                                     }}
                                                 />
                                             </Link>
@@ -254,38 +269,34 @@ export default function TimeReports({
 
                         <Card>
                             <CardHeader>
-                                <CardTitle>Tempo por tarefa</CardTitle>
+                                <CardTitle>Tempo por categoria</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <ul className="space-y-3 text-sm">
-                                    {by_task.map((row) => (
+                                    {by_category.map((row) => (
                                         <li
-                                            key={row.task_id}
+                                            key={row.category_id}
                                             className="space-y-1"
                                         >
                                             <div className="flex justify-between gap-2">
                                                 <span className="truncate">
-                                                    {row.title}
-                                                    {row.status !==
-                                                        'active' && (
+                                                    {row.name}
+                                                    {row.archived && (
                                                         <span className="ml-1 text-xs text-muted-foreground">
-                                                            (
-                                                            {row.status ===
-                                                            'archived'
-                                                                ? 'arquivada'
-                                                                : 'concluída'}
-                                                            )
+                                                            (arquivada)
                                                         </span>
                                                     )}
                                                 </span>
                                                 <span className="shrink-0 tabular-nums">
-                                                    {formatMinutes(row.minutes)}{' '}
+                                                    {formatDuration(
+                                                        row.seconds,
+                                                    )}{' '}
                                                     · {formatPercent(row.share)}
                                                 </span>
                                             </div>
                                             <ProgressBar
                                                 percent={row.share / 100}
-                                                label={`Parcela de ${row.title}`}
+                                                label={`Parcela de ${row.name}`}
                                             />
                                         </li>
                                     ))}
@@ -296,48 +307,6 @@ export default function TimeReports({
                 )}
 
                 <Heatmap heatmap={heatmap} />
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Metas</CardTitle>
-                        <CardDescription>
-                            Progresso com todo o tempo já lançado em cada
-                            tarefa.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {goals.length === 0 ? (
-                            <EmptyState
-                                icon={Target}
-                                title="Nenhuma tarefa com meta"
-                                description="Defina uma meta de tempo ou de resultado nas tarefas."
-                            />
-                        ) : (
-                            <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                {goals.map((task) => (
-                                    <li
-                                        key={task.id}
-                                        className="space-y-2 rounded-lg border p-3"
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="font-medium">
-                                                {task.title}
-                                            </span>
-                                            {task.status !== 'active' && (
-                                                <span className="text-xs text-muted-foreground">
-                                                    {task.status === 'archived'
-                                                        ? 'arquivada'
-                                                        : 'concluída'}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <TaskProgress task={task} />
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </CardContent>
-                </Card>
             </div>
         </>
     );
@@ -351,12 +320,12 @@ const LEVELS = [
     'bg-primary',
 ];
 
-function level(minutes: number): number {
-    if (minutes <= 0) {
+function level(seconds: number): number {
+    if (seconds <= 0) {
         return 0;
     }
 
-    return minutes < 60 ? 1 : minutes < 180 ? 2 : minutes < 300 ? 3 : 4;
+    return seconds < 3600 ? 1 : seconds < 10800 ? 2 : seconds < 18000 ? 3 : 4;
 }
 
 /**
@@ -380,7 +349,7 @@ function Heatmap({ heatmap }: { heatmap: Props['heatmap'] }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Dias com tempo registrado</CardTitle>
+                <CardTitle>Dias com horas registradas</CardTitle>
                 <CardDescription>
                     {recorded} dia(s) com registro nas últimas 53 semanas.
                 </CardDescription>
@@ -394,19 +363,21 @@ function Heatmap({ heatmap }: { heatmap: Props['heatmap'] }) {
                     {weeks.map((week) => (
                         <div key={week[0]} className="flex flex-col gap-0.5">
                             {week.map((day) => {
-                                const minutes = heatmap.days[day] ?? 0;
+                                const seconds = heatmap.days[day] ?? 0;
 
                                 return (
                                     <Link
                                         key={day}
-                                        href={time.days.show(day)}
-                                        title={`${formatDate(day)}: ${minutes > 0 ? formatMinutes(minutes) : 'sem registro'}`}
+                                        href={time.index({
+                                            query: { view: 'week', date: day },
+                                        })}
+                                        title={`${formatDate(day)}: ${seconds > 0 ? formatDuration(seconds) : 'sem registro'}`}
                                         tabIndex={-1}
                                         className={cn(
                                             'size-3 rounded-[2px]',
                                             day > now
                                                 ? 'opacity-30'
-                                                : LEVELS[level(minutes)],
+                                                : LEVELS[level(seconds)],
                                             day > now && 'bg-muted',
                                         )}
                                     />
@@ -432,7 +403,7 @@ function Heatmap({ heatmap }: { heatmap: Props['heatmap'] }) {
 
 TimeReports.layout = {
     breadcrumbs: [
-        { title: 'Tarefas e tempo', href: time.index() },
+        { title: 'Tempo', href: time.index() },
         { title: 'Relatórios', href: time.reports.index() },
     ],
 };

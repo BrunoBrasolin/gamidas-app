@@ -31,7 +31,7 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain items={mainNavItems} />
-                <NavMain items={timeNavItems} label="Tarefas e tempo" />
+                <NavMain items={timeNavItems} label="Tempo" />
             </SidebarContent>
 
             <SidebarFooter>

@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\HouseholdMember;
-use App\Services\TimerService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -44,22 +43,8 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'household' => fn () => $this->household($request),
-            'timer' => fn () => $this->timer($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
-    }
-
-    /**
-     * The user's running (or last paused) timer, so every page can show it
-     * and a refresh never loses it. Elapsed time is computed on the server.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function timer(Request $request): ?array
-    {
-        $user = $request->user();
-
-        return $user === null ? null : app(TimerService::class)->current($user)?->toPage();
     }
 
     /**

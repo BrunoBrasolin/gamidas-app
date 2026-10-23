@@ -1,15 +1,12 @@
 import {
     BarChart3,
     CalendarDays,
-    Clock,
     Home,
     LayoutGrid,
-    ListTodo,
-    NotebookPen,
     Receipt,
     Repeat,
     Sheet,
-    Timer,
+    Tags,
     TrendingUp,
     Wallet,
 } from 'lucide-react';
@@ -76,39 +73,23 @@ export const mainNavItems: NavItem[] = [
 ];
 
 /**
- * The personal task & time tracking module (private to each user).
+ * The personal time tracking module (private to each user).
  */
 export const timeNavItems: NavItem[] = [
     {
-        title: 'Visão geral',
+        title: 'Planilha de horas',
         href: time.index(),
-        icon: Clock,
-    },
-    {
-        title: 'Planilha',
-        href: time.sheet(),
         icon: Sheet,
-        activePrefix: '/time/days',
     },
     {
-        title: 'Tarefas',
-        href: time.tasks.index(),
-        icon: ListTodo,
-    },
-    {
-        title: 'Cronômetro',
-        href: time.timer.index(),
-        icon: Timer,
+        title: 'Categorias',
+        href: time.categories.index(),
+        icon: Tags,
     },
     {
         title: 'Relatórios de tempo',
         href: time.reports.index(),
         icon: TrendingUp,
-    },
-    {
-        title: 'Notas diárias',
-        href: time.notes.index(),
-        icon: NotebookPen,
     },
 ];
 

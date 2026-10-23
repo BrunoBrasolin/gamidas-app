@@ -31,11 +31,14 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Limit how often financial records can be written by a single user.
+     * Limit how often records can be written by a single user.
      */
     protected function configureRateLimiting(): void
     {
         RateLimiter::for('finance-writes', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+
+        // Time tracking writes more often (inline sheet edits, note autosave).
+        RateLimiter::for('time-writes', fn (Request $request) => Limit::perMinute(180)->by($request->user()?->id ?: $request->ip()));
     }
 
     /**

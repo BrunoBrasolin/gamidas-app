@@ -184,3 +184,78 @@
         box-shadow: none !important;
     }
 }
+
+/*
+ * Rendered Markdown of daily notes (resources/js/components/time/markdown.tsx).
+ */
+@layer components {
+    .markdown {
+        @apply space-y-3 text-sm leading-relaxed break-words;
+    }
+
+    .markdown h1 {
+        @apply text-xl font-semibold;
+    }
+
+    .markdown h2 {
+        @apply text-lg font-semibold;
+    }
+
+    .markdown h3,
+    .markdown h4 {
+        @apply font-semibold;
+    }
+
+    .markdown a {
+        @apply text-primary underline underline-offset-2;
+    }
+
+    .markdown ul {
+        @apply list-disc space-y-1 pl-5;
+    }
+
+    .markdown ol {
+        @apply list-decimal space-y-1 pl-5;
+    }
+
+    .markdown li.task-list-item {
+        @apply list-none;
+    }
+
+    .markdown ul.contains-task-list {
+        @apply pl-1;
+    }
+
+    .markdown li.task-list-item input {
+        @apply mr-2 align-middle;
+    }
+
+    .markdown blockquote {
+        @apply border-l-4 pl-3 text-muted-foreground;
+    }
+
+    .markdown code {
+        @apply rounded bg-muted px-1 py-0.5 font-mono text-[0.85em];
+    }
+
+    .markdown pre {
+        @apply overflow-x-auto rounded-md bg-muted p-3;
+    }
+
+    .markdown pre code {
+        @apply bg-transparent p-0;
+    }
+
+    .markdown table {
+        @apply block w-full border-collapse overflow-x-auto;
+    }
+
+    .markdown th,
+    .markdown td {
+        @apply border px-2 py-1 text-left;
+    }
+
+    .markdown hr {
+        @apply border-border;
+    }
+}

@@ -70,6 +70,38 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
+     * @return HasMany<Task, $this>
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
+     * @return HasMany<TimerSession, $this>
+     */
+    public function timerSessions(): HasMany
+    {
+        return $this->hasMany(TimerSession::class);
+    }
+
+    /**
+     * @return HasMany<TimeEntry, $this>
+     */
+    public function timeEntries(): HasMany
+    {
+        return $this->hasMany(TimeEntry::class);
+    }
+
+    /**
+     * @return HasMany<DailyNote, $this>
+     */
+    public function dailyNotes(): HasMany
+    {
+        return $this->hasMany(DailyNote::class);
+    }
+
+    /**
      * The id of the user's household, or null when they belong to none.
      */
     public function householdId(): ?int

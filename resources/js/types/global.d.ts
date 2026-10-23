@@ -1,4 +1,5 @@
 import type { Auth } from '@/types/auth';
+import type { TimerSession } from '@/types/time';
 
 export type SharedHousehold = {
     id: number;
@@ -18,6 +19,7 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             household: SharedHousehold | null;
+            timer: TimerSession | null;
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

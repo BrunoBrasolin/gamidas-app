@@ -11,7 +11,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { mainNavItems } from '@/lib/navigation';
+import { mainNavItems, timeNavItems } from '@/lib/navigation';
 import { dashboard } from '@/routes';
 
 export function AppSidebar() {
@@ -31,6 +31,7 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain items={mainNavItems} />
+                <NavMain items={timeNavItems} label="Tarefas e tempo" />
             </SidebarContent>
 
             <SidebarFooter>

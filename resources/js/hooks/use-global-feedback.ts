@@ -12,6 +12,9 @@ const GLOBAL_ERROR_KEYS = [
     'payment',
     'recurring_expense',
     'salaries',
+    'task',
+    'timer',
+    'from',
 ];
 
 const HTTP_MESSAGES: Record<number, string> = {
@@ -42,9 +45,16 @@ export function useGlobalFeedback(): void {
             }
         });
 
+        const offNetwork = router.on('networkError', () => {
+            toast.error(
+                'Sem conexão com o servidor. Nada foi salvo; tente novamente.',
+            );
+        });
+
         return () => {
             offError();
             offException();
+            offNetwork();
         };
     }, []);
 }

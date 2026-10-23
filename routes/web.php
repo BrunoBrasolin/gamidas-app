@@ -10,6 +10,14 @@ use App\Http\Controllers\Finance\RecurringExpenseController;
 use App\Http\Controllers\Finance\ReportController;
 use App\Http\Controllers\Household\MemberController;
 use App\Http\Controllers\Household\SalaryController;
+use App\Http\Controllers\Time\DailyNoteController;
+use App\Http\Controllers\Time\DayController;
+use App\Http\Controllers\Time\OverviewController;
+use App\Http\Controllers\Time\TaskController;
+use App\Http\Controllers\Time\TimeEntryController;
+use App\Http\Controllers\Time\TimerController;
+use App\Http\Controllers\Time\TimeReportController;
+use App\Http\Controllers\Time\TimeSheetController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
@@ -53,6 +61,44 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
 
         Route::put('household/members/{member}', [MemberController::class, 'update'])->name('household.members.update');
         Route::put('household/salaries', [SalaryController::class, 'update'])->name('household.salaries.update');
+    });
+
+    // Personal task & time tracking. Every record belongs to the signed-in user.
+    Route::prefix('time')->name('time.')->group(function () {
+        $date = '\d{4}-\d{2}-\d{2}';
+
+        Route::get('/', OverviewController::class)->name('index');
+        Route::get('sheet', TimeSheetController::class)->name('sheet');
+        Route::get('days/{date}', DayController::class)->where('date', $date)->name('days.show');
+        Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
+        Route::get('timer', [TimerController::class, 'index'])->name('timer.index');
+        Route::get('reports', TimeReportController::class)->name('reports.index');
+        Route::get('notes', [DailyNoteController::class, 'index'])->name('notes.index');
+        Route::get('notes/{date}', [DailyNoteController::class, 'show'])->where('date', $date)->name('notes.show');
+
+        Route::middleware('throttle:time-writes')->group(function () use ($date) {
+            Route::post('tasks', [TaskController::class, 'store'])->name('tasks.store');
+            Route::put('tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+            Route::delete('tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+            Route::post('tasks/{task}/complete', [TaskController::class, 'complete'])->name('tasks.complete');
+            Route::delete('tasks/{task}/complete', [TaskController::class, 'reopen'])->name('tasks.reopen');
+            Route::post('tasks/{task}/archive', [TaskController::class, 'archive'])->name('tasks.archive');
+            Route::delete('tasks/{task}/archive', [TaskController::class, 'restore'])->name('tasks.restore');
+
+            Route::post('timer', [TimerController::class, 'start'])->name('timer.start');
+            Route::post('timer/{session}/pause', [TimerController::class, 'pause'])->name('timer.pause');
+            Route::post('timer/{session}/resume', [TimerController::class, 'resume'])->name('timer.resume');
+            Route::post('timer/{session}/stop', [TimerController::class, 'stop'])->name('timer.stop');
+            Route::delete('timer/{session}', [TimerController::class, 'destroy'])->name('timer.destroy');
+
+            Route::post('entries', [TimeEntryController::class, 'store'])->name('entries.store');
+            Route::put('entries/{entry}', [TimeEntryController::class, 'update'])->name('entries.update');
+            Route::delete('entries/{entry}', [TimeEntryController::class, 'destroy'])->name('entries.destroy');
+            Route::put('sheet/cell', [TimeEntryController::class, 'cell'])->name('sheet.cell');
+            Route::post('days/{date}/copy', [TimeEntryController::class, 'copy'])->where('date', $date)->name('days.copy');
+
+            Route::put('notes/{date}', [DailyNoteController::class, 'update'])->where('date', $date)->name('notes.update');
+        });
     });
 });
 

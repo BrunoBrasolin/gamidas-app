@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        // Markdown notes keep their exact whitespace (indentation, line breaks).
+        $middleware->trimStrings(except: ['content']);
+
         $middleware->alias([
             'household' => EnsureUserBelongsToHousehold::class,
         ]);

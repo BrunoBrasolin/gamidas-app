@@ -11,7 +11,12 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { mainNavItems, showNavItems, timeNavItems } from '@/lib/navigation';
+import {
+    mainNavItems,
+    showNavItems,
+    studyNavItems,
+    timeNavItems,
+} from '@/lib/navigation';
 import { dashboard } from '@/routes';
 
 export function AppSidebar() {
@@ -32,6 +37,7 @@ export function AppSidebar() {
             <SidebarContent>
                 <NavMain items={mainNavItems} />
                 <NavMain items={timeNavItems} label="Tempo" />
+                <NavMain items={studyNavItems} label="Estudos" />
                 <NavMain items={showNavItems} label="Lazer" />
             </SidebarContent>
 

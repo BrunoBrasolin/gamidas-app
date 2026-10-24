@@ -15,9 +15,13 @@ import { Spinner } from '@/components/ui/spinner';
 
 /**
  * Asks for confirmation before sending a request, typically a deletion.
+ * Opens from its trigger, or is controlled through open/onOpenChange (to
+ * open it from a menu item).
  */
 export function ConfirmDialog({
     trigger,
+    open: controlledOpen,
+    onOpenChange,
     title,
     description,
     confirmLabel = 'Confirmar',
@@ -26,7 +30,9 @@ export function ConfirmDialog({
     url,
     onSuccess,
 }: {
-    trigger: ReactNode;
+    trigger?: ReactNode;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
     title: string;
     description: ReactNode;
     confirmLabel?: string;
@@ -35,7 +41,13 @@ export function ConfirmDialog({
     url: string;
     onSuccess?: () => void;
 }) {
-    const [open, setOpen] = useState(false);
+    const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+    const open = controlledOpen ?? uncontrolledOpen;
+
+    function setOpen(next: boolean) {
+        setUncontrolledOpen(next);
+        onOpenChange?.(next);
+    }
     const [processing, setProcessing] = useState(false);
 
     function confirm() {
@@ -53,7 +65,7 @@ export function ConfirmDialog({
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
             <DialogContent>
                 <DialogTitle>{title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>

@@ -1,4 +1,5 @@
 import {
+    LibraryBig,
     BarChart3,
     CalendarDays,
     Home,
@@ -19,6 +20,7 @@ import personal from '@/routes/personal';
 import recurringExpenses from '@/routes/recurring-expenses';
 import reports from '@/routes/reports';
 import shows from '@/routes/shows';
+import study from '@/routes/study';
 import time from '@/routes/time';
 import type { NavItem } from '@/types';
 
@@ -107,8 +109,21 @@ export const showNavItems: NavItem[] = [
     },
 ];
 
+/**
+ * The study library (private to each user).
+ */
+export const studyNavItems: NavItem[] = [
+    {
+        title: 'Biblioteca',
+        href: study.index(),
+        icon: LibraryBig,
+        activePrefix: '/study',
+    },
+];
+
 export const allNavItems: NavItem[] = [
     ...mainNavItems,
     ...timeNavItems,
+    ...studyNavItems,
     ...showNavItems,
 ];

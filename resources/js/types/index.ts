@@ -5,3 +5,4 @@ export type * from './finance';
 export type * from './calendar';
 export type * from './time';
 export type * from './shows';
+export type * from './study';

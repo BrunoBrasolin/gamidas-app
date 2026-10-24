@@ -62,19 +62,23 @@ class StudyLibraryController extends Controller
 
     /**
      * Search subject titles and descriptions, chapter titles and page titles
-     * and text. LIKE keeps it portable between SQLite and MySQL.
+     * and text, optionally within one subject. LIKE keeps it portable between
+     * SQLite and MySQL (both match case-insensitively).
      */
     public function search(Request $request): Response
     {
         $user = $this->user($request);
         $query = Str::limit(trim((string) $request->query('q', '')), 100, '');
+        $within = $request->integer('subject') > 0
+            ? $user->studySubjects()->find($request->integer('subject'))
+            : null;
         $results = ['subjects' => [], 'chapters' => [], 'pages' => []];
 
         if (mb_strlen($query) >= 2) {
             $like = '%'.addcslashes($query, '\\%_').'%';
-            $owned = fn (Builder $q) => $q->where('user_id', $user->id);
+            $owned = fn (Builder $q) => $q->where('user_id', $user->id)->when($within, fn (Builder $q) => $q->whereKey($within?->id));
 
-            $results['subjects'] = $user->studySubjects()
+            $results['subjects'] = $within !== null ? [] : $user->studySubjects()
                 ->where(fn (Builder $q) => $q->where('title', 'like', $like)->orWhere('description', 'like', $like))
                 ->withCount(StudyPresenter::subjectCounts())
                 ->orderBy('title')
@@ -110,7 +114,11 @@ class StudyLibraryController extends Controller
                 ->values();
         }
 
-        return Inertia::render('study/search', ['query' => $query, 'results' => $results]);
+        return Inertia::render('study/search', [
+            'query' => $query,
+            'subject' => $within === null ? null : ['id' => $within->id, 'title' => $within->title],
+            'results' => $results,
+        ]);
     }
 
     /**

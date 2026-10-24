@@ -20,6 +20,16 @@
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
 
+    /* Reading face of the study library; Iowan Old Style ships with iPadOS. */
+    --font-serif:
+        'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua',
+        Georgia, ui-serif, serif;
+
+    --color-paper: var(--paper);
+    --color-paper-edge: var(--paper-edge);
+    --color-ink: var(--ink);
+    --color-ink-soft: var(--ink-soft);
+
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
     --radius-sm: calc(var(--radius) - 4px);
@@ -102,6 +112,10 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.87 0 0);
+    --paper: oklch(0.985 0.008 85);
+    --paper-edge: oklch(0.93 0.018 80);
+    --ink: oklch(0.25 0.015 60);
+    --ink-soft: oklch(0.48 0.02 65);
 }
 
 @media screen {
@@ -138,6 +152,10 @@
         --sidebar-accent-foreground: oklch(0.985 0 0);
         --sidebar-border: oklch(0.269 0 0);
         --sidebar-ring: oklch(0.439 0 0);
+        --paper: oklch(0.2 0.006 70);
+        --paper-edge: oklch(0.3 0.01 70);
+        --ink: oklch(0.9 0.015 80);
+        --ink-soft: oklch(0.72 0.015 75);
     }
 }
 
@@ -257,5 +275,153 @@
 
     .markdown hr {
         @apply border-border;
+    }
+}
+
+/*
+ * Study library: page text shared by the editor (Tiptap's .ProseMirror) and
+ * the reader (resources/js/components/study/content-renderer.tsx), so both
+ * look the same. Size and measure come from --study-font-size and
+ * --study-measure, set by the reading preferences.
+ */
+@layer components {
+    .study-prose {
+        font-family: var(--font-serif);
+        font-size: var(--study-font-size, 1.1875rem);
+        line-height: 1.7;
+        color: var(--ink);
+        overflow-wrap: break-word;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    .study-prose > * + * {
+        margin-top: 0.9em;
+    }
+
+    .study-prose :is(h1, .h-1) {
+        @apply mt-[1.6em] font-sans text-[1.55em] leading-tight font-semibold tracking-tight;
+    }
+
+    .study-prose :is(h2, .h-2) {
+        @apply mt-[1.5em] font-sans text-[1.3em] leading-snug font-semibold tracking-tight;
+    }
+
+    .study-prose :is(h3, .h-3) {
+        @apply mt-[1.3em] font-sans text-[1.1em] leading-snug font-semibold;
+    }
+
+    .study-prose > :first-child {
+        margin-top: 0;
+    }
+
+    .study-prose a {
+        @apply underline decoration-1 underline-offset-[3px];
+        color: oklch(0.45 0.12 250);
+    }
+
+    .dark .study-prose a {
+        color: oklch(0.78 0.1 250);
+    }
+
+    .study-prose :is(ul, ol) {
+        @apply pl-[1.4em];
+    }
+
+    .study-prose ul {
+        @apply list-disc;
+    }
+
+    .study-prose ol {
+        @apply list-decimal;
+    }
+
+    .study-prose li + li,
+    .study-prose li > * + * {
+        margin-top: 0.3em;
+    }
+
+    .study-prose li::marker {
+        color: var(--ink-soft);
+    }
+
+    .study-prose blockquote {
+        @apply border-l-4 pl-[1em] italic;
+        border-color: var(--paper-edge);
+        color: var(--ink-soft);
+    }
+
+    .study-prose :not(pre) > code {
+        @apply rounded px-[0.3em] py-[0.1em] font-mono text-[0.85em];
+        background: var(--paper-edge);
+    }
+
+    .study-prose pre {
+        @apply overflow-x-auto rounded-lg p-[1em] font-mono text-[0.8em] leading-normal;
+        background: oklch(0.22 0.01 60);
+        color: oklch(0.93 0.01 80);
+    }
+
+    .study-prose hr {
+        @apply my-[2em] border-0 border-t;
+        border-color: var(--paper-edge);
+    }
+
+    .study-prose .study-table {
+        @apply overflow-x-auto;
+    }
+
+    .study-prose table {
+        @apply w-full border-collapse font-sans text-[0.85em];
+    }
+
+    .study-prose :is(td, th) {
+        @apply border px-[0.75em] py-[0.45em] align-top;
+        border-color: var(--paper-edge);
+    }
+
+    .study-prose th {
+        @apply text-left font-semibold;
+        background: color-mix(in oklch, var(--paper-edge) 45%, transparent);
+    }
+
+    .study-prose :is(td, th) > * + * {
+        margin-top: 0.4em;
+    }
+
+    /* Editor-only details. */
+    .study-prose.ProseMirror {
+        @apply min-h-[50vh] outline-none;
+    }
+
+    .study-prose.ProseMirror .is-editor-empty:first-child::before {
+        content: attr(data-placeholder);
+        @apply pointer-events-none float-left h-0;
+        color: var(--ink-soft);
+        opacity: 0.7;
+    }
+
+    .study-prose.ProseMirror .selectedCell {
+        background: color-mix(in oklch, oklch(0.6 0.1 250) 18%, transparent);
+    }
+
+    .study-prose.ProseMirror .column-resize-handle {
+        @apply pointer-events-none absolute top-0 -right-0.5 bottom-0 w-1;
+        background: oklch(0.6 0.1 250);
+    }
+
+    .study-prose.ProseMirror .tableWrapper {
+        @apply overflow-x-auto;
+    }
+
+    .study-prose.ProseMirror table {
+        @apply relative;
+    }
+
+    .study-prose.ProseMirror .ProseMirror-selectednode > [data-node-card] {
+        @apply ring-2 ring-ring ring-offset-2 ring-offset-paper;
+    }
+
+    .study-prose.ProseMirror .ProseMirror-gapcursor::after {
+        border-top-color: var(--ink);
     }
 }

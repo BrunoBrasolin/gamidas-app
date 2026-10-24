@@ -41,7 +41,11 @@ function renderText(node: StudyNode, key: number): ReactNode {
 
                 if (href) {
                     element = (
-                        <a href={href} target="_blank" rel="noopener noreferrer">
+                        <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
                             {element}
                         </a>
                     );

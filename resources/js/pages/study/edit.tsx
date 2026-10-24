@@ -77,7 +77,12 @@ function SaveIndicator({
             label: time ? `Salvo às ${time}` : 'Salvo',
         },
         pending: {
-            icon: <span className="size-2 rounded-full bg-amber-500" aria-hidden />,
+            icon: (
+                <span
+                    className="size-2 rounded-full bg-amber-500"
+                    aria-hidden
+                />
+            ),
             label: 'Alterações não salvas',
         },
         saving: {
@@ -85,7 +90,9 @@ function SaveIndicator({
             label: 'Salvando…',
         },
         conflict: {
-            icon: <AlertTriangle className="size-4 text-amber-600" aria-hidden />,
+            icon: (
+                <AlertTriangle className="size-4 text-amber-600" aria-hidden />
+            ),
             label: 'Alterada em outro lugar',
         },
     };

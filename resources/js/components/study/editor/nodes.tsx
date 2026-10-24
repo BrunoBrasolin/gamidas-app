@@ -8,11 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { formatBytes } from '@/lib/study';
-import {
-    MissingAttachment,
-    PdfCard,
-    StudyFigure,
-} from '../attachment-viewers';
+import { MissingAttachment, PdfCard, StudyFigure } from '../attachment-viewers';
 import { useStudyEditor } from './context';
 import { IMAGE_ACCEPT, PDF_ACCEPT } from './uploads';
 import type { UploadKind } from './uploads';
@@ -102,7 +98,9 @@ function AttachmentBlockView({
             if (stored) {
                 updateAttributes({ attachmentId: stored.id });
                 toast.success(
-                    kind === 'image' ? 'Imagem substituída.' : 'PDF substituído.',
+                    kind === 'image'
+                        ? 'Imagem substituída.'
+                        : 'PDF substituído.',
                 );
             }
         });
@@ -144,7 +142,9 @@ function AttachmentBlockView({
                         aria-label="Legenda da imagem"
                         className="block w-full rounded-md border-0 bg-transparent px-2 py-1 text-center font-sans text-sm text-ink-soft outline-none placeholder:text-ink-soft/60 focus-visible:ring-2 focus-visible:ring-ring"
                         onChange={(event) =>
-                            updateAttributes({ alt: event.target.value || null })
+                            updateAttributes({
+                                alt: event.target.value || null,
+                            })
                         }
                     />
                 </div>

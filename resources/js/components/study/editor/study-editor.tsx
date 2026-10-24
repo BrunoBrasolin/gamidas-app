@@ -99,7 +99,10 @@ export function StudyEditor({
                 return false;
             }
 
-            if (node.type.name === 'studyUpload' && node.attrs.uploadId === id) {
+            if (
+                node.type.name === 'studyUpload' &&
+                node.attrs.uploadId === id
+            ) {
                 found = { pos, size: node.nodeSize };
 
                 return false;
@@ -118,7 +121,11 @@ export function StudyEditor({
             return;
         }
 
-        uploads.update(id, { status: 'uploading', progress: 0, error: undefined });
+        uploads.update(id, {
+            status: 'uploading',
+            progress: 0,
+            error: undefined,
+        });
 
         sendFile(uploadUrl, upload.file, (progress) =>
             uploads.update(id, { progress }),
@@ -270,7 +277,10 @@ export function StudyEditor({
                     defaultProtocol: 'https',
                     protocols: ['mailto'],
                     isAllowedUri: (url) => safeHref(url) !== null,
-                    HTMLAttributes: { rel: 'noopener noreferrer', target: null },
+                    HTMLAttributes: {
+                        rel: 'noopener noreferrer',
+                        target: null,
+                    },
                 },
             }),
             TableKit.configure({ table: { resizable: false } }),

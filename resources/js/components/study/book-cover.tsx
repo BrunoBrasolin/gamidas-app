@@ -27,7 +27,7 @@ export function BookCover({
     return (
         <div
             className={cn(
-                'relative aspect-[3/4] w-full overflow-hidden rounded-r-md rounded-l-sm shadow-[0_1px_2px_rgba(0,0,0,0.12),0_8px_20px_-8px_rgba(60,40,20,0.45)]',
+                'relative aspect-[3/4] w-full overflow-hidden rounded-l-sm rounded-r-md shadow-[0_1px_2px_rgba(0,0,0,0.12),0_8px_20px_-8px_rgba(60,40,20,0.45)]',
                 className,
             )}
             style={{

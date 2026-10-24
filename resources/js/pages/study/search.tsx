@@ -48,7 +48,11 @@ export default function StudySearch({
                         <h1 className="font-serif text-3xl font-semibold tracking-tight">
                             Buscar
                         </h1>
-                        <form onSubmit={submit} role="search" className="flex gap-2">
+                        <form
+                            onSubmit={submit}
+                            role="search"
+                            className="flex gap-2"
+                        >
                             <div className="relative flex-1">
                                 <Search
                                     className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-soft"
@@ -107,8 +111,14 @@ export default function StudySearch({
                     )}
 
                     {results.subjects.length > 0 && (
-                        <section className="space-y-3" aria-labelledby="r-subjects">
-                            <h2 id="r-subjects" className="font-serif text-lg font-semibold">
+                        <section
+                            className="space-y-3"
+                            aria-labelledby="r-subjects"
+                        >
+                            <h2
+                                id="r-subjects"
+                                className="font-serif text-lg font-semibold"
+                            >
                                 Matérias
                             </h2>
                             <ul className="grid grid-cols-3 gap-4 sm:grid-cols-5">
@@ -135,8 +145,14 @@ export default function StudySearch({
                     )}
 
                     {results.chapters.length > 0 && (
-                        <section className="space-y-3" aria-labelledby="r-chapters">
-                            <h2 id="r-chapters" className="font-serif text-lg font-semibold">
+                        <section
+                            className="space-y-3"
+                            aria-labelledby="r-chapters"
+                        >
+                            <h2
+                                id="r-chapters"
+                                className="font-serif text-lg font-semibold"
+                            >
                                 Capítulos
                             </h2>
                             <ul className="divide-y divide-paper-edge rounded-xl border border-paper-edge bg-background/60">
@@ -168,11 +184,21 @@ export default function StudySearch({
                     )}
 
                     {results.pages.length > 0 && (
-                        <section className="space-y-3" aria-labelledby="r-pages">
-                            <h2 id="r-pages" className="font-serif text-lg font-semibold">
+                        <section
+                            className="space-y-3"
+                            aria-labelledby="r-pages"
+                        >
+                            <h2
+                                id="r-pages"
+                                className="font-serif text-lg font-semibold"
+                            >
                                 Páginas
                                 <span className="ml-2 font-sans text-sm font-normal text-ink-soft">
-                                    {plural(results.pages.length, 'resultado', 'resultados')}
+                                    {plural(
+                                        results.pages.length,
+                                        'resultado',
+                                        'resultados',
+                                    )}
                                 </span>
                             </h2>
                             <ul className="space-y-2">
@@ -183,7 +209,9 @@ export default function StudySearch({
                                             className="block space-y-1.5 rounded-xl border border-paper-edge bg-background/60 p-4 hover:bg-background"
                                         >
                                             <span className="flex items-center gap-2">
-                                                <StatusIcon status={page.status} />
+                                                <StatusIcon
+                                                    status={page.status}
+                                                />
                                                 <span className="truncate font-serif text-lg font-semibold">
                                                     {page.title}
                                                 </span>
@@ -201,7 +229,9 @@ export default function StudySearch({
                                                     aria-hidden
                                                 />
                                                 {page.subject.title} · editada{' '}
-                                                {formatRelative(page.updated_at)}
+                                                {formatRelative(
+                                                    page.updated_at,
+                                                )}
                                             </span>
                                             {page.excerpt && (
                                                 <span className="line-clamp-3 block font-serif text-sm text-ink-soft">

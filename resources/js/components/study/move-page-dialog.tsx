@@ -70,7 +70,10 @@ export function MovePageDialog({
                             }}
                         >
                             {destinations.map((destination) => (
-                                <option key={destination.id} value={destination.id}>
+                                <option
+                                    key={destination.id}
+                                    value={destination.id}
+                                >
                                     {destination.title}
                                 </option>
                             ))}

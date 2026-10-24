@@ -45,7 +45,9 @@ export function StudyTopBar({
                 <div className="flex min-w-0 flex-1 items-center justify-center">
                     {children}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">{actions}</div>
+                <div className="flex shrink-0 items-center gap-1">
+                    {actions}
+                </div>
             </div>
         </header>
     );

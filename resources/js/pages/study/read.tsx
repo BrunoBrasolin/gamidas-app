@@ -77,7 +77,11 @@ function useReaderPrefs() {
 
     const size = Math.min(FONT_SIZES.length - 1, Math.max(0, prefs.size));
 
-    return { size, width: prefs.width in MEASURES ? prefs.width : 'medium', update };
+    return {
+        size,
+        width: prefs.width in MEASURES ? prefs.width : 'medium',
+        update,
+    };
 }
 
 /**
@@ -214,8 +218,7 @@ function ContentsSheet({
                             Sumário
                         </SheetTitle>
                         <SheetDescription className="text-ink-soft">
-                            Seções desta página e as outras páginas da
-                            matéria.
+                            Seções desta página e as outras páginas da matéria.
                         </SheetDescription>
                     </div>
                     {headings.length > 0 && (
@@ -474,10 +477,9 @@ export default function StudyRead({
         return () => window.removeEventListener('keydown', onKey);
     }, [next, previous]);
 
-    const isEmpty =
-        (page.content.content ?? []).every(
-            (node) => node.type === 'paragraph' && !node.content?.length,
-        );
+    const isEmpty = (page.content.content ?? []).every(
+        (node) => node.type === 'paragraph' && !node.content?.length,
+    );
 
     return (
         <>
@@ -529,16 +531,10 @@ export default function StudyRead({
                             status={page.status}
                             compact
                         />
-                        <Button
-                            variant="outline"
-                            className="ml-1 h-10"
-                            asChild
-                        >
+                        <Button variant="outline" className="ml-1 h-10" asChild>
                             <Link href={study.pages.edit(page.id)}>
                                 <Pencil />
-                                <span className="hidden sm:inline">
-                                    Editar
-                                </span>
+                                <span className="hidden sm:inline">Editar</span>
                             </Link>
                         </Button>
                     </>

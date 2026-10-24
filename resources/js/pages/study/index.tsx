@@ -358,14 +358,17 @@ export default function StudyLibrary({
                     </header>
 
                     {recentPages.length > 0 && (
-                        <section aria-labelledby="recent-title" className="space-y-3">
+                        <section
+                            aria-labelledby="recent-title"
+                            className="space-y-3"
+                        >
                             <h2
                                 id="recent-title"
                                 className="font-serif text-xl font-semibold"
                             >
                                 Continuar lendo
                             </h2>
-                            <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:-mx-6 sm:px-6">
+                            <div className="-mx-4 flex [scrollbar-width:thin] gap-3 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6">
                                 {recentPages.map((page) => (
                                     <PageLinkCard key={page.id} page={page} />
                                 ))}
@@ -373,7 +376,10 @@ export default function StudyLibrary({
                         </section>
                     )}
 
-                    <section aria-labelledby="shelf-title" className="space-y-5">
+                    <section
+                        aria-labelledby="shelf-title"
+                        className="space-y-5"
+                    >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <h2
                                 id="shelf-title"
@@ -427,7 +433,9 @@ export default function StudyLibrary({
                                         </option>
                                     </NativeSelect>
                                     <Button
-                                        variant={organizing ? 'default' : 'outline'}
+                                        variant={
+                                            organizing ? 'default' : 'outline'
+                                        }
                                         className="h-11"
                                         aria-pressed={organizing}
                                         onClick={() => {
@@ -541,7 +549,10 @@ export default function StudyLibrary({
                     </section>
 
                     {bookmarks.length > 0 && (
-                        <section aria-labelledby="bookmarks-title" className="space-y-3">
+                        <section
+                            aria-labelledby="bookmarks-title"
+                            className="space-y-3"
+                        >
                             <h2
                                 id="bookmarks-title"
                                 className="flex items-center gap-2 font-serif text-xl font-semibold"
@@ -599,7 +610,9 @@ export default function StudyLibrary({
                                                         study.subjects.restore.url(
                                                             subject.id,
                                                         ),
-                                                        { preserveScroll: true },
+                                                        {
+                                                            preserveScroll: true,
+                                                        },
                                                     )
                                                 }
                                             >

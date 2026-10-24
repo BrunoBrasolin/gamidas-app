@@ -69,12 +69,7 @@ export function PdfCard({
                 </span>
             </button>
             <div className="flex items-center gap-1">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-10"
-                    asChild
-                >
+                <Button variant="ghost" size="icon" className="size-10" asChild>
                     <a
                         href={downloadUrl(attachment)}
                         aria-label={`Baixar ${attachment.name}`}
@@ -104,9 +99,7 @@ export function PdfViewerDialog({
 }) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                className="flex h-[92dvh] max-w-[min(64rem,96vw)] flex-col gap-3 p-3 sm:max-w-[min(64rem,96vw)] [&>button:last-child]:hidden"
-            >
+            <DialogContent className="flex h-[92dvh] max-w-[min(64rem,96vw)] flex-col gap-3 p-3 sm:max-w-[min(64rem,96vw)] [&>button:last-child]:hidden">
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="min-w-0 flex-1">
                         <DialogTitle className="truncate text-base">
@@ -172,9 +165,7 @@ export function ImageViewerDialog({
 }) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                className="flex max-h-[96dvh] max-w-[96vw] flex-col gap-3 border-0 bg-neutral-950 p-3 text-white sm:max-w-[96vw] [&>button:last-child]:hidden"
-            >
+            <DialogContent className="flex max-h-[96dvh] max-w-[96vw] flex-col gap-3 border-0 bg-neutral-950 p-3 text-white sm:max-w-[96vw] [&>button:last-child]:hidden">
                 <div className="flex items-center gap-2">
                     <DialogTitle className="min-w-0 flex-1 truncate text-sm font-normal text-white/80">
                         {alt || attachment.name}

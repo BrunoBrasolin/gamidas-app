@@ -6,6 +6,7 @@ use App\Enums\StudyPageStatus;
 use App\Models\StudyAttachment;
 use App\Models\StudyPage;
 use App\Models\StudySubject;
+use App\Support\StudyContent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -242,7 +243,7 @@ class StudyPageTest extends TestCase
 
         $copied = $copy->attachments()->sole();
         $this->assertNotSame($image, $copied->id);
-        $this->assertSame([$copied->id], \App\Support\StudyContent::attachmentIds($copy->content));
+        $this->assertSame([$copied->id], StudyContent::attachmentIds($copy->content));
         Storage::disk('local')->assertExists($copied->path);
         Storage::disk('local')->assertExists(StudyAttachment::query()->findOrFail($image)->path);
     }

@@ -100,7 +100,11 @@ export function PromptDialog({
                     </div>
                     <DialogFooter className="gap-2">
                         <DialogClose asChild>
-                            <Button type="button" variant="secondary" className="h-11">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="h-11"
+                            >
                                 Cancelar
                             </Button>
                         </DialogClose>

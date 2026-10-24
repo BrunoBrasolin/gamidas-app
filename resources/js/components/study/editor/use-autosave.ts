@@ -137,7 +137,9 @@ export function useAutosave({
                     );
 
                     const delay =
-                        RETRY_MS[Math.min(attempts.current, RETRY_MS.length - 1)];
+                        RETRY_MS[
+                            Math.min(attempts.current, RETRY_MS.length - 1)
+                        ];
                     attempts.current++;
                     timer.current = window.setTimeout(() => void save(), delay);
 

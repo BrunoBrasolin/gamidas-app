@@ -26,10 +26,7 @@ import { BookCover } from '@/components/study/book-cover';
 import { MovePageDialog } from '@/components/study/move-page-dialog';
 import { ProgressBar } from '@/components/study/progress-bar';
 import { PromptDialog } from '@/components/study/prompt-dialog';
-import {
-    setPageStatus,
-    StatusIcon,
-} from '@/components/study/status-control';
+import { setPageStatus, StatusIcon } from '@/components/study/status-control';
 import { SubjectFormDialog } from '@/components/study/subject-form-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -113,9 +110,7 @@ function PageRow({
                         {page.title}
                     </span>
                     <span className="flex items-center gap-2 text-xs text-ink-soft">
-                        <span>
-                            Editada {formatRelative(page.updated_at)}
-                        </span>
+                        <span>Editada {formatRelative(page.updated_at)}</span>
                         {page.attachments_count > 0 && (
                             <span className="flex items-center gap-0.5">
                                 <Paperclip className="size-3" aria-hidden />
@@ -411,13 +406,16 @@ export default function StudySubjectPage({
                                     {subject.title}
                                 </h1>
                                 {subject.description && (
-                                    <p className="max-w-prose text-ink-soft whitespace-pre-line">
+                                    <p className="max-w-prose whitespace-pre-line text-ink-soft">
                                         {subject.description}
                                     </p>
                                 )}
                             </div>
                             <div className="max-w-sm">
-                                <ProgressBar counts={subject.counts} showLabel />
+                                <ProgressBar
+                                    counts={subject.counts}
+                                    showLabel
+                                />
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {(continuePage ?? firstPage) && (
@@ -952,6 +950,9 @@ export default function StudySubjectPage({
 StudySubjectPage.layout = (props: { subject: StudySubject }) => ({
     breadcrumbs: [
         { title: 'Biblioteca', href: study.index() },
-        { title: props.subject.title, href: study.subjects.show(props.subject.id) },
+        {
+            title: props.subject.title,
+            href: study.subjects.show(props.subject.id),
+        },
     ],
 });

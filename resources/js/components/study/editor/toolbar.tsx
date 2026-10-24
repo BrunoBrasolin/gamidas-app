@@ -284,7 +284,7 @@ export function EditorToolbar({
         <div
             role="toolbar"
             aria-label="Formatação"
-            className="flex items-center gap-0.5 overflow-x-auto px-2 py-1.5 [scrollbar-width:none]"
+            className="flex [scrollbar-width:none] items-center gap-0.5 overflow-x-auto px-2 py-1.5"
         >
             <ToolButton
                 icon={Undo2}

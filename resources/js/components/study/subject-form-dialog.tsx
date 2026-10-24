@@ -67,7 +67,8 @@ export function SubjectFormDialog({
     }, [form.data.cover]);
 
     const coverUrl =
-        preview ?? (form.data.remove_cover ? null : (subject?.cover_url ?? null));
+        preview ??
+        (form.data.remove_cover ? null : (subject?.cover_url ?? null));
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -187,7 +188,10 @@ export function SubjectFormDialog({
                                     placeholder="Ex.: Biologia"
                                     className="h-11 text-base"
                                     onChange={(event) =>
-                                        form.setData('title', event.target.value)
+                                        form.setData(
+                                            'title',
+                                            event.target.value,
+                                        )
                                     }
                                 />
                             </FormField>
@@ -227,7 +231,9 @@ export function SubjectFormDialog({
                                                 aria-label={
                                                     STUDY_COLORS[color].label
                                                 }
-                                                title={STUDY_COLORS[color].label}
+                                                title={
+                                                    STUDY_COLORS[color].label
+                                                }
                                                 onClick={() =>
                                                     form.setData(
                                                         'accent_color',
@@ -253,7 +259,9 @@ export function SubjectFormDialog({
                                         );
                                     })}
                                 </div>
-                                <InputError message={form.errors.accent_color} />
+                                <InputError
+                                    message={form.errors.accent_color}
+                                />
                             </fieldset>
                         </div>
                     </div>

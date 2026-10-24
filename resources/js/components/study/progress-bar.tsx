@@ -35,9 +35,7 @@ export function ProgressBar({
                     style={{ width: `${progress}%` }}
                 />
             </div>
-            {showLabel && (
-                <p className="text-xs text-ink-soft">{label}</p>
-            )}
+            {showLabel && <p className="text-xs text-ink-soft">{label}</p>}
         </div>
     );
 }

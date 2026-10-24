@@ -14,8 +14,9 @@ export type StudyEditorContextValue = {
     cancelUpload: (uploadId: string) => void;
 };
 
-export const StudyEditorContext =
-    createContext<StudyEditorContextValue | null>(null);
+export const StudyEditorContext = createContext<StudyEditorContextValue | null>(
+    null,
+);
 
 export function useStudyEditor(): StudyEditorContextValue {
     const value = useContext(StudyEditorContext);

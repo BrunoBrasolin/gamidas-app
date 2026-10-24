@@ -1,6 +1,6 @@
-# Finanças da Casa
+# Maggie Castle
 
-Aplicação de finanças da casa e pessoais para Bruno e Letícia, substituindo as planilhas de Excel. Interface em português (pt-BR), valores em Real (`R$ 1.234,56`) e fuso horário `America/Sao_Paulo`.
+Aplicação de Maggie Castle e pessoais para Bruno e Letícia, substituindo as planilhas de Excel. Interface em português (pt-BR), valores em Real (`R$ 1.234,56`) e fuso horário `America/Sao_Paulo`.
 
 Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Fortify, Wayfinder).
 
@@ -14,6 +14,7 @@ Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React
 - **Relatórios** anuais da casa e pessoais.
 - **Configurações da casa**: salários (com histórico) e membros.
 - **Tempo** (`/time`, privado de cada usuário): categorias (um trabalho ou cliente por categoria), planilha de horas por dia × categoria (semana e mês) com tempo em h:mm:ss e nota em Markdown em cada célula, e relatórios de tempo registrado.
+- **Shows** (`/shows`, compartilhado pela casa): shows que vocês foram, com banda, nome da tour, local, data, setlist, shows de abertura (cada um com seu setlist) e link do álbum do Google Fotos; lista por ano com busca e totais de shows, bandas, locais e músicas.
 
 ## Requisitos
 
@@ -38,7 +39,7 @@ php artisan key:generate
 ### Configuração do ambiente (`.env`)
 
 ```dotenv
-APP_NAME="Finanças da Casa"
+APP_NAME="Maggie Castle"
 APP_LOCALE=pt_BR
 APP_TIMEZONE=America/Sao_Paulo
 
@@ -232,6 +233,15 @@ Em **Settings › Secrets and variables › Actions**:
 - **Cronômetros** (`time_timers`): cada categoria ativa tem no máximo um cronômetro (índice único por categoria), com iniciar, pausar, zerar e "lançar na planilha de hoje" (soma o tempo decorrido à célula de hoje, preservando a nota, e zera). O relógio é do servidor (`started_at` + segundos acumulados), então o tempo segue contando ao recarregar a página ou em outro aparelho. Iniciar um cronômetro já ativo não faz nada; categorias arquivadas não iniciam cronômetro.
 - A planilha mostra semana (segunda a domingo) ou mês, uma coluna por categoria ativa mais as arquivadas com lançamentos no período, totais por dia e por categoria. Os relatórios somam as mesmas células (total, médias, comparação com o período anterior, tempo por dia e por categoria, mapa de calor).
 - A renderização do Markdown (`react-markdown` + GFM) descarta HTML bruto, neutraliza links `javascript:` e não carrega imagens externas.
+
+### Shows
+
+- Shows (`shows`) e aberturas (`show_opening_acts`) pertencem à **residência**: todos os membros veem, editam e excluem qualquer show; shows de outra residência respondem **404**. Fica registrado quem cadastrou (`created_by_user_id`, vazio nos importados).
+- Obrigatórios: banda, local e data (`Y-m-d`, de 2000 a 2100). Nome da tour, setlist, aberturas e álbum são opcionais.
+- O **setlist** é digitado com uma música por linha, na ordem tocada, e guardado como lista JSON; linhas em branco e numeração no início (`1.`, `2)`, `3 -`) são descartadas. Até 200 músicas por setlist e 10 aberturas por show, na ordem em que tocaram. Editar um show substitui todas as aberturas.
+- O link do álbum precisa ser `https` (ex.: o link de compartilhamento do Google Fotos) e abre em nova aba.
+- Nos totais, bandas contam atrações principais e aberturas uma vez cada, ignorando maiúsculas e acentos; locais idem.
+- **Importação do site antigo**: `php artisan shows:import [residência] [--from=url-ou-arquivo] [--dry-run]` lê a página do GitHub Pages (padrão `https://brunobrasolin.github.io/shows/`) e importa para a residência informada (sem id: a única que existe, ou escolhida numa lista): cada `h1` "Banda | Tour" é um show, com `Data: dd/mm/aaaa`, `Local:` e o setlist; cada título menor seguinte ("Banda | Show Abertura") é uma abertura. Shows que a residência já tem (mesma banda e data) são pulados, então dá para rodar de novo. Se o servidor não alcançar o site, passe um arquivo HTML salvo em `--from`.
 
 ### Segurança e integridade
 

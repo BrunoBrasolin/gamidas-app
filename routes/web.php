@@ -10,6 +10,12 @@ use App\Http\Controllers\Finance\RecurringExpenseController;
 use App\Http\Controllers\Finance\ReportController;
 use App\Http\Controllers\Household\MemberController;
 use App\Http\Controllers\Household\SalaryController;
+use App\Http\Controllers\Shows\ShowController;
+use App\Http\Controllers\Study\StudyAttachmentController;
+use App\Http\Controllers\Study\StudyChapterController;
+use App\Http\Controllers\Study\StudyLibraryController;
+use App\Http\Controllers\Study\StudyPageController;
+use App\Http\Controllers\Study\StudySubjectController;
 use App\Http\Controllers\Time\TimeCategoryController;
 use App\Http\Controllers\Time\TimeLogController;
 use App\Http\Controllers\Time\TimeReportController;
@@ -79,6 +85,61 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             Route::delete('categories/{category}/timer', [TimeTimerController::class, 'reset'])->name('timer.reset');
 
             Route::put('logs', [TimeLogController::class, 'update'])->name('logs.update');
+        });
+    });
+
+    // Concerts the user attended. Every show belongs to the signed-in user.
+    Route::get('shows', [ShowController::class, 'index'])->name('shows.index');
+    Route::get('shows/create', [ShowController::class, 'create'])->name('shows.create');
+    Route::get('shows/{show}', [ShowController::class, 'show'])->name('shows.show');
+    Route::get('shows/{show}/edit', [ShowController::class, 'edit'])->name('shows.edit');
+
+    Route::middleware('throttle:finance-writes')->group(function () {
+        Route::post('shows', [ShowController::class, 'store'])->name('shows.store');
+        Route::put('shows/{show}', [ShowController::class, 'update'])->name('shows.update');
+        Route::delete('shows/{show}', [ShowController::class, 'destroy'])->name('shows.destroy');
+    });
+
+    // Study library: subjects (books), chapters, pages and their files.
+    // Everything belongs to the signed-in user; files are served only through
+    // the authorized attachment route.
+    Route::prefix('study')->name('study.')->group(function () {
+        Route::get('/', [StudyLibraryController::class, 'index'])->name('index');
+        Route::get('search', [StudyLibraryController::class, 'search'])->name('search');
+        Route::get('subjects/{subject}', [StudySubjectController::class, 'show'])->name('subjects.show');
+        Route::get('pages/{page}', [StudyPageController::class, 'show'])->name('pages.show');
+        Route::get('pages/{page}/edit', [StudyPageController::class, 'edit'])->name('pages.edit');
+        Route::get('files/{attachment}', [StudyAttachmentController::class, 'show'])->name('attachments.show');
+
+        Route::middleware('throttle:study-writes')->group(function () {
+            Route::post('subjects', [StudySubjectController::class, 'store'])->name('subjects.store');
+            Route::put('subjects/order', [StudySubjectController::class, 'order'])->name('subjects.order');
+            Route::put('subjects/{subject}', [StudySubjectController::class, 'update'])->name('subjects.update');
+            Route::delete('subjects/{subject}', [StudySubjectController::class, 'destroy'])->name('subjects.destroy');
+            Route::post('subjects/{subject}/archive', [StudySubjectController::class, 'archive'])->name('subjects.archive');
+            Route::delete('subjects/{subject}/archive', [StudySubjectController::class, 'restore'])->name('subjects.restore');
+            Route::post('subjects/{subject}/pin', [StudySubjectController::class, 'pin'])->name('subjects.pin');
+            Route::delete('subjects/{subject}/pin', [StudySubjectController::class, 'unpin'])->name('subjects.unpin');
+            Route::put('subjects/{subject}/arrange', [StudySubjectController::class, 'arrange'])->name('subjects.arrange');
+
+            Route::post('subjects/{subject}/chapters', [StudyChapterController::class, 'store'])->name('chapters.store');
+            Route::put('chapters/{chapter}', [StudyChapterController::class, 'update'])->name('chapters.update');
+            Route::delete('chapters/{chapter}', [StudyChapterController::class, 'destroy'])->name('chapters.destroy');
+
+            Route::post('subjects/{subject}/pages', [StudyPageController::class, 'store'])->name('pages.store');
+            Route::put('pages/{page}', [StudyPageController::class, 'update'])->name('pages.update');
+            Route::put('pages/{page}/content', [StudyPageController::class, 'content'])->name('pages.content');
+            Route::put('pages/{page}/status', [StudyPageController::class, 'status'])->name('pages.status');
+            Route::put('pages/{page}/reading', [StudyPageController::class, 'reading'])->name('pages.reading');
+            Route::post('pages/{page}/bookmark', [StudyPageController::class, 'bookmark'])->name('pages.bookmark');
+            Route::delete('pages/{page}/bookmark', [StudyPageController::class, 'unbookmark'])->name('pages.unbookmark');
+            Route::post('pages/{page}/duplicate', [StudyPageController::class, 'duplicate'])->name('pages.duplicate');
+            Route::put('pages/{page}/move', [StudyPageController::class, 'move'])->name('pages.move');
+            Route::post('pages/{page}/archive', [StudyPageController::class, 'archive'])->name('pages.archive');
+            Route::delete('pages/{page}/archive', [StudyPageController::class, 'restore'])->name('pages.restore');
+            Route::delete('pages/{page}', [StudyPageController::class, 'destroy'])->name('pages.destroy');
+
+            Route::post('pages/{page}/attachments', [StudyAttachmentController::class, 'store'])->name('attachments.store');
         });
     });
 });

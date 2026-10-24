@@ -78,6 +78,14 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
+     * @return HasMany<StudySubject, $this>
+     */
+    public function studySubjects(): HasMany
+    {
+        return $this->hasMany(StudySubject::class);
+    }
+
+    /**
      * @return HasMany<TimeLog, $this>
      */
     public function timeLogs(): HasMany

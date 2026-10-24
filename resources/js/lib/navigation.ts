@@ -7,6 +7,7 @@ import {
     Repeat,
     Sheet,
     Tags,
+    Ticket,
     TrendingUp,
     Wallet,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ import household from '@/routes/household';
 import personal from '@/routes/personal';
 import recurringExpenses from '@/routes/recurring-expenses';
 import reports from '@/routes/reports';
+import shows from '@/routes/shows';
 import time from '@/routes/time';
 import type { NavItem } from '@/types';
 
@@ -93,4 +95,20 @@ export const timeNavItems: NavItem[] = [
     },
 ];
 
-export const allNavItems: NavItem[] = [...mainNavItems, ...timeNavItems];
+/**
+ * Concerts the user attended (private to each user).
+ */
+export const showNavItems: NavItem[] = [
+    {
+        title: 'Shows',
+        href: shows.index(),
+        icon: Ticket,
+        activePrefix: '/shows',
+    },
+];
+
+export const allNavItems: NavItem[] = [
+    ...mainNavItems,
+    ...timeNavItems,
+    ...showNavItems,
+];

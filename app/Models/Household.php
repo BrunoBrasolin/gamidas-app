@@ -32,6 +32,14 @@ class Household extends Model
     }
 
     /**
+     * @return HasMany<Show, $this>
+     */
+    public function shows(): HasMany
+    {
+        return $this->hasMany(Show::class);
+    }
+
+    /**
      * @return BelongsToMany<User, $this>
      */
     public function users(): BelongsToMany

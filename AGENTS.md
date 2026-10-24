@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Household + personal finance app (Finanças da Casa). Laravel 13 + Inertia v3 + React 19 + TypeScript + Tailwind 4 + shadcn/ui, Fortify auth, Wayfinder routes. UI is pt-BR, currency BRL, timezone `America/Sao_Paulo`. `README.md` is the source of truth for business rules — read its "Regras de negócio" section before touching money, splits, recurrences, cards or payments.
+Household + personal finance app (Maggie Castle). Laravel 13 + Inertia v3 + React 19 + TypeScript + Tailwind 4 + shadcn/ui, Fortify auth, Wayfinder routes. UI is pt-BR, currency BRL, timezone `America/Sao_Paulo`. `README.md` is the source of truth for business rules — read its "Regras de negócio" section before touching money, splits, recurrences, cards or payments.
 
 ## Security — this repository is PUBLIC
 

@@ -7,7 +7,7 @@ import AuthLayout from '@/layouts/auth-layout';
 import HouseholdLayout from '@/layouts/household/layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Finanças da Casa';
+const appName = import.meta.env.VITE_APP_NAME || 'Maggie Castle';
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

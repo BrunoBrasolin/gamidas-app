@@ -96,6 +96,10 @@ class KnowledgeSubjectService
         DB::transaction(function () use ($subject) {
             $subject->update(['cover_attachment_id' => null]);
             $this->attachments->delete($subject->attachments()->get());
+            // Pages first: on MySQL, deleting the categories would set their
+            // pages' category_id to null while the same pages are being
+            // deleted with the subject, and that update is refused.
+            $subject->pages()->delete();
             $subject->delete();
         });
     }

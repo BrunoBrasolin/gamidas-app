@@ -30,6 +30,7 @@ class ShowRequest extends FinanceRequest
             'setlist' => ['present', 'array', 'max:'.self::MAX_SONGS],
             'setlist.*' => ['required', 'string', 'max:200'],
             'photos_url' => ['nullable', 'string', 'max:2048', 'url:https'],
+            'playlist_url' => ['nullable', 'string', 'max:2048', 'url:https'],
             'opening_acts' => ['present', 'array', 'max:'.self::MAX_OPENING_ACTS],
             'opening_acts.*.band' => ['required', 'string', 'max:120'],
             'opening_acts.*.setlist' => ['present', 'array', 'max:'.self::MAX_SONGS],
@@ -50,6 +51,7 @@ class ShowRequest extends FinanceRequest
             'setlist' => 'setlist',
             'setlist.*' => 'música',
             'photos_url' => 'link do álbum',
+            'playlist_url' => 'link da playlist',
             'opening_acts' => 'shows de abertura',
             'opening_acts.*.band' => 'banda de abertura',
             'opening_acts.*.setlist' => 'setlist da abertura',
@@ -64,6 +66,7 @@ class ShowRequest extends FinanceRequest
     {
         return [
             'photos_url.url' => 'Informe um link https válido, como o de compartilhamento do álbum do Google Fotos.',
+            'playlist_url.url' => 'Informe um link https válido, como o de compartilhamento da playlist do Spotify.',
             'setlist.max' => 'O setlist pode ter no máximo '.self::MAX_SONGS.' músicas.',
             'opening_acts.*.setlist.max' => 'O setlist pode ter no máximo '.self::MAX_SONGS.' músicas.',
         ];
@@ -78,6 +81,7 @@ class ShowRequest extends FinanceRequest
             'tour' => $this->text('tour') ?: null,
             'venue' => $this->text('venue'),
             'photos_url' => $this->text('photos_url') ?: null,
+            'playlist_url' => $this->text('playlist_url') ?: null,
             'setlist' => self::songs($this->input('setlist')),
             'opening_acts' => is_array($acts) ? array_values(array_map(fn ($act) => is_array($act) ? [
                 'band' => trim((string) ($act['band'] ?? '')),
@@ -89,12 +93,12 @@ class ShowRequest extends FinanceRequest
     /**
      * The validated show, ready for {@see ShowService}.
      *
-     * @return array{band: string, tour: string|null, venue: string, show_date: string, setlist: list<string>, photos_url: string|null, opening_acts: list<array{band: string, setlist: list<string>}>}
+     * @return array{band: string, tour: string|null, venue: string, show_date: string, setlist: list<string>, photos_url: string|null, playlist_url: string|null, opening_acts: list<array{band: string, setlist: list<string>}>}
      */
     public function show(): array
     {
-        /** @var array{band: string, tour: string|null, venue: string, show_date: string, setlist: list<string>, photos_url: string|null, opening_acts: list<array{band: string, setlist: list<string>}>} */
-        return $this->safe()->only(['band', 'tour', 'venue', 'show_date', 'setlist', 'photos_url', 'opening_acts']);
+        /** @var array{band: string, tour: string|null, venue: string, show_date: string, setlist: list<string>, photos_url: string|null, playlist_url: string|null, opening_acts: list<array{band: string, setlist: list<string>}>} */
+        return $this->safe()->only(['band', 'tour', 'venue', 'show_date', 'setlist', 'photos_url', 'playlist_url', 'opening_acts']);
     }
 
     private function text(string $key): string

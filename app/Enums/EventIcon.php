@@ -24,4 +24,5 @@ enum EventIcon: string
     case Reminder = 'reminder';
     case Pet = 'pet';
     case Sport = 'sport';
+    case Music = 'music';
 }

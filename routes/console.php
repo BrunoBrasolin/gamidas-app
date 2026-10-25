@@ -7,6 +7,6 @@ use Illuminate\Support\Facades\Schedule;
 // cron fires schedule:run every 20 minutes, so the time must sit on that grid.
 Schedule::command('expenses:generate')->dailyAt('00:20')->withoutOverlapping();
 
-// Delete study attachments removed from their page more than a day ago and
+// Delete knowledge attachments removed from their page more than a day ago and
 // files no attachment points to.
-Schedule::command('study:prune-attachments')->dailyAt('03:20')->withoutOverlapping();
+Schedule::command('knowledge:prune-attachments')->dailyAt('03:20')->withoutOverlapping();

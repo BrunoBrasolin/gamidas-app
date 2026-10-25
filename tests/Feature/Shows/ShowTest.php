@@ -33,6 +33,7 @@ class ShowTest extends TestCase
             'show_date' => '2026-01-31',
             'setlist' => "Nightcall\n\n  Game Over  \r\nMattel\n",
             'photos_url' => 'https://photos.app.goo.gl/abc123',
+            'playlist_url' => 'https://open.spotify.com/playlist/abc123',
             'opening_acts' => [
                 ['band' => 'A Day To Remember', 'setlist' => "The Downfall of Us All\nAll I Want"],
                 ['band' => 'Mr. Bungle', 'setlist' => ''],
@@ -57,6 +58,7 @@ class ShowTest extends TestCase
         $this->assertSame('2026-01-31', $show->show_date->toDateString());
         $this->assertSame(['Nightcall', 'Game Over', 'Mattel'], $show->setlist);
         $this->assertSame('https://photos.app.goo.gl/abc123', $show->photos_url);
+        $this->assertSame('https://open.spotify.com/playlist/abc123', $show->playlist_url);
 
         $acts = $show->openingActs;
         $this->assertSame(['A Day To Remember', 'Mr. Bungle'], $acts->pluck('band')->all());
@@ -67,12 +69,13 @@ class ShowTest extends TestCase
     public function test_tour_photos_and_opening_acts_are_optional(): void
     {
         $this->actingAs($this->bruno)
-            ->post(route('shows.store'), $this->payload(['tour' => '', 'photos_url' => '', 'opening_acts' => []]))
+            ->post(route('shows.store'), $this->payload(['tour' => '', 'photos_url' => '', 'playlist_url' => '', 'opening_acts' => []]))
             ->assertSessionHasNoErrors();
 
         $show = Show::query()->sole();
         $this->assertNull($show->tour);
         $this->assertNull($show->photos_url);
+        $this->assertNull($show->playlist_url);
         $this->assertSame(0, $show->openingActs()->count());
     }
 
@@ -84,13 +87,18 @@ class ShowTest extends TestCase
                 'venue' => ' ',
                 'show_date' => '2026-02-30',
                 'photos_url' => 'javascript:alert(1)',
+                'playlist_url' => 'javascript:alert(1)',
                 'opening_acts' => [['band' => '', 'setlist' => 'Song']],
             ]))
-            ->assertSessionHasErrors(['band', 'venue', 'show_date', 'photos_url', 'opening_acts.0.band']);
+            ->assertSessionHasErrors(['band', 'venue', 'show_date', 'photos_url', 'playlist_url', 'opening_acts.0.band']);
 
         $this->actingAs($this->bruno)
             ->post(route('shows.store'), $this->payload(['photos_url' => 'http://photos.app.goo.gl/abc']))
             ->assertSessionHasErrors('photos_url');
+
+        $this->actingAs($this->bruno)
+            ->post(route('shows.store'), $this->payload(['playlist_url' => 'http://open.spotify.com/playlist/abc']))
+            ->assertSessionHasErrors('playlist_url');
 
         $this->assertSame(0, Show::query()->count());
     }

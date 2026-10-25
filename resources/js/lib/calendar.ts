@@ -8,6 +8,7 @@ import {
     GraduationCap,
     Heart,
     Home,
+    Music,
     PartyPopper,
     PawPrint,
     Plane,
@@ -113,6 +114,7 @@ export const EVENT_ICONS: Record<
     shopping: { label: 'Compras', icon: ShoppingCart },
     money: { label: 'Finanças', icon: Wallet },
     pet: { label: 'Pet', icon: PawPrint },
+    music: { label: 'Show', icon: Music },
 };
 
 export const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -196,7 +198,9 @@ export function weekdayOf(date: string): number {
  * Unique key of an event on the agenda: occurrences of a series share its id.
  */
 export function eventKey(event: CalendarEvent): string {
-    return `${event.id}:${event.occurrence ?? ''}`;
+    return event.show_id !== null
+        ? `show:${event.show_id}`
+        : `${event.id}:${event.occurrence ?? ''}`;
 }
 
 /**

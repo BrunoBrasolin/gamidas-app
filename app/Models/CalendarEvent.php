@@ -165,6 +165,7 @@ class CalendarEvent extends Model
                 'color' => $this->color->value,
                 'icon' => $this->icon->value,
             ] : null,
+            'show_id' => null,
             'created_by' => $this->creator?->firstName(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];

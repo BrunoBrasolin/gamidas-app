@@ -55,6 +55,7 @@ class ShowPageParser
                     'show_date' => '',
                     'setlist' => [],
                     'photos_url' => null,
+                    'playlist_url' => null,
                     'opening_acts' => [],
                 ];
 

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * in the order they were sent.
  *
  * @phpstan-type OpeningAct array{band: string, setlist: list<string>}
- * @phpstan-type ShowData array{band: string, tour: string|null, venue: string, show_date: string, setlist: list<string>, photos_url: string|null, opening_acts: list<OpeningAct>}
+ * @phpstan-type ShowData array{band: string, tour: string|null, venue: string, show_date: string, setlist: list<string>, photos_url: string|null, playlist_url: string|null, opening_acts: list<OpeningAct>}
  */
 class ShowService
 {
@@ -60,6 +60,7 @@ class ShowService
             'show_date' => $data['show_date'],
             'setlist' => $data['setlist'],
             'photos_url' => $data['photos_url'],
+            'playlist_url' => $data['playlist_url'],
         ];
     }
 

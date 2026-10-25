@@ -40,8 +40,8 @@ class AppServiceProvider extends ServiceProvider
         // Time tracking writes more often (inline sheet edits, note autosave).
         RateLimiter::for('time-writes', fn (Request $request) => Limit::perMinute(180)->by($request->user()?->id ?: $request->ip()));
 
-        // The study editor autosaves, uploads files and records the reading position.
-        RateLimiter::for('study-writes', fn (Request $request) => Limit::perMinute(240)->by($request->user()?->id ?: $request->ip()));
+        // The knowledge editor autosaves, uploads files and records the reading position.
+        RateLimiter::for('knowledge-writes', fn (Request $request) => Limit::perMinute(240)->by($request->user()?->id ?: $request->ip()));
     }
 
     /**

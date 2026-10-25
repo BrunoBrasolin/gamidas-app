@@ -28,6 +28,7 @@ type ShowForm = {
     show_date: string;
     setlist: string;
     photos_url: string;
+    playlist_url: string;
     opening_acts: ActForm[];
 };
 
@@ -75,6 +76,7 @@ export default function ShowFormPage({ show }: { show: Show | null }) {
         show_date: show?.date ?? '',
         setlist: show?.setlist.join('\n') ?? '',
         photos_url: show?.photos_url ?? '',
+        playlist_url: show?.playlist_url ?? '',
         opening_acts:
             show?.opening_acts.map((act) => ({
                 band: act.band,
@@ -213,6 +215,28 @@ export default function ShowFormPage({ show }: { show: Show | null }) {
                                 onChange={(event) =>
                                     form.setData(
                                         'photos_url',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </FormField>
+                        <FormField
+                            id="show-playlist"
+                            label="Playlist do Spotify (opcional)"
+                            error={errors.playlist_url}
+                            hint="Cole o link de compartilhamento da playlist."
+                            className="md:col-span-2"
+                        >
+                            <Input
+                                id="show-playlist"
+                                type="url"
+                                inputMode="url"
+                                maxLength={2048}
+                                placeholder="https://open.spotify.com/playlist/…"
+                                value={form.data.playlist_url}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'playlist_url',
                                         event.target.value,
                                     )
                                 }

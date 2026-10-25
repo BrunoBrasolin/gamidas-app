@@ -44,6 +44,7 @@ import expenses from '@/routes/expenses';
 import household from '@/routes/household';
 import personal from '@/routes/personal';
 import recurringExpenses from '@/routes/recurring-expenses';
+import shows from '@/routes/shows';
 import type {
     CalendarEvent,
     HouseholdMonthSummary,
@@ -407,14 +408,18 @@ export default function Dashboard({
                                 {events.map((event) => (
                                     <li key={eventKey(event)}>
                                         <Link
-                                            href={calendar.index({
-                                                query: {
-                                                    month: event.date.slice(
-                                                        0,
-                                                        7,
-                                                    ),
-                                                },
-                                            })}
+                                            href={
+                                                event.show_id !== null
+                                                    ? shows.show(event.show_id)
+                                                    : calendar.index({
+                                                          query: {
+                                                              month: event.date.slice(
+                                                                  0,
+                                                                  7,
+                                                              ),
+                                                          },
+                                                      })
+                                            }
                                             className="flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-accent/50"
                                         >
                                             <EventIcon event={event} />

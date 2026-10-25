@@ -19,7 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         // Markdown notes keep their exact whitespace (indentation, line breaks).
-        $middleware->trimStrings(except: ['content']);
+        // Knowledge page autosaves send a document whose text nodes must arrive
+        // untouched ("a " + bold "word"), so nothing in them is trimmed.
+        // (Global middleware runs before routing, so match the path.)
+        $knowledgeAutosave = fn (Request $request) => $request->is('knowledge/pages/*/content');
+        $middleware->trimStrings(except: ['content', $knowledgeAutosave]);
+        $middleware->convertEmptyStringsToNull(except: [$knowledgeAutosave]);
 
         $middleware->alias([
             'household' => EnsureUserBelongsToHousehold::class,

@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Shows\ShowRequest;
 use App\Models\Show;
+use App\Models\ShowChecklistItem;
 use App\Models\ShowOpeningAct;
 use App\Services\ShowService;
 use Illuminate\Http\RedirectResponse;
@@ -57,8 +58,17 @@ class ShowController extends Controller
     {
         Gate::authorize('view', $show);
         $show->load('creator:id,name');
+        $checked = $show->checkedItems()->pluck('show_checklist_items.id')->flip();
 
-        return Inertia::render('shows/show', ['show' => $this->present($show)]);
+        return Inertia::render('shows/show', [
+            'show' => $this->present($show),
+            'checklist' => $show->household->showChecklistItems()->get()
+                ->map(fn (ShowChecklistItem $item) => [
+                    'id' => $item->id,
+                    'label' => $item->label,
+                    'checked' => $checked->has($item->id),
+                ])->values(),
+        ]);
     }
 
     public function edit(Show $show): Response
@@ -101,6 +111,7 @@ class ShowController extends Controller
             'date' => $show->show_date->toDateString(),
             'setlist' => $show->setlist,
             'photos_url' => $show->photos_url,
+            'playlist_url' => $show->playlist_url,
             'created_by' => $show->creator?->firstName(),
             'opening_acts' => $show->openingActs->map(fn (ShowOpeningAct $act) => [
                 'band' => $act->band,

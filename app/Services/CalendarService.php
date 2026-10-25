@@ -6,6 +6,7 @@ use App\Enums\RecurrenceFrequency;
 use App\Models\CalendarEvent;
 use App\Models\CalendarEventException;
 use App\Models\Household;
+use App\Models\Show;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -17,6 +18,9 @@ use Illuminate\Validation\ValidationException;
  * into occurrences on demand. Nothing is materialized: a series stores its
  * rule, and only occurrences changed or deleted on their own are stored, as
  * exceptions keyed by their original date.
+ *
+ * The household's shows are listed too, on their dates, as read-only entries
+ * edited on the shows page.
  */
 final class CalendarService
 {
@@ -85,8 +89,18 @@ final class CalendarService
             }
         }
 
-        usort($items, fn (array $a, array $b) => [$a['date'], $a['time'] ?? '', $a['id'], $a['occurrence'] ?? '']
-            <=> [$b['date'], $b['time'] ?? '', $b['id'], $b['occurrence'] ?? '']);
+        $shows = Show::query()
+            ->where('household_id', $household->id)
+            ->whereBetween('show_date', [$from->toDateString(), $to->toDateString()])
+            ->with('creator:id,name')
+            ->get();
+
+        foreach ($shows as $show) {
+            $items[] = $show->toAgendaPage();
+        }
+
+        usort($items, fn (array $a, array $b) => [$a['date'], $a['time'] ?? '', $a['show_id'] !== null, $a['id'], $a['occurrence'] ?? '']
+            <=> [$b['date'], $b['time'] ?? '', $b['show_id'] !== null, $b['id'], $b['occurrence'] ?? '']);
 
         return $items;
     }

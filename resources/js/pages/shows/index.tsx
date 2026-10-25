@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import {
     Calendar,
     Images,
+    ListChecks,
     ListMusic,
     MapPin,
     Mic2,
@@ -99,6 +100,23 @@ function ShowCard({ show }: { show: Show }) {
                         </a>
                     </Button>
                 )}
+                {show.playlist_url && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="shrink-0"
+                    >
+                        <a
+                            href={show.playlist_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <ListMusic />
+                            Playlist
+                        </a>
+                    </Button>
+                )}
             </CardContent>
         </Card>
     );
@@ -137,6 +155,12 @@ export default function ShowsIndex({
                     title="Shows"
                     description="Os shows da casa, com setlist, aberturas e álbum de fotos."
                 >
+                    <Button variant="outline" asChild>
+                        <Link href={shows.checklist.edit()}>
+                            <ListChecks />
+                            Checklist
+                        </Link>
+                    </Button>
                     <Button asChild>
                         <Link href={shows.create()}>
                             <Plus />

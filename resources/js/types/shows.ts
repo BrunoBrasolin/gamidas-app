@@ -13,9 +13,17 @@ export type Show = {
     date: string;
     setlist: string[];
     photos_url: string | null;
+    playlist_url: string | null;
     /** First name of who registered it; null for imported shows. */
     created_by: string | null;
     opening_acts: OpeningAct[];
+};
+
+/** An item of the household's checklist, as packed for one show. */
+export type ShowChecklistItem = {
+    id: number;
+    label: string;
+    checked: boolean;
 };
 
 export type ShowStats = {

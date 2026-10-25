@@ -41,6 +41,7 @@ import { capitalize, formatDate, formatMonth, today } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import calendar from '@/routes/calendar';
+import shows from '@/routes/shows';
 import type { CalendarEvent } from '@/types';
 
 type View = 'calendar' | 'list';
@@ -85,6 +86,12 @@ export default function CalendarIndex({ filters, events }: Props) {
             event,
         }));
     };
+
+    // Shows are edited on their own page; everything else in the editor.
+    const openEvent = (event: CalendarEvent) =>
+        event.show_id !== null
+            ? router.visit(shows.show(event.show_id))
+            : openEditor(event.date, event);
 
     const addEvent = () =>
         openEditor(
@@ -200,14 +207,14 @@ export default function CalendarIndex({ filters, events }: Props) {
                         byDate={byDate}
                         onDayClick={onDayClick}
                         onShowDay={setSelectedDay}
-                        onEventClick={(event) => openEditor(event.date, event)}
+                        onEventClick={openEvent}
                     />
                 ) : (
                     <EventList
                         events={monthEvents}
                         today={now}
                         onAdd={addEvent}
-                        onEventClick={(event) => openEditor(event.date, event)}
+                        onEventClick={openEvent}
                     />
                 )}
             </div>
@@ -217,7 +224,7 @@ export default function CalendarIndex({ filters, events }: Props) {
                 events={selectedDay ? (byDate.get(selectedDay) ?? []) : []}
                 onClose={() => setSelectedDay(null)}
                 onAdd={openEditor}
-                onEventClick={(event) => openEditor(event.date, event)}
+                onEventClick={openEvent}
             />
 
             <EventFormDialog

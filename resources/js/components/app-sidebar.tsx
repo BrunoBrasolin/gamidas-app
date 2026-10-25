@@ -14,7 +14,7 @@ import {
 import {
     mainNavItems,
     showNavItems,
-    studyNavItems,
+    knowledgeNavItems,
     timeNavItems,
 } from '@/lib/navigation';
 import { dashboard } from '@/routes';
@@ -37,7 +37,10 @@ export function AppSidebar() {
             <SidebarContent>
                 <NavMain items={mainNavItems} />
                 <NavMain items={timeNavItems} label="Tempo" />
-                <NavMain items={studyNavItems} label="Estudos" />
+                <NavMain
+                    items={knowledgeNavItems}
+                    label="Base de Conhecimento"
+                />
                 <NavMain items={showNavItems} label="Lazer" />
             </SidebarContent>
 

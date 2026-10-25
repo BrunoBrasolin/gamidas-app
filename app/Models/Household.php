@@ -40,6 +40,14 @@ class Household extends Model
     }
 
     /**
+     * @return HasMany<ShowChecklistItem, $this>
+     */
+    public function showChecklistItems(): HasMany
+    {
+        return $this->hasMany(ShowChecklistItem::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
      * @return BelongsToMany<User, $this>
      */
     public function users(): BelongsToMany

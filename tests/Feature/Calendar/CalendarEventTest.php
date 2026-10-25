@@ -5,6 +5,7 @@ namespace Tests\Feature\Calendar;
 use App\Enums\EventColor;
 use App\Enums\EventIcon;
 use App\Models\CalendarEvent;
+use App\Models\Show;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Date;
@@ -199,6 +200,43 @@ class CalendarEventTest extends TestCase
                 ->where('events.0.title', 'Hoje')
                 ->where('events.0.time', '20:00')
                 ->where('events.1.title', 'Daqui a 30 dias')
+            );
+    }
+
+    public function test_household_shows_are_listed_on_their_dates(): void
+    {
+        $this->event('2026-10-25', '19:30', attributes: ['title' => 'Jantar']);
+        Show::factory()->create([
+            'household_id' => $this->household->id,
+            'band' => 'Iron Maiden',
+            'tour' => 'Run For Your Lives',
+            'venue' => 'Allianz Parque, São Paulo',
+            'show_date' => '2026-10-25',
+        ]);
+        Show::factory()->create(['household_id' => $this->household->id, 'show_date' => '2026-11-01']);
+        Show::factory()->create(['household_id' => $this->createOutsider()->householdId(), 'show_date' => '2026-10-25']);
+
+        $this->actingAs($this->leticia)
+            ->get(route('calendar.index', ['month' => '2026-10']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('events', 2)
+                ->where('events.0.title', 'Iron Maiden')
+                ->where('events.0.date', '2026-10-25')
+                ->where('events.0.time', null)
+                ->where('events.0.description', 'Run For Your Lives · Allianz Parque, São Paulo')
+                ->where('events.0.icon', 'music')
+                ->where('events.0.show_id', Show::query()->where('band', 'Iron Maiden')->value('id'))
+                ->where('events.1.title', 'Jantar')
+                ->where('events.1.show_id', null)
+            );
+
+        $this->actingAs($this->bruno)
+            ->get(route('dashboard'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('events', 3)
+                ->where('events.0.title', 'Iron Maiden')
+                ->where('events.1.title', 'Jantar')
+                ->where('events.2.date', '2026-11-01')
             );
     }
 

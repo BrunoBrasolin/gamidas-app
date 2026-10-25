@@ -1,8 +1,16 @@
 import { Head, Link } from '@inertiajs/react';
-import { Calendar, Images, MapPin, Pencil, Trash2 } from 'lucide-react';
+import {
+    Calendar,
+    Images,
+    ListMusic,
+    MapPin,
+    Pencil,
+    Trash2,
+} from 'lucide-react';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { PageHeader } from '@/components/finance/page-header';
 import { Setlist, showTitle } from '@/components/shows/setlist';
+import { ShowChecklist } from '@/components/shows/show-checklist';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -11,11 +19,20 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { formatDate } from '@/lib/format';
+import { formatDate, today } from '@/lib/format';
 import shows from '@/routes/shows';
-import type { Show } from '@/types';
+import type { Show, ShowChecklistItem } from '@/types';
 
-export default function ShowDetails({ show }: { show: Show }) {
+export default function ShowDetails({
+    show,
+    checklist,
+}: {
+    show: Show;
+    checklist: ShowChecklistItem[];
+}) {
+    // The checklist only matters until the day of the show.
+    const upcoming = show.date >= today();
+
     return (
         <>
             <Head title={showTitle(show)} />
@@ -50,6 +67,18 @@ export default function ShowDetails({ show }: { show: Show }) {
                             </a>
                         </Button>
                     )}
+                    {show.playlist_url && (
+                        <Button variant="outline" asChild>
+                            <a
+                                href={show.playlist_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <ListMusic />
+                                Playlist
+                            </a>
+                        </Button>
+                    )}
                     <Button variant="outline" asChild>
                         <Link href={shows.edit(show.id)}>
                             <Pencil />
@@ -72,6 +101,10 @@ export default function ShowDetails({ show }: { show: Show }) {
                         url={shows.destroy.url(show.id)}
                     />
                 </PageHeader>
+
+                {upcoming && (
+                    <ShowChecklist showId={show.id} items={checklist} />
+                )}
 
                 <Card>
                     <CardHeader>

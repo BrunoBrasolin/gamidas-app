@@ -6,7 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import HouseholdLayout from '@/layouts/household/layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import StudyFocusLayout from '@/layouts/study/focus-layout';
+import KnowledgeFocusLayout from '@/layouts/knowledge/focus-layout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Maggie Castle';
 
@@ -22,8 +22,8 @@ void createInertiaApp({
                 return [AppLayout, SettingsLayout];
             case name.startsWith('household/'):
                 return [AppLayout, HouseholdLayout];
-            case name === 'study/read' || name === 'study/edit':
-                return StudyFocusLayout;
+            case name === 'knowledge/read' || name === 'knowledge/edit':
+                return KnowledgeFocusLayout;
             default:
                 return AppLayout;
         }

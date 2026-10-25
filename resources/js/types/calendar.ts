@@ -25,7 +25,8 @@ export type EventIcon =
     | 'family'
     | 'reminder'
     | 'pet'
-    | 'sport';
+    | 'sport'
+    | 'music';
 
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
@@ -63,6 +64,8 @@ export type CalendarEvent = {
         CalendarEvent,
         'title' | 'date' | 'time' | 'description' | 'color' | 'icon'
     > | null;
+    /** Id of the show this entry stands for; shows are edited on their own page. */
+    show_id: number | null;
     created_by: string | null;
     created_at: string | null;
 };

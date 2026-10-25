@@ -10,12 +10,13 @@ use App\Http\Controllers\Finance\RecurringExpenseController;
 use App\Http\Controllers\Finance\ReportController;
 use App\Http\Controllers\Household\MemberController;
 use App\Http\Controllers\Household\SalaryController;
+use App\Http\Controllers\Knowledge\KnowledgeAttachmentController;
+use App\Http\Controllers\Knowledge\KnowledgeBaseController;
+use App\Http\Controllers\Knowledge\KnowledgeCategoryController;
+use App\Http\Controllers\Knowledge\KnowledgePageController;
+use App\Http\Controllers\Knowledge\KnowledgeSubjectController;
+use App\Http\Controllers\Shows\ShowChecklistController;
 use App\Http\Controllers\Shows\ShowController;
-use App\Http\Controllers\Study\StudyAttachmentController;
-use App\Http\Controllers\Study\StudyChapterController;
-use App\Http\Controllers\Study\StudyLibraryController;
-use App\Http\Controllers\Study\StudyPageController;
-use App\Http\Controllers\Study\StudySubjectController;
 use App\Http\Controllers\Time\TimeCategoryController;
 use App\Http\Controllers\Time\TimeLogController;
 use App\Http\Controllers\Time\TimeReportController;
@@ -89,57 +90,65 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
     });
 
     // Concerts the user attended. Every show belongs to the signed-in user.
+    // The checklist of things to take is shared by every show of the household.
     Route::get('shows', [ShowController::class, 'index'])->name('shows.index');
     Route::get('shows/create', [ShowController::class, 'create'])->name('shows.create');
+    Route::get('shows/checklist', [ShowChecklistController::class, 'edit'])->name('shows.checklist.edit');
     Route::get('shows/{show}', [ShowController::class, 'show'])->name('shows.show');
     Route::get('shows/{show}/edit', [ShowController::class, 'edit'])->name('shows.edit');
 
     Route::middleware('throttle:finance-writes')->group(function () {
         Route::post('shows', [ShowController::class, 'store'])->name('shows.store');
+        Route::put('shows/checklist', [ShowChecklistController::class, 'update'])->name('shows.checklist.update');
         Route::put('shows/{show}', [ShowController::class, 'update'])->name('shows.update');
         Route::delete('shows/{show}', [ShowController::class, 'destroy'])->name('shows.destroy');
+        Route::put('shows/{show}/checklist/{item}', [ShowChecklistController::class, 'check'])->name('shows.checklist.check');
     });
 
-    // Study library: subjects (books), chapters, pages and their files.
+    // Knowledge base: subjects (books), categories, pages and their files.
     // Everything belongs to the signed-in user; files are served only through
     // the authorized attachment route.
-    Route::prefix('study')->name('study.')->group(function () {
-        Route::get('/', [StudyLibraryController::class, 'index'])->name('index');
-        Route::get('search', [StudyLibraryController::class, 'search'])->name('search');
-        Route::get('subjects/{subject}', [StudySubjectController::class, 'show'])->name('subjects.show');
-        Route::get('pages/{page}', [StudyPageController::class, 'show'])->name('pages.show');
-        Route::get('pages/{page}/edit', [StudyPageController::class, 'edit'])->name('pages.edit');
-        Route::get('files/{attachment}', [StudyAttachmentController::class, 'show'])->name('attachments.show');
+    // Old links from when the knowledge base was called "Estudos".
+    Route::get('study/{path?}', fn (?string $path = null) => redirect('/knowledge'.($path === null ? '' : '/'.$path), 301))->where('path', '.*');
 
-        Route::middleware('throttle:study-writes')->group(function () {
-            Route::post('subjects', [StudySubjectController::class, 'store'])->name('subjects.store');
-            Route::put('subjects/order', [StudySubjectController::class, 'order'])->name('subjects.order');
-            Route::put('subjects/{subject}', [StudySubjectController::class, 'update'])->name('subjects.update');
-            Route::delete('subjects/{subject}', [StudySubjectController::class, 'destroy'])->name('subjects.destroy');
-            Route::post('subjects/{subject}/archive', [StudySubjectController::class, 'archive'])->name('subjects.archive');
-            Route::delete('subjects/{subject}/archive', [StudySubjectController::class, 'restore'])->name('subjects.restore');
-            Route::post('subjects/{subject}/pin', [StudySubjectController::class, 'pin'])->name('subjects.pin');
-            Route::delete('subjects/{subject}/pin', [StudySubjectController::class, 'unpin'])->name('subjects.unpin');
-            Route::put('subjects/{subject}/arrange', [StudySubjectController::class, 'arrange'])->name('subjects.arrange');
+    Route::prefix('knowledge')->name('knowledge.')->group(function () {
+        Route::get('/', [KnowledgeBaseController::class, 'index'])->name('index');
+        Route::get('search', [KnowledgeBaseController::class, 'search'])->name('search');
+        Route::get('subjects/{subject}', [KnowledgeSubjectController::class, 'show'])->name('subjects.show');
+        Route::get('pages/{page}', [KnowledgePageController::class, 'show'])->name('pages.show');
+        Route::get('pages/{page}/edit', [KnowledgePageController::class, 'edit'])->name('pages.edit');
+        Route::get('files/{attachment}', [KnowledgeAttachmentController::class, 'show'])->name('attachments.show');
 
-            Route::post('subjects/{subject}/chapters', [StudyChapterController::class, 'store'])->name('chapters.store');
-            Route::put('chapters/{chapter}', [StudyChapterController::class, 'update'])->name('chapters.update');
-            Route::delete('chapters/{chapter}', [StudyChapterController::class, 'destroy'])->name('chapters.destroy');
+        Route::middleware('throttle:knowledge-writes')->group(function () {
+            Route::post('subjects', [KnowledgeSubjectController::class, 'store'])->name('subjects.store');
+            Route::put('subjects/order', [KnowledgeSubjectController::class, 'order'])->name('subjects.order');
+            Route::put('subjects/{subject}', [KnowledgeSubjectController::class, 'update'])->name('subjects.update');
+            Route::delete('subjects/{subject}', [KnowledgeSubjectController::class, 'destroy'])->name('subjects.destroy');
+            Route::post('subjects/{subject}/archive', [KnowledgeSubjectController::class, 'archive'])->name('subjects.archive');
+            Route::delete('subjects/{subject}/archive', [KnowledgeSubjectController::class, 'restore'])->name('subjects.restore');
+            Route::post('subjects/{subject}/pin', [KnowledgeSubjectController::class, 'pin'])->name('subjects.pin');
+            Route::delete('subjects/{subject}/pin', [KnowledgeSubjectController::class, 'unpin'])->name('subjects.unpin');
+            Route::put('subjects/{subject}/arrange', [KnowledgeSubjectController::class, 'arrange'])->name('subjects.arrange');
 
-            Route::post('subjects/{subject}/pages', [StudyPageController::class, 'store'])->name('pages.store');
-            Route::put('pages/{page}', [StudyPageController::class, 'update'])->name('pages.update');
-            Route::put('pages/{page}/content', [StudyPageController::class, 'content'])->name('pages.content');
-            Route::put('pages/{page}/status', [StudyPageController::class, 'status'])->name('pages.status');
-            Route::put('pages/{page}/reading', [StudyPageController::class, 'reading'])->name('pages.reading');
-            Route::post('pages/{page}/bookmark', [StudyPageController::class, 'bookmark'])->name('pages.bookmark');
-            Route::delete('pages/{page}/bookmark', [StudyPageController::class, 'unbookmark'])->name('pages.unbookmark');
-            Route::post('pages/{page}/duplicate', [StudyPageController::class, 'duplicate'])->name('pages.duplicate');
-            Route::put('pages/{page}/move', [StudyPageController::class, 'move'])->name('pages.move');
-            Route::post('pages/{page}/archive', [StudyPageController::class, 'archive'])->name('pages.archive');
-            Route::delete('pages/{page}/archive', [StudyPageController::class, 'restore'])->name('pages.restore');
-            Route::delete('pages/{page}', [StudyPageController::class, 'destroy'])->name('pages.destroy');
+            Route::post('subjects/{subject}/categories', [KnowledgeCategoryController::class, 'store'])->name('categories.store');
+            Route::put('categories/{category}', [KnowledgeCategoryController::class, 'update'])->name('categories.update');
+            Route::put('categories/{category}/move', [KnowledgeCategoryController::class, 'move'])->name('categories.move');
+            Route::delete('categories/{category}', [KnowledgeCategoryController::class, 'destroy'])->name('categories.destroy');
 
-            Route::post('pages/{page}/attachments', [StudyAttachmentController::class, 'store'])->name('attachments.store');
+            Route::post('subjects/{subject}/pages', [KnowledgePageController::class, 'store'])->name('pages.store');
+            Route::put('pages/{page}', [KnowledgePageController::class, 'update'])->name('pages.update');
+            Route::put('pages/{page}/content', [KnowledgePageController::class, 'content'])->name('pages.content');
+            Route::put('pages/{page}/status', [KnowledgePageController::class, 'status'])->name('pages.status');
+            Route::put('pages/{page}/reading', [KnowledgePageController::class, 'reading'])->name('pages.reading');
+            Route::post('pages/{page}/bookmark', [KnowledgePageController::class, 'bookmark'])->name('pages.bookmark');
+            Route::delete('pages/{page}/bookmark', [KnowledgePageController::class, 'unbookmark'])->name('pages.unbookmark');
+            Route::post('pages/{page}/duplicate', [KnowledgePageController::class, 'duplicate'])->name('pages.duplicate');
+            Route::put('pages/{page}/move', [KnowledgePageController::class, 'move'])->name('pages.move');
+            Route::post('pages/{page}/archive', [KnowledgePageController::class, 'archive'])->name('pages.archive');
+            Route::delete('pages/{page}/archive', [KnowledgePageController::class, 'restore'])->name('pages.restore');
+            Route::delete('pages/{page}', [KnowledgePageController::class, 'destroy'])->name('pages.destroy');
+
+            Route::post('pages/{page}/attachments', [KnowledgeAttachmentController::class, 'store'])->name('attachments.store');
         });
     });
 });

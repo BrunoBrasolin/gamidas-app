@@ -14,7 +14,8 @@ Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React
 - **Relatórios** anuais da casa e pessoais.
 - **Configurações da casa**: salários (com histórico) e membros.
 - **Tempo** (`/time`, privado de cada usuário): categorias (um trabalho ou cliente por categoria), planilha de horas por dia × categoria (semana e mês) com tempo em h:mm:ss e nota em Markdown em cada célula, e relatórios de tempo registrado.
-- **Shows** (`/shows`, compartilhado pela casa): shows que vocês foram, com banda, nome da tour, local, data, setlist, shows de abertura (cada um com seu setlist) e link do álbum do Google Fotos; lista por ano com busca e totais de shows, bandas, locais e músicas.
+- **Base de Conhecimento** (`/knowledge`, privado de cada usuário): matérias em forma de livros (capa, cor, fixar, arquivar, ordem manual), categorias opcionais com subcategorias, páginas escritas num editor rico (atalhos de Markdown e barra de formatação, tabelas, imagens entre parágrafos e PDFs anexados), salvamento automático, modo de leitura com sumário, tamanho de letra e largura ajustáveis, marcadores, status de estudo e busca no texto das páginas.
+- **Shows** (`/shows`, compartilhado pela casa): shows que vocês foram, com banda, nome da tour, local, data, setlist, shows de abertura (cada um com seu setlist) link do álbum do Google Fotos e link da playlist do Spotify; lista por ano com busca e totais de shows, bandas, locais e músicas.
 
 ## Requisitos
 
@@ -96,6 +97,8 @@ php artisan expenses:generate                 # manual, idempotente
 php artisan expenses:generate --through=2027-06
 ```
 
+Anexos da Base de Conhecimento removidos do texto de uma página ficam guardados por `KNOWLEDGE_PRUNE_AFTER_HOURS` horas (padrão 24, para o "desfazer" do editor) e depois são apagados por `knowledge:prune-attachments`, agendado diariamente às 03:20. O mesmo comando apaga arquivos da pasta `knowledge/` sem registro no banco.
+
 Configure o agendador no servidor para rodar a cada 20 minutos (economiza conexões no MySQL da hospedagem compartilhada). Os horários das tarefas precisam cair nessa grade (`:00`, `:20`, `:40`):
 
 ```cron
@@ -150,7 +153,8 @@ Em **Settings › Secrets and variables › Actions**:
     ```
 
 4. Depois do primeiro deploy, crie a residência e as contas pelo SSH (veja [Criação da residência e das contas](#criação-da-residência-e-das-contas)), usando `/opt/alt/php83/usr/bin/php artisan ...`.
-5. Em hPanel › Avançado › Cron Jobs, agende a cada 20 minutos (`*/20 * * * *`):
+5. Em hPanel › Avançado › Configuração do PHP, deixe `upload_max_filesize` e `post_max_size` pelo menos do tamanho do maior anexo da Base de Conhecimento (`KNOWLEDGE_MAX_PDF_KB`, padrão 30 MB).
+6. Em hPanel › Avançado › Cron Jobs, agende a cada 20 minutos (`*/20 * * * *`):
 
     ```cron
     /opt/alt/php83/usr/bin/php /home/<usuario>/<DEPLOY_PATH>/artisan schedule:run >> /dev/null 2>&1
@@ -239,9 +243,20 @@ Em **Settings › Secrets and variables › Actions**:
 - Shows (`shows`) e aberturas (`show_opening_acts`) pertencem à **residência**: todos os membros veem, editam e excluem qualquer show; shows de outra residência respondem **404**. Fica registrado quem cadastrou (`created_by_user_id`, vazio nos importados).
 - Obrigatórios: banda, local e data (`Y-m-d`, de 2000 a 2100). Nome da tour, setlist, aberturas e álbum são opcionais.
 - O **setlist** é digitado com uma música por linha, na ordem tocada, e guardado como lista JSON; linhas em branco e numeração no início (`1.`, `2)`, `3 -`) são descartadas. Até 200 músicas por setlist e 10 aberturas por show, na ordem em que tocaram. Editar um show substitui todas as aberturas.
-- O link do álbum precisa ser `https` (ex.: o link de compartilhamento do Google Fotos) e abre em nova aba.
+- Os links do álbum e da playlist precisam ser `https` (ex.: o link de compartilhamento do Google Fotos / do Spotify) e abrem em nova aba.
 - Nos totais, bandas contam atrações principais e aberturas uma vez cada, ignorando maiúsculas e acentos; locais idem.
 - **Importação do site antigo**: `php artisan shows:import [residência] [--from=url-ou-arquivo] [--dry-run]` lê a página do GitHub Pages (padrão `https://brunobrasolin.github.io/shows/`) e importa para a residência informada (sem id: a única que existe, ou escolhida numa lista): cada `h1` "Banda | Tour" é um show, com `Data: dd/mm/aaaa`, `Local:` e o setlist; cada título menor seguinte ("Banda | Show Abertura") é uma abertura. Shows que a residência já tem (mesma banda e data) são pulados, então dá para rodar de novo. Se o servidor não alcançar o site, passe um arquivo HTML salvo em `--from`.
+
+### Base de Conhecimento
+
+- Matérias (`knowledge_subjects`), categorias (`knowledge_categories`), páginas (`knowledge_pages`) e anexos (`knowledge_attachments`) pertencem a **um usuário**: cada pessoa monta a própria base e não vê a do outro membro. Políticas respondem **404** para registros alheios, e IDs de matéria ou categoria enviados pelo navegador só são aceitos se forem do próprio usuário.
+- Categorias são opcionais e cada matéria tem as suas. Uma categoria pode ficar dentro de outra da mesma matéria (`parent_id`), até 5 níveis; nunca dentro dela mesma ou de uma subcategoria dela. Cada página fica em no máximo uma categoria. Excluir uma categoria **não** apaga nada dentro dela: as páginas e subcategorias vão para o fim da categoria de cima (no primeiro nível, as páginas vão para "Sem categoria" e as subcategorias sobem para o primeiro nível). No sumário e na navegação entre páginas, cada categoria vem com as páginas dela e depois as subcategorias, em ordem; por último, as páginas sem categoria; páginas arquivadas ficam de fora.
+- Até out/2026 a seção se chamava "Estudos" (tabelas `study_*`, capítulos em vez de categorias, rota `/study`). A migração `2026_10_25_000001_move_study_to_knowledge_base` copia os dados para as tabelas `knowledge_*` mantendo os ids, transforma capítulos em categorias de primeiro nível, renomeia os blocos de anexo dentro das páginas e move os arquivos de `study/` para `knowledge/`. Links antigos em `/study/...` redirecionam.
+- O conteúdo da página é o documento do editor (Tiptap/ProseMirror, JSON). No servidor ele é reconstruído com uma lista fechada de blocos, marcas e atributos: links só `http(s)` e `mailto`, blocos de anexo só com anexos da própria página. O modo de leitura monta o documento como componentes React, sem injetar HTML. O texto puro (`content_text`) alimenta a busca.
+- **Salvamento automático**: cada salvamento leva a revisão em que o editor se baseou. Se a página foi salva em outra aba ou aparelho depois disso, o servidor responde **409** e nada é sobrescrito até a pessoa escolher entre a versão salva e a dela. Falhas de rede tentam de novo sem perder o texto; ao sair do editor ou mandar o app para segundo plano, salva na hora.
+- **Anexos**: imagens JPEG, PNG, WebP ou GIF (até `KNOWLEDGE_MAX_IMAGE_KB`, padrão 10 MB) e PDFs (até `KNOWLEDGE_MAX_PDF_KB`, padrão 30 MB). O tipo é detectado pelo conteúdo do arquivo, nunca pelo nome ou pelo tipo enviado pelo navegador (SVG não é aceito). Os arquivos ficam no disco privado (`storage/app/private/knowledge/<usuário>/`) com nome aleatório e só são servidos pela rota autenticada `/knowledge/files/{id}`, com `X-Content-Type-Options: nosniff`.
+- Um anexo novo fica "solto" até o texto que o posiciona ser salvo; anexos tirados do texto também ficam soltos e são apagados depois do prazo (veja [Tarefas agendadas](#tarefas-agendadas)). Excluir uma página ou matéria apaga na hora os arquivos dela; duplicar uma página copia os arquivos; mover uma página para outra matéria leva os anexos junto.
+- Status de estudo por página (não lida, estudando, revisada) é manual e opcional; a matéria mostra o progresso. Marcar, mudar status ou abrir uma página não altera a data de edição.
 
 ### Segurança e integridade
 

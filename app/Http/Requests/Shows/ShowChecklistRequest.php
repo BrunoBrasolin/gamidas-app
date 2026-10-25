@@ -50,6 +50,8 @@ class ShowChecklistRequest extends FinanceRequest
     /**
      * Report a too-long item on the whole list, since the form edits it as
      * a single text field.
+     *
+     * @return list<callable(Validator): void>
      */
     public function after(): array
     {

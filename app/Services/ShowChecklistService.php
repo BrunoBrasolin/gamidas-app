@@ -27,7 +27,7 @@ class ShowChecklistService
 
             $kept = [];
 
-            foreach (array_values($labels) as $position => $label) {
+            foreach ($labels as $position => $label) {
                 $item = $existing->get(self::key($label));
 
                 if ($item === null) {

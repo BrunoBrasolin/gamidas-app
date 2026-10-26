@@ -509,7 +509,12 @@ function GoalSection({
                                     {goals.met}
                                     <span className="text-base font-normal text-muted-foreground">
                                         {' '}
-                                        de {judged} dia(s) útil(eis)
+                                        de{' '}
+                                        {plural(
+                                            judged,
+                                            'dia útil',
+                                            'dias úteis',
+                                        )}
                                     </span>
                                 </span>
                             }

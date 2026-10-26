@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Pencil, Plus, Receipt, Trash2 } from 'lucide-react';
+import { CheckCheck, Pencil, Plus, Receipt, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
 import { FilterSelect } from '@/components/finance/filter-select';
@@ -39,7 +39,7 @@ type Filters = {
     month: string;
     scope: Scope;
     creator: number | null;
-    status: 'paid' | 'pending' | 'overdue' | null;
+    status: 'paid' | 'pending' | 'overdue' | 'awaiting_amount' | null;
     source: 'one_off' | 'fixed' | 'temporary' | null;
 };
 
@@ -51,6 +51,9 @@ type Props = {
         paid_cents: number;
         pending_cents: number;
         members: Record<number, number>;
+        awaiting_amount_count: number;
+        payable_count: number;
+        payable_cents: number;
     };
     summary: HouseholdMonthSummary;
     members: Member[];
@@ -167,6 +170,7 @@ export default function ExpensesIndex({
                             ['pending', 'Pendentes'],
                             ['overdue', 'Vencidas'],
                             ['paid', 'Pagas'],
+                            ['awaiting_amount', 'Valor a definir'],
                         ]}
                     />
                     <FilterSelect
@@ -264,10 +268,8 @@ export default function ExpensesIndex({
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">
-                                                    <Money
-                                                        cents={
-                                                            occurrence.amount_cents
-                                                        }
+                                                    <Amount
+                                                        occurrence={occurrence}
                                                     />
                                                 </TableCell>
                                                 {isHousehold &&
@@ -357,7 +359,12 @@ export default function ExpensesIndex({
                                                         />
                                                     </TableCell>
                                                 ))}
-                                            <TableCell colSpan={3} />
+                                            <TableCell colSpan={3}>
+                                                <PayAllButton
+                                                    filters={filters}
+                                                    totals={totals}
+                                                />
+                                            </TableCell>
                                         </TableRow>
                                     </TableFooter>
                                 </Table>
@@ -382,10 +389,8 @@ export default function ExpensesIndex({
                                                 Total
                                             </dt>
                                             <dd className="text-right font-medium">
-                                                <Money
-                                                    cents={
-                                                        occurrence.amount_cents
-                                                    }
+                                                <Amount
+                                                    occurrence={occurrence}
                                                 />
                                             </dd>
                                             {isHousehold &&
@@ -424,9 +429,16 @@ export default function ExpensesIndex({
                                 </Card>
                             ))}
                             <Card className="py-4">
-                                <CardContent className="flex justify-between px-4 text-sm font-medium">
-                                    <span>Total do mês</span>
-                                    <Money cents={totals.total_cents} />
+                                <CardContent className="space-y-3 px-4 text-sm">
+                                    <div className="flex justify-between font-medium">
+                                        <span>Total do mês</span>
+                                        <Money cents={totals.total_cents} />
+                                    </div>
+                                    <PayAllButton
+                                        filters={filters}
+                                        totals={totals}
+                                        className="w-full"
+                                    />
                                 </CardContent>
                             </Card>
                         </div>
@@ -436,6 +448,69 @@ export default function ExpensesIndex({
                 )}
             </div>
         </>
+    );
+}
+
+function Amount({ occurrence }: { occurrence: Occurrence }) {
+    if (occurrence.awaits_amount) {
+        return (
+            <span className="text-sm font-normal text-amber-700 dark:text-amber-400">
+                A definir
+            </span>
+        );
+    }
+
+    return <Money cents={occurrence.amount_cents} />;
+}
+
+/**
+ * Marks every pending expense of the month (within the filters on screen)
+ * as paid at once. Only the expenses the user may confirm are included: the
+ * server skips household expenses they created and months without amount.
+ */
+function PayAllButton({
+    filters,
+    totals,
+    className,
+}: {
+    filters: Filters;
+    totals: Props['totals'];
+    className?: string;
+}) {
+    if (totals.payable_count === 0) {
+        return null;
+    }
+
+    const skipped = totals.awaiting_amount_count;
+
+    return (
+        <ConfirmDialog
+            method="post"
+            destructive={false}
+            url={expenses.payAll.url({ query: filters })}
+            title="Pagar tudo?"
+            description={
+                <>
+                    {totals.payable_count === 1
+                        ? '1 despesa pendente'
+                        : `${totals.payable_count} despesas pendentes`}{' '}
+                    de {formatMonth(filters.month)}, somando{' '}
+                    <Money cents={totals.payable_cents} />, serão marcadas como
+                    pagas por você.
+                    {filters.scope === 'household' &&
+                        ' Despesas que você cadastrou continuam aguardando a confirmação do outro membro.'}
+                    {skipped > 0 &&
+                        ` ${skipped === 1 ? '1 conta sem valor definido fica' : `${skipped} contas sem valor definido ficam`} de fora.`}
+                </>
+            }
+            confirmLabel="Marcar como pagas"
+            trigger={
+                <Button size="sm" className={cn('ml-auto flex', className)}>
+                    <CheckCheck />
+                    Pagar tudo
+                </Button>
+            }
+        />
     );
 }
 
@@ -464,6 +539,14 @@ function ExpenseTitle({ occurrence }: { occurrence: Occurrence }) {
                 )}
                 {occurrence.is_customized && (
                     <Badge variant="secondary">Ajustada no mês</Badge>
+                )}
+                {occurrence.awaits_amount && (
+                    <Badge
+                        variant="outline"
+                        className="border-amber-500/60 text-amber-700 dark:text-amber-400"
+                    >
+                        Valor a definir
+                    </Badge>
                 )}
             </div>
         </div>

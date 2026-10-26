@@ -4,10 +4,13 @@ namespace Tests\Feature\Finance;
 
 use App\Enums\ExpenseScope;
 use App\Enums\PaymentEventType;
+use App\Models\AuditLog;
 use App\Models\PaymentEvent;
 use App\Services\SalaryService;
+use App\Support\Month;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Date;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesHousehold;
 use Tests\TestCase;
 
@@ -177,5 +180,73 @@ class PaymentConfirmationTest extends TestCase
 
         $this->actingAs($outsider)->post(route('expenses.payment.store', $expense))->assertNotFound();
         $this->assertFalse($expense->fresh()->isPaid());
+    }
+
+    public function test_pay_all_confirms_every_expense_of_the_month_the_user_can_confirm(): void
+    {
+        $october = Month::parse('2026-10');
+        $byLeticia = $this->createExpense($this->leticia, 100_000, $october);
+        $alsoByLeticia = $this->createExpense($this->leticia, 2_550, $october);
+        $byBruno = $this->createExpense($this->bruno, 40_000, $october);
+        $nextMonth = $this->createExpense($this->leticia, 70_000, Month::parse('2026-11'));
+        $personal = $this->createExpense($this->bruno, 9_900, $october, ExpenseScope::Personal);
+        $alreadyPaid = $this->createExpense($this->leticia, 1_000, $october);
+        $this->actingAs($this->bruno)->post(route('expenses.payment.store', $alreadyPaid));
+
+        $this->actingAs($this->bruno)
+            ->get(route('expenses.index', ['month' => '2026-10']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('totals.payable_count', 2)
+                ->where('totals.payable_cents', 102_550)
+            );
+
+        $this->actingAs($this->bruno)
+            ->post(route('expenses.pay-all', ['month' => '2026-10', 'scope' => 'household']))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        foreach ([$byLeticia, $alsoByLeticia] as $expense) {
+            $expense->refresh();
+            $this->assertTrue($expense->isPaid());
+            $this->assertSame($this->bruno->id, $expense->paid_by_user_id);
+        }
+
+        // Bruno's own expense still waits for Letícia; other months and
+        // personal expenses are untouched.
+        $this->assertFalse($byBruno->fresh()->isPaid());
+        $this->assertFalse($nextMonth->fresh()->isPaid());
+        $this->assertFalse($personal->fresh()->isPaid());
+
+        $this->assertSame(3, PaymentEvent::query()->where('type', PaymentEventType::Paid)->count());
+        $this->assertSame(3, AuditLog::query()->where('action', 'payment.confirmed')->count());
+
+        $this->actingAs($this->leticia)
+            ->post(route('expenses.pay-all', ['month' => '2026-10', 'scope' => 'household']))
+            ->assertRedirect();
+
+        $this->assertTrue($byBruno->fresh()->isPaid());
+        $this->assertSame($this->leticia->id, $byBruno->fresh()->paid_by_user_id);
+    }
+
+    public function test_pay_all_honors_the_filters_and_the_personal_scope(): void
+    {
+        $october = Month::parse('2026-10');
+        $household = $this->createExpense($this->leticia, 10_000, $october);
+        $personal = $this->createExpense($this->bruno, 9_900, $october, ExpenseScope::Personal);
+        $leticiasPersonal = $this->createExpense($this->leticia, 5_000, $october, ExpenseScope::Personal);
+
+        $this->actingAs($this->bruno)
+            ->post(route('expenses.pay-all', ['month' => '2026-10', 'scope' => 'household', 'source' => 'fixed']))
+            ->assertRedirect();
+
+        $this->assertFalse($household->fresh()->isPaid());
+
+        $this->actingAs($this->bruno)
+            ->post(route('expenses.pay-all', ['month' => '2026-10', 'scope' => 'personal']))
+            ->assertRedirect();
+
+        $this->assertTrue($personal->fresh()->isPaid());
+        $this->assertFalse($household->fresh()->isPaid());
+        $this->assertFalse($leticiasPersonal->fresh()->isPaid());
     }
 }

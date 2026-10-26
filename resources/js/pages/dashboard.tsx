@@ -5,6 +5,7 @@ import {
     CalendarDays,
     CheckCircle2,
     Home,
+    PencilLine,
     PiggyBank,
     Receipt,
     TrendingDown,
@@ -235,6 +236,21 @@ export default function Dashboard({
                                     vencida(s)
                                 </Link>
                             )}
+                            {summary.awaiting_amount_count > 0 && (
+                                <Link
+                                    href={expenses.index({
+                                        query: {
+                                            month,
+                                            status: 'awaiting_amount',
+                                        },
+                                    })}
+                                    className="flex items-center gap-1 text-sm font-medium text-amber-700 dark:text-amber-400"
+                                >
+                                    <PencilLine className="size-4" />
+                                    {summary.awaiting_amount_count} conta(s)
+                                    aguardando o valor do mês
+                                </Link>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -315,11 +331,15 @@ export default function Dashboard({
                                                         occurrence.due_date,
                                                     )}{' '}
                                                     ·{' '}
-                                                    <Money
-                                                        cents={
-                                                            occurrence.amount_cents
-                                                        }
-                                                    />
+                                                    {occurrence.awaits_amount ? (
+                                                        'valor a definir'
+                                                    ) : (
+                                                        <Money
+                                                            cents={
+                                                                occurrence.amount_cents
+                                                            }
+                                                        />
+                                                    )}
                                                 </div>
                                             </div>
                                             <PaymentActions

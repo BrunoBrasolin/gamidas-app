@@ -49,6 +49,10 @@ class ExpenseOccurrencePolicy
             return Response::deny('Esta despesa já foi marcada como paga.');
         }
 
+        if ($occurrence->awaitsAmount()) {
+            return Response::deny('Informe o valor deste mês antes de confirmar o pagamento.');
+        }
+
         if ($occurrence->isHousehold() && $occurrence->created_by_user_id === $user->id) {
             return Response::deny('O pagamento de uma despesa da casa deve ser confirmado pelo outro membro da residência.');
         }

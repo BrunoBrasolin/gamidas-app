@@ -43,6 +43,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
 
     Route::middleware('throttle:finance-writes')->group(function () {
         Route::post('expenses', [HouseholdExpenseController::class, 'store'])->name('expenses.store');
+        Route::post('expenses/pay-all', [HouseholdExpenseController::class, 'payAll'])->name('expenses.pay-all');
         Route::put('expenses/{occurrence}', [HouseholdExpenseController::class, 'update'])->name('expenses.update');
         Route::delete('expenses/{occurrence}', [HouseholdExpenseController::class, 'destroy'])->name('expenses.destroy');
         Route::post('expenses/{occurrence}/payment', [ExpensePaymentController::class, 'store'])->name('expenses.payment.store');

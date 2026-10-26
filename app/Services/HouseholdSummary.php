@@ -23,7 +23,7 @@ final class HouseholdSummary
     /**
      * Totals of the household's shared expenses for one month.
      *
-     * @return array{total_cents: int, paid_cents: int, pending_cents: int, count: int, paid_count: int, pending_count: int, overdue_count: int, by_source: array<string, int>, by_member: array<int, array{user_id: int, total_cents: int, paid_cents: int, pending_cents: int}>}
+     * @return array{total_cents: int, paid_cents: int, pending_cents: int, count: int, paid_count: int, pending_count: int, overdue_count: int, awaiting_amount_count: int, by_source: array<string, int>, by_member: array<int, array{user_id: int, total_cents: int, paid_cents: int, pending_cents: int}>}
      */
     public function month(Household $household, CarbonImmutable $month): array
     {
@@ -46,6 +46,7 @@ final class HouseholdSummary
         $pendingCount = (int) ($pending?->getAttribute('aggregate_count') ?? 0);
 
         $overdueCount = $base()->overdue()->count();
+        $awaitingAmountCount = $base()->awaitingAmount()->count();
 
         return [
             'total_cents' => $paidCents + $pendingCents,
@@ -55,6 +56,7 @@ final class HouseholdSummary
             'paid_count' => $paidCount,
             'pending_count' => $pendingCount,
             'overdue_count' => $overdueCount,
+            'awaiting_amount_count' => $awaitingAmountCount,
             'by_source' => $this->bySource($household, $month),
             'by_member' => $this->byMember($household, $month, $month),
         ];

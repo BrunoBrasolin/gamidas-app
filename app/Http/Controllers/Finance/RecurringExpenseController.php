@@ -67,6 +67,7 @@ class RecurringExpenseController extends Controller
                 'title' => $template->title,
                 'notes' => $template->notes,
                 'amount_cents' => $template->amount_cents,
+                'is_variable' => $template->is_variable,
                 'due_day' => $template->due_day,
                 'start_month' => Month::key($template->start_month),
                 'end_month' => $template->end_month ? Month::key($template->end_month) : null,

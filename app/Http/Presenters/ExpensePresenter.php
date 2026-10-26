@@ -64,6 +64,7 @@ final class ExpensePresenter
             'status' => $occurrence->status->value,
             'is_overdue' => $occurrence->isOverdue(),
             'is_customized' => $occurrence->is_customized,
+            'awaits_amount' => $occurrence->awaitsAmount(),
             'shares' => $occurrence->shares
                 ->map(fn (ExpenseShare $share) => [
                     'user_id' => $share->user_id,

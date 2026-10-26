@@ -32,13 +32,18 @@ final class RecurringExpenseService
     }
 
     /**
-     * @param  array{scope: ExpenseScope, kind: RecurringKind, title: string, notes: ?string, amount_cents: int, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}  $data
+     * Variable templates (amount changing every month, like the electricity
+     * bill) store no amount; their months are generated at zero and wait for
+     * the month's amount to be filled in.
+     *
+     * @param  array{scope: ExpenseScope, kind: RecurringKind, title: string, notes: ?string, amount_cents: int, is_variable?: bool, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}  $data
      */
     public function create(Household $household, User $actor, array $data): RecurringExpense
     {
         return DB::transaction(function () use ($household, $actor, $data) {
             $template = RecurringExpense::create([
                 ...$data,
+                ...$this->amount($data),
                 ...$this->period($data['kind'], $data['start_month'], $data['end_month'], $data['total_months']),
                 'household_id' => $household->id,
                 'owner_user_id' => $data['scope'] === ExpenseScope::Personal ? $actor->id : null,
@@ -54,7 +59,7 @@ final class RecurringExpenseService
     }
 
     /**
-     * @param  array{title: string, notes: ?string, amount_cents: int, due_day: int, end_month: ?CarbonImmutable, total_months: ?int}  $data
+     * @param  array{title: string, notes: ?string, amount_cents: int, is_variable?: bool, due_day: int, end_month: ?CarbonImmutable, total_months: ?int}  $data
      */
     public function update(RecurringExpense $template, User $actor, array $data, CarbonImmutable $effectiveFrom): RecurringExpense
     {
@@ -67,6 +72,7 @@ final class RecurringExpenseService
 
             $template->update([
                 ...$data,
+                ...$this->amount($data),
                 ...$period,
                 'ended_at' => $period['end_month'] === null ? null : $template->ended_at,
                 'updated_by_user_id' => $actor->id,
@@ -170,6 +176,22 @@ final class RecurringExpenseService
     }
 
     /**
+     * Variable templates never carry an amount.
+     *
+     * @param  array{amount_cents: int, is_variable?: bool}  $data
+     * @return array{amount_cents: int, is_variable: bool}
+     */
+    private function amount(array $data): array
+    {
+        $variable = $data['is_variable'] ?? false;
+
+        return [
+            'amount_cents' => $variable ? 0 : $data['amount_cents'],
+            'is_variable' => $variable,
+        ];
+    }
+
+    /**
      * Normalize the end of a template's period from its kind.
      *
      * @return array{end_month: ?CarbonImmutable, total_months: ?int}
@@ -239,6 +261,7 @@ final class RecurringExpenseService
             'kind' => $template->kind->value,
             'scope' => $template->scope->value,
             'amount_cents' => $template->amount_cents,
+            'is_variable' => $template->is_variable,
             'due_day' => $template->due_day,
             'start_month' => Month::key($template->start_month),
             'end_month' => $template->end_month ? Month::key($template->end_month) : null,

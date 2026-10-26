@@ -27,7 +27,8 @@ use Illuminate\Support\Carbon;
  * @property RecurringKind $kind
  * @property string $title
  * @property string|null $notes
- * @property int $amount_cents
+ * @property int $amount_cents Zero for variable templates.
+ * @property bool $is_variable Whether each month's amount is filled in by hand.
  * @property int $due_day
  * @property CarbonImmutable $start_month
  * @property CarbonImmutable|null $end_month
@@ -44,7 +45,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'household_id', 'scope', 'owner_user_id', 'kind', 'title', 'notes',
-    'amount_cents', 'due_day', 'start_month', 'end_month', 'total_months', 'ended_at',
+    'amount_cents', 'is_variable', 'due_day', 'start_month', 'end_month', 'total_months', 'ended_at',
     'created_by_user_id', 'updated_by_user_id',
 ])]
 class RecurringExpense extends Model
@@ -61,6 +62,7 @@ class RecurringExpense extends Model
             'scope' => ExpenseScope::class,
             'kind' => RecurringKind::class,
             'amount_cents' => 'integer',
+            'is_variable' => 'boolean',
             'due_day' => 'integer',
             'total_months' => 'integer',
             'start_month' => DateOnly::class,

@@ -191,6 +191,7 @@ Em **Settings › Secrets and variables › Actions**:
 - **Encerrar** define o último mês: meses pendentes posteriores são removidos e os pagos permanecem. Não é possível encerrar antes de um mês já pago (reabra-o primeiro) nem excluir um modelo com meses pagos.
 - **Extras temporárias**: valor mensal por N meses; o mês final é calculado e exibido, e nada é gerado depois dele.
 - Dia de vencimento 29–31 cai no último dia de meses mais curtos.
+- **Valor variável** (ex.: conta de luz): o modelo não tem valor; cada mês é gerado com R$ 0,00 e aparece em Despesas como **"Valor a definir"** (filtro próprio e aviso no painel) até alguém informar o valor do mês — o que o marca como ajustado. Um mês sem valor não pode ser confirmado como pago. Editar o modelo para variável (ou de volta para valor fixo) segue a regra do "aplicar a partir de".
 
 ### Despesas avulsas e parcelas
 
@@ -205,6 +206,7 @@ Em **Settings › Secrets and variables › Actions**:
 - A confirmação grava situação, data/hora e quem confirmou, além de um evento no histórico de pagamentos e na auditoria.
 - Uma despesa paga não pode ser editada nem excluída. Ela só pode ser **reaberta** por quem confirmou o pagamento, com motivo obrigatório; o histórico anterior é mantido e a despesa volta a seguir os salários atuais.
 - Despesas pessoais são marcadas como pagas ou reabertas pelo próprio dono.
+- **Pagar tudo** (no total do mês em Despesas) confirma de uma vez todas as despesas pendentes do mês, respeitando os filtros da tela, que o usuário pode confirmar: as da casa cadastradas por ele continuam aguardando o outro membro, e meses sem valor ficam de fora. Cada despesa ganha seu próprio evento no histórico e na auditoria, e a operação é tudo ou nada.
 - Uma despesa pendente só fica **vencida** depois que termina o mês do vencimento: vencendo em 10/10, passa a constar como vencida a partir de 01/11.
 
 ### Finanças pessoais
@@ -236,6 +238,7 @@ Em **Settings › Secrets and variables › Actions**:
 - **Células** (`time_logs`): uma por categoria e dia (índice único), com duração em **segundos** (0 a 86.400) e uma nota em Markdown opcional (até 200.000 caracteres), editáveis quando quiser. Digita-se `7:42:14`, `1:30` (horas e minutos), `1h30`, `45m` ou `1,5h`. Uma célula sem tempo e sem nota é removida; salvar só o tempo mantém a nota. A data é local (`Y-m-d`, sem conversão de fuso), de 2000 a 2100.
 - **Cronômetros** (`time_timers`): cada categoria ativa tem no máximo um cronômetro (índice único por categoria), com iniciar, pausar, zerar e "lançar na planilha de hoje" (soma o tempo decorrido à célula de hoje, preservando a nota, e zera). O relógio é do servidor (`started_at` + segundos acumulados), então o tempo segue contando ao recarregar a página ou em outro aparelho. Iniciar um cronômetro já ativo não faz nada; categorias arquivadas não iniciam cronômetro.
 - A planilha mostra semana (segunda a domingo) ou mês, uma coluna por categoria ativa mais as arquivadas com lançamentos no período, totais por dia e por categoria. Os relatórios somam as mesmas células (total, médias, comparação com o período anterior, tempo por dia e por categoria, mapa de calor).
+- **Meta nos relatórios**: a meta é avaliada só em **dias úteis** (segunda a sexta, exceto feriados nacionais: fixos, Sexta-feira Santa e Consciência Negra a partir de 2024; Carnaval e Corpus Christi são ponto facultativo e contam como úteis). Um dia útil atinge a meta quando **cada** categoria com meta chega à sua; a meta de uma categoria vale do dia em que foi criada (ou de um dia anterior com tempo lançado nela) até a véspera do arquivamento, usando a meta atual. Hoje fica "em andamento" até atingir, sem contar como falha; dias futuros não têm veredito. O relatório mostra dias atingidos × abaixo da meta (taxa, quanto faltou, sequência atual e melhor sequência), um calendário colorido e as listas de dias abaixo da meta e de **fins de semana e feriados trabalhados**.
 - A renderização do Markdown (`react-markdown` + GFM) descarta HTML bruto, neutraliza links `javascript:` e não carrega imagens externas.
 
 ### Shows

@@ -1,6 +1,7 @@
 import { Form, router } from '@inertiajs/react';
-import { CheckCircle2, RotateCcw } from 'lucide-react';
+import { CheckCircle2, PencilLine, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
+import { ExpenseFormDialog } from '@/components/finance/expense-form-dialog';
 import { FormField } from '@/components/finance/form-field';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,6 +49,31 @@ export function PaymentActions({ occurrence }: { occurrence: Occurrence }) {
                     <ReopenPaymentDialog occurrence={occurrence} />
                 )}
             </div>
+        );
+    }
+
+    if (occurrence.awaits_amount) {
+        // A month of a variable bill (e.g. electricity): it can only be paid
+        // once this month's amount is filled in.
+        return occurrence.can.update ? (
+            <ExpenseFormDialog
+                occurrence={occurrence}
+                month={occurrence.billing_month}
+                trigger={
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-amber-500/60 text-amber-700 dark:text-amber-400"
+                    >
+                        <PencilLine />
+                        Informar valor
+                    </Button>
+                }
+            />
+        ) : (
+            <span className="text-xs text-muted-foreground">
+                Aguardando o valor do mês
+            </span>
         );
     }
 

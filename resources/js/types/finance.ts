@@ -49,6 +49,7 @@ export type Occurrence = {
     status: OccurrenceStatus;
     is_overdue: boolean;
     is_customized: boolean;
+    awaits_amount: boolean;
     shares: Share[];
     created_by: UserRef;
     created_at: string | null;
@@ -84,6 +85,7 @@ export type HouseholdMonthSummary = {
     paid_count: number;
     pending_count: number;
     overdue_count: number;
+    awaiting_amount_count: number;
     by_source: {
         one_off: number;
         fixed: number;

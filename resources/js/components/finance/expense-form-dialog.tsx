@@ -42,6 +42,7 @@ export function ExpenseFormDialog({
     const [open, setOpen] = useState(false);
     const editing = occurrence !== undefined;
     const isRecurring = occurrence?.source === 'recurring';
+    const awaitsAmount = occurrence?.awaits_amount ?? false;
     const [amountCents, setAmountCents] = useState(
         occurrence?.amount_cents ?? 0,
     );
@@ -72,14 +73,20 @@ export function ExpenseFormDialog({
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {editing ? 'Editar despesa' : 'Nova despesa avulsa'}
+                        {awaitsAmount
+                            ? `Valor de “${occurrence?.title}”`
+                            : editing
+                              ? 'Editar despesa'
+                              : 'Nova despesa avulsa'}
                     </DialogTitle>
                     <DialogDescription>
-                        {isRecurring
-                            ? 'A alteração vale só para este mês. Para mudar os próximos meses, edite a despesa recorrente.'
-                            : occurrence?.installment_number
-                              ? `Parcela ${occurrence.installment_number}/${occurrence.installment_count}: a alteração vale só para esta parcela.`
-                              : 'Para contas que se repetem todo mês, use Despesas recorrentes. O mês de referência é o mês do vencimento.'}
+                        {awaitsAmount
+                            ? 'Esta conta tem valor variável: informe o valor deste mês. Os outros meses não mudam.'
+                            : isRecurring
+                              ? 'A alteração vale só para este mês. Para mudar os próximos meses, edite a despesa recorrente.'
+                              : occurrence?.installment_number
+                                ? `Parcela ${occurrence.installment_number}/${occurrence.installment_count}: a alteração vale só para esta parcela.`
+                                : 'Para contas que se repetem todo mês, use Despesas recorrentes. O mês de referência é o mês do vencimento.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -125,7 +132,12 @@ export function ExpenseFormDialog({
                                         id="expense-amount"
                                         name="amount"
                                         required
-                                        defaultCents={occurrence?.amount_cents}
+                                        defaultCents={
+                                            awaitsAmount
+                                                ? null
+                                                : occurrence?.amount_cents
+                                        }
+                                        autoFocus={awaitsAmount}
                                         onCentsChange={setAmountCents}
                                         aria-invalid={!!errors.amount}
                                     />

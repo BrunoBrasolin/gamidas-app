@@ -17,6 +17,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesHousehold;
 use Tests\TestCase;
 
@@ -342,5 +343,114 @@ class RecurringExpenseTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame(['2027-01', '2027-02'], $this->months($template));
+    }
+
+    public function test_variable_templates_generate_months_waiting_for_their_amount(): void
+    {
+        $this->actingAs($this->leticia)
+            ->post(route('recurring-expenses.store'), [
+                'kind' => 'fixed',
+                'scope' => 'household',
+                'title' => 'Luz',
+                'is_variable' => '1',
+                'due_day' => 15,
+                'start_month' => '2026-10',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $template = RecurringExpense::query()->where('title', 'Luz')->sole();
+        $this->assertTrue($template->is_variable);
+        $this->assertSame(0, $template->amount_cents);
+        $this->assertSame(['2026-10', '2026-11', '2026-12'], $this->months($template));
+
+        $october = $template->occurrences()->where('billing_month', '2026-10-01')->sole();
+        $this->assertSame(0, $october->amount_cents);
+        $this->assertTrue($october->awaitsAmount());
+        $this->assertSame([$this->bruno->id => 0, $this->leticia->id => 0], $this->sharesOf($october));
+
+        // It shows up as a reminder and cannot be paid without an amount.
+        $this->actingAs($this->bruno)
+            ->get(route('expenses.index', ['month' => '2026-10', 'status' => 'awaiting_amount']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('occurrences.data', 1)
+                ->where('occurrences.data.0.awaits_amount', true)
+                ->where('occurrences.data.0.payment.can_confirm', false)
+                ->where('summary.awaiting_amount_count', 1)
+                ->where('totals.awaiting_amount_count', 1)
+            );
+
+        $this->actingAs($this->bruno)->post(route('expenses.payment.store', $october))->assertForbidden();
+
+        // Filling in the month's amount splits it and allows the payment.
+        $this->actingAs($this->leticia)
+            ->put(route('expenses.update', $october), [
+                'title' => 'Luz',
+                'amount' => '287.43',
+                'due_date' => '2026-10-15',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $october->refresh();
+        $this->assertSame(28_743, $october->amount_cents);
+        $this->assertFalse($october->awaitsAmount());
+        $this->assertTrue($october->is_customized);
+        $this->assertSame(28_743, array_sum($this->sharesOf($october)));
+
+        $this->actingAs($this->bruno)->post(route('expenses.payment.store', $october))->assertRedirect();
+        $this->assertTrue($october->fresh()->isPaid());
+
+        // Other months still wait for theirs.
+        $this->assertTrue($template->occurrences()->where('billing_month', '2026-11-01')->sole()->awaitsAmount());
+    }
+
+    public function test_a_fixed_amount_is_required_unless_the_template_is_variable(): void
+    {
+        $this->actingAs($this->leticia)
+            ->post(route('recurring-expenses.store'), [
+                'kind' => 'fixed',
+                'scope' => 'household',
+                'title' => 'Internet',
+                'is_variable' => '0',
+                'due_day' => 10,
+                'start_month' => '2026-10',
+            ])
+            ->assertSessionHasErrors('amount');
+
+        $this->assertSame(0, RecurringExpense::query()->count());
+    }
+
+    public function test_a_template_can_become_variable_from_an_effective_month(): void
+    {
+        $template = $this->createTemplate();
+
+        $this->actingAs($this->bruno)
+            ->put(route('recurring-expenses.update', $template), [
+                'title' => 'Internet',
+                'is_variable' => '1',
+                'amount' => '999.99',
+                'due_day' => 10,
+                'effective_month' => '2026-11',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $template->refresh();
+        $this->assertTrue($template->is_variable);
+        $this->assertSame(0, $template->amount_cents);
+
+        $amounts = $template->occurrences()->orderBy('billing_month')->pluck('amount_cents')->map(fn ($cents) => (int) $cents)->all();
+        $this->assertSame([12_000, 12_000, 0, 0], $amounts);
+
+        $this->actingAs($this->bruno)
+            ->put(route('recurring-expenses.update', $template), [
+                'title' => 'Internet',
+                'is_variable' => '0',
+                'amount' => '130.00',
+                'due_day' => 10,
+                'effective_month' => '2026-12',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $amounts = $template->occurrences()->orderBy('billing_month')->pluck('amount_cents')->map(fn ($cents) => (int) $cents)->all();
+        $this->assertSame([12_000, 12_000, 0, 13_000], $amounts);
     }
 }

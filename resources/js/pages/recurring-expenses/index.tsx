@@ -23,6 +23,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Collapsible,
     CollapsibleContent,
@@ -38,6 +39,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -60,6 +62,7 @@ type Template = {
     title: string;
     notes: string | null;
     amount_cents: number;
+    is_variable: boolean;
     due_day: number;
     start_month: string;
     end_month: string | null;
@@ -264,7 +267,14 @@ function TemplateCard({
                                 )}
                             </div>
                             <p className="text-sm text-muted-foreground">
-                                <Money cents={template.amount_cents} /> por mês
+                                {template.is_variable ? (
+                                    'Valor variável, informado a cada mês'
+                                ) : (
+                                    <>
+                                        <Money cents={template.amount_cents} />{' '}
+                                        por mês
+                                    </>
+                                )}{' '}
                                 · vence todo dia {template.due_day}
                             </p>
                             <p className="text-sm text-muted-foreground">
@@ -360,10 +370,17 @@ function TemplateCard({
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <Money
-                                            cents={occurrence.amount_cents}
-                                            className="block"
-                                        />
+                                        {occurrence.status === 'pending' &&
+                                        occurrence.amount_cents === 0 ? (
+                                            <span className="block text-amber-700 dark:text-amber-400">
+                                                A definir
+                                            </span>
+                                        ) : (
+                                            <Money
+                                                cents={occurrence.amount_cents}
+                                                className="block"
+                                            />
+                                        )}
                                         <StatusBadge
                                             status={occurrence.status}
                                         />
@@ -407,6 +424,7 @@ function RecurringFormDialog({
         template?.start_month ?? currentMonth,
     );
     const [totalMonths, setTotalMonths] = useState(template?.total_months ?? 3);
+    const [variable, setVariable] = useState(template?.is_variable ?? false);
     const form = editing
         ? recurringExpenses.update.form(template.id)
         : recurringExpenses.store.form();
@@ -431,7 +449,7 @@ function RecurringFormDialog({
                         {editing
                             ? 'As mudanças valem para os meses pendentes a partir do mês escolhido. Meses pagos, anteriores ou ajustados individualmente não mudam.'
                             : kind === 'fixed'
-                              ? 'Mesmo valor todo mês, indefinidamente ou até um mês final.'
+                              ? 'Mesmo valor todo mês, indefinidamente ou até um mês final. Para contas que mudam todo mês, como a luz, marque “Valor variável”.'
                               : 'Valor mensal fixo cobrado por um número de meses. Ex.: R$ 300,00 por 4 meses gera 4 cobranças de R$ 300,00.'}
                     </DialogDescription>
                 </DialogHeader>
@@ -474,18 +492,57 @@ function RecurringFormDialog({
                                 />
                             </FormField>
 
-                            <FormField
-                                id="recurring-amount"
-                                label="Valor mensal"
-                                error={errors.amount}
-                            >
-                                <MoneyInput
+                            <div className="space-y-2">
+                                <div className="flex items-start gap-3">
+                                    <Checkbox
+                                        id="recurring-variable"
+                                        checked={variable}
+                                        onCheckedChange={(checked) =>
+                                            setVariable(checked === true)
+                                        }
+                                    />
+                                    <input
+                                        type="hidden"
+                                        name="is_variable"
+                                        value={variable ? '1' : '0'}
+                                    />
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="recurring-variable">
+                                            Valor variável
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Para contas que mudam todo mês, como
+                                            a luz. Cada mês aparece em Despesas
+                                            como “Valor a definir” até você
+                                            informar o valor.
+                                        </p>
+                                    </div>
+                                </div>
+                                {errors.is_variable && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.is_variable}
+                                    </p>
+                                )}
+                            </div>
+
+                            {!variable && (
+                                <FormField
                                     id="recurring-amount"
-                                    name="amount"
-                                    required
-                                    defaultCents={template?.amount_cents}
-                                />
-                            </FormField>
+                                    label="Valor mensal"
+                                    error={errors.amount}
+                                >
+                                    <MoneyInput
+                                        id="recurring-amount"
+                                        name="amount"
+                                        required
+                                        defaultCents={
+                                            template?.is_variable
+                                                ? null
+                                                : template?.amount_cents
+                                        }
+                                    />
+                                </FormField>
+                            )}
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <FormField

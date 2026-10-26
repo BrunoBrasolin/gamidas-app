@@ -7,6 +7,7 @@ use App\Models\TimeLog;
 use App\Models\TimeTimer;
 use App\Models\User;
 use App\Support\Day;
+use App\Support\Holidays;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Date;
@@ -157,6 +158,130 @@ class TimeSummary
             ])->all()),
             'cells' => (object) $cells,
             'total_seconds' => array_sum($byDay),
+        ];
+    }
+
+    /**
+     * The daily goal judged day by day over a period.
+     *
+     * Only business days (Monday to Friday, except national holidays) have a
+     * verdict. A category's goal applies from the day it was created (or any
+     * earlier day with time in it) until the day it was archived, using its
+     * current goal. A business day meets the goal when every applicable
+     * category reaches its own goal; today is "pending" until it does, and
+     * future days have no verdict. Weekends and holidays with time recorded
+     * are reported apart, as days worked off the clock.
+     *
+     * @return array{summary: array<string, mixed>, days: list<array<string, mixed>>}
+     */
+    public function goals(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $categoryId = null): array
+    {
+        $today = Day::today()->toDateString();
+
+        $cells = [];
+
+        foreach ($this->logs($user, $from, $to, $categoryId)->where('seconds', '>', 0)->get(['time_category_id', 'log_date', 'seconds']) as $log) {
+            $cells[$log->log_date->toDateString()][$log->time_category_id] = $log->seconds;
+        }
+
+        $categories = $user->timeCategories()
+            ->when($categoryId !== null, fn (Builder $query) => $query->whereKey($categoryId))
+            ->orderBy('name')
+            ->get();
+
+        $withGoal = $categories->filter(fn (TimeCategory $category) => $category->daily_goal_seconds !== null)->keyBy('id');
+        $names = $categories->pluck('name', 'id');
+
+        $days = [];
+
+        foreach (Day::range($from, $to) as $date) {
+            $tracked = $cells[$date] ?? [];
+            $holiday = Holidays::name($date);
+            $business = Holidays::isBusinessDay($date);
+
+            $goals = $business ? $withGoal->filter(fn (TimeCategory $category) => ($category->created_at === null
+                    || $category->created_at->toDateString() <= $date
+                    || isset($tracked[$category->id]))
+                && ($category->archived_at === null || $category->archived_at->toDateString() > $date)) : collect();
+
+            $met = $goals->every(fn (TimeCategory $category) => ($tracked[$category->id] ?? 0) >= $category->daily_goal_seconds);
+            $seconds = array_sum($tracked);
+
+            $status = match (true) {
+                ! $business => $seconds > 0 ? 'off_worked' : 'off',
+                $goals->isEmpty() => 'no_goal',
+                $date > $today => 'future',
+                $met => 'met',
+                $date === $today => 'pending',
+                default => 'missed',
+            };
+
+            $rows = [];
+
+            foreach ($names as $id => $name) {
+                $goal = $goals->get($id)?->daily_goal_seconds;
+
+                if (isset($tracked[$id]) || $goal !== null) {
+                    $rows[] = ['category_id' => $id, 'name' => $name, 'seconds' => $tracked[$id] ?? 0, 'goal_seconds' => $goal];
+                }
+            }
+
+            $days[] = [
+                'date' => $date,
+                'seconds' => $seconds,
+                'goal_seconds' => $goals->isEmpty() ? null : (int) $goals->sum('daily_goal_seconds'),
+                'shortfall_seconds' => (int) $goals->sum(fn (TimeCategory $category) => max(0, $category->daily_goal_seconds - ($tracked[$category->id] ?? 0))),
+                'business' => $business,
+                'holiday' => $holiday,
+                'status' => $status,
+                'categories' => $rows,
+            ];
+        }
+
+        return ['summary' => $this->goalSummary($days, $withGoal->isNotEmpty()), 'days' => $days];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $days
+     * @return array<string, mixed>
+     */
+    private function goalSummary(array $days, bool $hasGoal): array
+    {
+        $count = fn (string $status) => count(array_filter($days, fn (array $day) => $day['status'] === $status));
+        $met = $count('met');
+        $missed = $count('missed');
+
+        $streak = 0;
+        $best = 0;
+
+        // Only judged days count: a pending today neither extends nor breaks it.
+        foreach ($days as $day) {
+            if ($day['status'] === 'met') {
+                $best = max($best, ++$streak);
+            } elseif ($day['status'] === 'missed') {
+                $streak = 0;
+            }
+        }
+
+        $offWorked = array_filter($days, fn (array $day) => $day['status'] === 'off_worked');
+
+        return [
+            'has_goal' => $hasGoal,
+            'business_days' => count(array_filter($days, fn (array $day) => $day['business'])),
+            'met' => $met,
+            'missed' => $missed,
+            'pending' => $count('pending'),
+            'future' => $count('future'),
+            // Basis points of the judged business days (8000 = 80%).
+            'rate' => $met + $missed > 0 ? intdiv($met * 10_000, $met + $missed) : null,
+            'shortfall_seconds' => array_sum(array_map(
+                fn (array $day) => $day['status'] === 'missed' ? $day['shortfall_seconds'] : 0,
+                $days,
+            )),
+            'current_streak' => $streak,
+            'best_streak' => $best,
+            'off_days_worked' => count($offWorked),
+            'off_seconds' => array_sum(array_column($offWorked, 'seconds')),
         ];
     }
 

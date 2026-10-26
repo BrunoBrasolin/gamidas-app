@@ -69,6 +69,28 @@ final class PaymentService
     }
 
     /**
+     * Confirm several occurrences at once ("Pagar tudo"), all or nothing.
+     * Each one gets its own payment event and audit entry, as if confirmed
+     * individually.
+     *
+     * @param  iterable<ExpenseOccurrence>  $occurrences
+     * @return int The number of occurrences confirmed.
+     */
+    public function confirmMany(iterable $occurrences, User $actor): int
+    {
+        return DB::transaction(function () use ($occurrences, $actor) {
+            $count = 0;
+
+            foreach ($occurrences as $occurrence) {
+                $this->confirm($occurrence, $actor);
+                $count++;
+            }
+
+            return $count;
+        });
+    }
+
+    /**
      * Reopen a paid occurrence. The payment history is kept and the reason is
      * recorded; the occurrence becomes pending and follows current salaries.
      */

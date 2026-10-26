@@ -46,6 +46,7 @@ class TimeReportController extends Controller
         $byCategory = $summary->secondsByCategory($user, $from, $to, $categoryId);
         $total = array_sum($byDay);
         $categories = $user->timeCategories()->get()->keyBy('id');
+        $goals = $summary->goals($user, $from, $to, $categoryId);
 
         arsort($byCategory);
 
@@ -72,7 +73,8 @@ class TimeReportController extends Controller
                     'total_seconds' => $summary->total($user, $previousFrom, $previousTo, $categoryId),
                 ],
             ],
-            'by_day' => array_map(fn (string $date) => ['date' => $date, 'seconds' => $byDay[$date] ?? 0], Day::range($from, $to)),
+            'goals' => $goals['summary'],
+            'by_day' => $goals['days'],
             'by_category' => array_map(fn (int $id, int $seconds) => [
                 'category_id' => $id,
                 'name' => $categories->get($id)->name ?? '',

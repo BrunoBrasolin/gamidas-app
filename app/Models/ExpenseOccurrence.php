@@ -104,6 +104,16 @@ class ExpenseOccurrence extends Model
         return ! $this->isPaid() && $this->due_date->lt(Month::current());
     }
 
+    /**
+     * A pending month of a variable recurring expense (e.g. the electricity
+     * bill) whose amount has not been filled in yet. It cannot be paid until
+     * it has one.
+     */
+    public function awaitsAmount(): bool
+    {
+        return ! $this->isPaid() && $this->amount_cents === 0;
+    }
+
     public function isHousehold(): bool
     {
         return $this->scope === ExpenseScope::Household;
@@ -150,6 +160,17 @@ class ExpenseOccurrence extends Model
     {
         $query->where($query->qualifyColumn('status'), OccurrenceStatus::Pending)
             ->where($query->qualifyColumn('due_date'), '<', Month::current()->toDateString());
+    }
+
+    /**
+     * Pending occurrences still waiting for their amount (see {@see awaitsAmount()}).
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeAwaitingAmount(Builder $query): void
+    {
+        $query->where($query->qualifyColumn('status'), OccurrenceStatus::Pending)
+            ->where($query->qualifyColumn('amount_cents'), 0);
     }
 
     /**

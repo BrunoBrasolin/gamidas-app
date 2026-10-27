@@ -1,6 +1,7 @@
 import type { KnowledgeAttachment } from '@/types';
 
-export type UploadKind = 'image' | 'pdf';
+/** Images go between paragraphs; anything else is a file card. */
+export type UploadKind = 'image' | 'file';
 
 export type UploadState = {
     id: string;
@@ -13,9 +14,16 @@ export type UploadState = {
 };
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const FILE_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+const FILE_EXTENSIONS = ['.pdf', '.pptx', '.docx', '.xlsx'];
 
 export const IMAGE_ACCEPT = IMAGE_TYPES.join(',');
-export const PDF_ACCEPT = 'application/pdf,.pdf';
+export const FILE_ACCEPT = [...FILE_TYPES, ...FILE_EXTENSIONS].join(',');
 
 /**
  * The kind of a picked file, or null when it is not accepted. Only a first
@@ -26,11 +34,21 @@ export function uploadKind(file: File): UploadKind | null {
         return 'image';
     }
 
-    if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
-        return 'pdf';
+    const name = file.name.toLowerCase();
+
+    if (
+        FILE_TYPES.includes(file.type) ||
+        FILE_EXTENSIONS.some((extension) => name.endsWith(extension))
+    ) {
+        return 'file';
     }
 
     return null;
+}
+
+/** The message shown for a file that is not accepted. */
+export function unsupportedMessage(file: File): string {
+    return `"${file.name}" não é uma imagem (JPEG, PNG, WebP, GIF), um PDF nem um arquivo do PowerPoint, Word ou Excel (.pptx, .docx, .xlsx).`;
 }
 
 /**

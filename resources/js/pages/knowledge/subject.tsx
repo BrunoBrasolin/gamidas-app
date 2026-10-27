@@ -32,7 +32,9 @@ import {
     setPageStatus,
     StatusIcon,
 } from '@/components/knowledge/status-control';
+import type { UploadLimits } from '@/components/knowledge/editor/knowledge-editor';
 import { SubjectFormDialog } from '@/components/knowledge/subject-form-dialog';
+import { UploadFileButton } from '@/components/knowledge/upload-file-button';
 import { Button } from '@/components/ui/button';
 import {
     Collapsible,
@@ -481,12 +483,14 @@ export default function KnowledgeSubjectPage({
     pages,
     continue_page: continuePage,
     destinations,
+    limits,
 }: {
     subject: KnowledgeSubject;
     categories: KnowledgeCategory[];
     pages: KnowledgePageSummary[];
     continue_page: KnowledgePageLink | null;
     destinations: KnowledgeDestination[];
+    limits: UploadLimits;
 }) {
     const [query, setQuery] = useState('');
     const [organizing, setOrganizing] = useState(false);
@@ -649,6 +653,10 @@ export default function KnowledgeSubjectPage({
                                     <Plus />
                                     Nova página
                                 </Button>
+                                <UploadFileButton
+                                    subjectId={subject.id}
+                                    limits={limits}
+                                />
                                 <Button
                                     variant="outline"
                                     className="h-11"
@@ -733,18 +741,25 @@ export default function KnowledgeSubjectPage({
                                     Nenhuma página ainda
                                 </p>
                                 <p className="max-w-md text-sm text-ink-soft">
-                                    Escreva a primeira página. Categorias (e
-                                    subcategorias) são opcionais — crie quando a
-                                    matéria crescer.
+                                    Escreva a primeira página ou envie um
+                                    arquivo (PDF, PowerPoint, Word, Excel).
+                                    Categorias (e subcategorias) são opcionais —
+                                    crie quando a matéria crescer.
                                 </p>
                             </div>
-                            <Button
-                                className="h-11 px-5"
-                                onClick={() => createPage(subject.id, null)}
-                            >
-                                <Plus />
-                                Escrever a primeira página
-                            </Button>
+                            <div className="flex flex-wrap justify-center gap-2">
+                                <Button
+                                    className="h-11 px-5"
+                                    onClick={() => createPage(subject.id, null)}
+                                >
+                                    <Plus />
+                                    Escrever a primeira página
+                                </Button>
+                                <UploadFileButton
+                                    subjectId={subject.id}
+                                    limits={limits}
+                                />
+                            </div>
                         </div>
                     ) : (
                         <section

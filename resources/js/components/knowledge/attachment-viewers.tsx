@@ -1,6 +1,6 @@
 import { Download, ExternalLink, FileText, X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -9,20 +9,128 @@ import {
     DialogDescription,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { formatBytes, isTouchDevice } from '@/lib/knowledge';
+import { Spinner } from '@/components/ui/spinner';
+import { jsonRequest } from '@/lib/http';
+import { formatBytes } from '@/lib/knowledge';
 import { cn } from '@/lib/utils';
-import type { KnowledgeAttachment } from '@/types';
+import knowledge from '@/routes/knowledge';
+import type { KnowledgeAttachment, KnowledgeAttachmentKind } from '@/types';
 
 function downloadUrl(attachment: KnowledgeAttachment): string {
     return `${attachment.url}?download=1`;
 }
 
+const DocumentReader = lazy(() => import('./document-reader'));
+
+type FileKind = Exclude<KnowledgeAttachmentKind, 'image'>;
+
+/** Badge of each kind of file, in the colors of their usual apps. */
+const FILE_BADGES: Record<FileKind, { label: string; className: string }> = {
+    pdf: {
+        label: 'PDF',
+        className: 'bg-red-600/10 text-red-700 dark:text-red-400',
+    },
+    slides: {
+        label: 'PPTX',
+        className: 'bg-orange-600/10 text-orange-700 dark:text-orange-400',
+    },
+    document: {
+        label: 'DOCX',
+        className: 'bg-blue-600/10 text-blue-700 dark:text-blue-400',
+    },
+    sheet: {
+        label: 'XLSX',
+        className: 'bg-green-600/10 text-green-700 dark:text-green-400',
+    },
+};
+
+/** Whether the built-in reader opens it (spreadsheets are only downloaded). */
+function isReadable(kind: KnowledgeAttachmentKind): boolean {
+    return kind === 'pdf' || kind === 'slides' || kind === 'document';
+}
+
+type Reading = { page: number; pages: number };
+
 /**
- * A PDF shown in the text as a document card. Tapping it opens the PDF: on
- * touch devices in the system viewer (a new tab), elsewhere in an
- * integrated viewer with the same fallback.
+ * The latest reading of each file in this visit. Pages restored from the
+ * browser history carry older props, so this wins over them.
  */
-export function PdfCard({
+const latestReading = new Map<number, Reading>();
+
+function readingOf(attachment: KnowledgeAttachment): Reading | null {
+    return (
+        latestReading.get(attachment.id) ??
+        (attachment.reading_page && attachment.page_count
+            ? { page: attachment.reading_page, pages: attachment.page_count }
+            : null)
+    );
+}
+
+/**
+ * Where the reader is in a file: kept for the card and sent to the server a
+ * moment after the page stops changing (and right away when the reader closes
+ * or the tab is hidden). Losing a reading position is harmless.
+ */
+function useFileReading(attachment: KnowledgeAttachment) {
+    const [reading, setReading] = useState<Reading | null>(() =>
+        readingOf(attachment),
+    );
+    const pending = useRef<Reading | null>(null);
+    const timer = useRef<number | undefined>(undefined);
+
+    function flush() {
+        window.clearTimeout(timer.current);
+        const next = pending.current;
+        pending.current = null;
+
+        if (next) {
+            jsonRequest(
+                'PUT',
+                knowledge.attachments.reading.url(attachment.id),
+                next,
+            ).catch(() => {});
+        }
+    }
+
+    const flushRef = useRef(flush);
+
+    useEffect(() => {
+        flushRef.current = flush;
+    });
+
+    useEffect(() => {
+        const onHide = () => {
+            if (document.visibilityState === 'hidden') {
+                flushRef.current();
+            }
+        };
+
+        document.addEventListener('visibilitychange', onHide);
+
+        return () => {
+            document.removeEventListener('visibilitychange', onHide);
+            flushRef.current();
+        };
+    }, []);
+
+    function report(page: number, pages: number) {
+        const next = { page, pages };
+        latestReading.set(attachment.id, next);
+        setReading(next);
+        pending.current = next;
+        window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(flush, 1200);
+    }
+
+    return { reading, report, flush };
+}
+
+/**
+ * A file shown in the text as a document card: PDFs, presentations and Word
+ * files open in the built-in reader (at the page where it was left);
+ * spreadsheets are downloaded.
+ */
+export function FileCard({
     attachment,
     actions,
     className,
@@ -33,6 +141,22 @@ export function PdfCard({
     className?: string;
 }) {
     const [viewing, setViewing] = useState(false);
+    const { reading, report, flush } = useFileReading(attachment);
+    const kind: FileKind =
+        attachment.kind === 'image' ? 'pdf' : attachment.kind;
+    const badge = FILE_BADGES[kind];
+    const readable = isReadable(kind);
+    const unit = kind === 'slides' ? 'Slide' : 'Página';
+
+    let hint: string;
+
+    if (!readable) {
+        hint = 'toque para baixar';
+    } else if (reading && reading.page > 1) {
+        hint = `${unit} ${reading.page} de ${reading.pages} · toque para continuar`;
+    } else {
+        hint = 'toque para abrir';
+    }
 
     return (
         <div
@@ -46,26 +170,44 @@ export function PdfCard({
                 type="button"
                 className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
                 onClick={() => {
-                    if (isTouchDevice()) {
-                        window.open(attachment.url, '_blank', 'noopener');
-                    } else {
+                    if (readable) {
                         setViewing(true);
+                    } else {
+                        window.location.assign(downloadUrl(attachment));
                     }
                 }}
             >
-                <span className="flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-md bg-red-600/10 text-red-700 dark:text-red-400">
+                <span
+                    className={cn(
+                        'flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-md',
+                        badge.className,
+                    )}
+                >
                     <FileText className="size-5" aria-hidden />
                     <span className="text-[0.55rem] font-bold tracking-wide">
-                        PDF
+                        {badge.label}
                     </span>
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-ink">
                         {attachment.name}
                     </span>
                     <span className="block text-xs text-ink-soft">
-                        {formatBytes(attachment.size)} · toque para abrir
+                        {formatBytes(attachment.size)} · {hint}
                     </span>
+                    {readable && reading && reading.pages > 1 && (
+                        <span
+                            className="mt-1.5 block h-1 max-w-48 overflow-hidden rounded-full bg-paper-edge"
+                            aria-hidden
+                        >
+                            <span
+                                className="block h-full bg-primary"
+                                style={{
+                                    width: `${Math.round((reading.page / reading.pages) * 100)}%`,
+                                }}
+                            />
+                        </span>
+                    )}
                 </span>
             </button>
             <div className="flex items-center gap-1">
@@ -79,73 +221,44 @@ export function PdfCard({
                 </Button>
                 {actions}
             </div>
-            <PdfViewerDialog
-                attachment={attachment}
-                open={viewing}
-                onOpenChange={setViewing}
-            />
-        </div>
-    );
-}
+            {readable && (
+                <Dialog
+                    open={viewing}
+                    onOpenChange={(open) => {
+                        setViewing(open);
 
-export function PdfViewerDialog({
-    attachment,
-    open,
-    onOpenChange,
-}: {
-    attachment: KnowledgeAttachment;
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-}) {
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex h-[92dvh] max-w-[min(64rem,96vw)] flex-col gap-3 p-3 sm:max-w-[min(64rem,96vw)] [&>button:last-child]:hidden">
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="min-w-0 flex-1">
-                        <DialogTitle className="truncate text-base">
-                            {attachment.name}
-                        </DialogTitle>
-                        <DialogDescription className="text-xs">
-                            {formatBytes(attachment.size)} · Se o PDF não
-                            aparecer, abra em nova aba.
-                        </DialogDescription>
-                    </div>
-                    <Button variant="outline" className="h-10" asChild>
-                        <a
-                            href={attachment.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            <ExternalLink />
-                            Abrir em nova aba
-                        </a>
-                    </Button>
-                    <Button variant="outline" className="h-10" asChild>
-                        <a href={downloadUrl(attachment)}>
-                            <Download />
-                            Baixar
-                        </a>
-                    </Button>
-                    <DialogClose asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-10"
-                            aria-label="Fechar"
-                        >
-                            <X />
-                        </Button>
-                    </DialogClose>
-                </div>
-                {open && (
-                    <iframe
-                        src={attachment.url}
-                        title={attachment.name}
-                        className="min-h-0 w-full flex-1 rounded-md border bg-muted"
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
+                        if (!open) {
+                            flush();
+                        }
+                    }}
+                >
+                    <DialogContent className="flex h-dvh max-h-dvh w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-[94dvh] sm:w-[min(72rem,96vw)] sm:max-w-[min(72rem,96vw)] sm:rounded-lg sm:border [&>button:last-child]:hidden">
+                        {viewing && (
+                            <Suspense
+                                fallback={
+                                    <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
+                                        <DialogTitle className="sr-only">
+                                            {attachment.name}
+                                        </DialogTitle>
+                                        <DialogDescription className="sr-only">
+                                            Abrindo o arquivo
+                                        </DialogDescription>
+                                        <Spinner />
+                                        Abrindo o arquivo…
+                                    </div>
+                                }
+                            >
+                                <DocumentReader
+                                    attachment={attachment}
+                                    initialPage={reading?.page ?? 1}
+                                    onPage={report}
+                                />
+                            </Suspense>
+                        )}
+                    </DialogContent>
+                </Dialog>
+            )}
+        </div>
     );
 }
 
@@ -264,7 +377,7 @@ export function KnowledgeFigure({
 /**
  * Placeholder for an attachment whose file is gone.
  */
-export function MissingAttachment({ kind }: { kind: 'image' | 'pdf' }) {
+export function MissingAttachment({ kind }: { kind: 'image' | 'file' }) {
     return (
         <div
             data-node-card

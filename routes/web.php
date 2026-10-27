@@ -137,6 +137,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             Route::delete('categories/{category}', [KnowledgeCategoryController::class, 'destroy'])->name('categories.destroy');
 
             Route::post('subjects/{subject}/pages', [KnowledgePageController::class, 'store'])->name('pages.store');
+            Route::post('subjects/{subject}/files', [KnowledgePageController::class, 'upload'])->name('pages.upload');
             Route::put('pages/{page}', [KnowledgePageController::class, 'update'])->name('pages.update');
             Route::put('pages/{page}/content', [KnowledgePageController::class, 'content'])->name('pages.content');
             Route::put('pages/{page}/status', [KnowledgePageController::class, 'status'])->name('pages.status');
@@ -150,6 +151,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             Route::delete('pages/{page}', [KnowledgePageController::class, 'destroy'])->name('pages.destroy');
 
             Route::post('pages/{page}/attachments', [KnowledgeAttachmentController::class, 'store'])->name('attachments.store');
+            Route::put('files/{attachment}/reading', [KnowledgeAttachmentController::class, 'reading'])->name('attachments.reading');
         });
     });
 });

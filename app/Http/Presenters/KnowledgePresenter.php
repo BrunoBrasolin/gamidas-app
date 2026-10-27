@@ -143,6 +143,8 @@ class KnowledgePresenter
             'mime' => $attachment->mime_type,
             'width' => $attachment->width,
             'height' => $attachment->height,
+            'reading_page' => $attachment->reading_page,
+            'page_count' => $attachment->page_count,
             'url' => self::fileUrl($attachment->id),
         ];
     }

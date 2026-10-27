@@ -84,6 +84,69 @@ class KnowledgePageTest extends TestCase
             ->assertSessionHasErrors('category_id');
     }
 
+    public function test_a_file_can_be_sent_as_a_new_page(): void
+    {
+        $category = $this->subject->categories()->create(['title' => 'Aulas', 'sort_order' => 1]);
+        KnowledgePage::factory()->for($this->subject, 'subject')->create(['category_id' => $category->id, 'sort_order' => 1]);
+
+        $response = $this->actingAs($this->leticia)
+            ->post(route('knowledge.pages.upload', $this->subject), [
+                'file' => $this->office('Aula 3 - Mitose.pptx', 'ppt/presentation.xml'),
+                'category_id' => $category->id,
+            ]);
+
+        $page = KnowledgePage::query()->where('title', 'Aula 3 - Mitose')->sole();
+        $response->assertRedirect(route('knowledge.pages.show', $page));
+
+        $attachment = KnowledgeAttachment::query()->sole();
+        $this->assertSame($category->id, $page->category_id);
+        $this->assertSame(2, $page->sort_order);
+        $this->assertSame($page->id, $attachment->page_id);
+        $this->assertNull($attachment->detached_at);
+        $this->assertSame([$attachment->id], KnowledgeContent::attachmentIds($page->content));
+        $this->assertSame('knowledgeFile', $page->content['content'][0]['type'] ?? null);
+
+        // The reader gets the file with where it was left.
+        $attachment->update(['reading_page' => 3, 'page_count' => 20]);
+
+        $this->actingAs($this->leticia)
+            ->get(route('knowledge.pages.show', $page))
+            ->assertInertia(fn (Assert $inertia) => $inertia
+                ->where("attachments.{$attachment->id}.kind", 'slides')
+                ->where("attachments.{$attachment->id}.reading_page", 3)
+                ->where("attachments.{$attachment->id}.page_count", 20));
+
+        // An image becomes an image block.
+        $this->actingAs($this->leticia)
+            ->post(route('knowledge.pages.upload', $this->subject), ['file' => $this->png('Esquema.png')])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('knowledgeImage', KnowledgePage::query()->where('title', 'Esquema')->sole()->content['content'][0]['type'] ?? null);
+    }
+
+    public function test_a_file_page_rejects_bad_files_and_foreign_places(): void
+    {
+        $other = KnowledgeSubject::factory()->for($this->leticia)->create();
+        $foreign = $other->categories()->create(['title' => 'Outro', 'sort_order' => 1]);
+
+        $this->actingAs($this->leticia)
+            ->post(route('knowledge.pages.upload', $this->subject), ['file' => $this->pdf(), 'category_id' => $foreign->id])
+            ->assertSessionHasErrors('category_id');
+
+        $this->actingAs($this->leticia)
+            ->post(route('knowledge.pages.upload', $this->subject), ['file' => $this->office('aula.pptx', null)])
+            ->assertSessionHasErrors('file');
+
+        $theirs = KnowledgeSubject::factory()->for($this->bruno)->create();
+
+        $this->actingAs($this->leticia)
+            ->post(route('knowledge.pages.upload', $theirs), ['file' => $this->pdf()])
+            ->assertNotFound();
+
+        $this->assertSame(0, KnowledgePage::query()->count());
+        $this->assertSame(0, KnowledgeAttachment::query()->count());
+    }
+
     public function test_autosave_stores_sanitized_content_and_its_text(): void
     {
         $page = KnowledgePage::factory()->for($this->subject, 'subject')->create();

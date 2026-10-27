@@ -5,8 +5,8 @@ namespace Tests\Concerns;
 use Illuminate\Http\UploadedFile;
 
 /**
- * Real image and PDF bytes for upload tests, built without GD so the tests
- * run on any PHP build.
+ * Real image, PDF and Office bytes for upload tests, built without GD so the
+ * tests run on any PHP build.
  */
 trait CreatesKnowledgeFiles
 {
@@ -36,6 +36,29 @@ trait CreatesKnowledgeFiles
         $bytes = "%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"
             ."2 0 obj << /Type /Pages /Kids [] /Count 0 >> endobj\n"
             ."trailer << /Root 1 0 R >>\n%%EOF\n";
+
+        return UploadedFile::fake()->createWithContent($name, $bytes);
+    }
+
+    /**
+     * A minimal Office Open XML package: [Content_Types].xml plus the part
+     * that says what it is (ppt/presentation.xml, word/document.xml, …).
+     */
+    protected function office(string $name, ?string $part, bool $contentTypes = true): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'office');
+        $zip = new \ZipArchive;
+        $zip->open($path, \ZipArchive::OVERWRITE);
+
+        if ($contentTypes) {
+            $zip->addFromString('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+        }
+
+        $zip->addFromString($part ?? 'notas.txt', '<?xml version="1.0"?><root/>');
+        $zip->close();
+
+        $bytes = (string) file_get_contents($path);
+        unlink($path);
 
         return UploadedFile::fake()->createWithContent($name, $bytes);
     }

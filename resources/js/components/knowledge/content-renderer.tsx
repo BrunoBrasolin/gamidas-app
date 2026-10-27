@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import { safeHref } from '@/lib/knowledge';
 import type { KnowledgeAttachmentMap, KnowledgeNode } from '@/types';
 import {
+    FileCard,
     MissingAttachment,
-    PdfCard,
     KnowledgeFigure,
 } from './attachment-viewers';
 
@@ -148,7 +148,7 @@ function renderNode(
             const id = intAttr(node, 'attachmentId');
             const attachment =
                 id === undefined ? undefined : context.attachments[String(id)];
-            const kind = node.type === 'knowledgeImage' ? 'image' : 'pdf';
+            const kind = node.type === 'knowledgeImage' ? 'image' : 'file';
 
             if (!attachment) {
                 return <MissingAttachment key={key} kind={kind} />;
@@ -160,7 +160,7 @@ function renderNode(
             return kind === 'image' ? (
                 <KnowledgeFigure key={key} attachment={attachment} alt={alt} />
             ) : (
-                <PdfCard key={key} attachment={attachment} />
+                <FileCard key={key} attachment={attachment} />
             );
         }
         default:

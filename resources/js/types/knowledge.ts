@@ -81,15 +81,26 @@ export type KnowledgeDestination = {
     categories: KnowledgeCategory[];
 };
 
+/** app/Enums/KnowledgeAttachmentKind.php */
+export type KnowledgeAttachmentKind =
+    | 'image'
+    | 'pdf'
+    | 'slides'
+    | 'document'
+    | 'sheet';
+
 export type KnowledgeAttachment = {
     id: number;
-    kind: 'image' | 'pdf';
+    kind: KnowledgeAttachmentKind;
     name: string;
     /** Bytes */
     size: number;
     mime: string;
     width: number | null;
     height: number | null;
+    /** Page (or slide) where the built-in reader was left. */
+    reading_page: number | null;
+    page_count: number | null;
     url: string;
 };
 

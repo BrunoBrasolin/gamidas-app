@@ -6,6 +6,7 @@ use App\Enums\KnowledgeAttachmentKind;
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\KnowledgePresenter;
+use App\Http\Requests\Knowledge\KnowledgeFilePageRequest;
 use App\Http\Requests\Knowledge\KnowledgePageContentRequest;
 use App\Http\Requests\Knowledge\KnowledgePageMoveRequest;
 use App\Http\Requests\Knowledge\KnowledgePageRequest;
@@ -44,6 +45,18 @@ class KnowledgePageController extends Controller
         $page = $this->pages->create($subject, (string) $request->validated('title'), $request->category($subject));
 
         return to_route('knowledge.pages.edit', $page);
+    }
+
+    /**
+     * Create a page holding an uploaded file and open it in the reader.
+     */
+    public function upload(KnowledgeFilePageRequest $request, KnowledgeSubject $subject): RedirectResponse
+    {
+        $page = $this->pages->createFromFile($subject, $request->category($subject), $request->upload(), $request->info());
+
+        $this->toast('Arquivo enviado.');
+
+        return to_route('knowledge.pages.show', $page);
     }
 
     /**
@@ -96,7 +109,7 @@ class KnowledgePageController extends Controller
             'attachments' => KnowledgePresenter::attachmentMap($page->attachments()->get()),
             'limits' => [
                 'image_kb' => KnowledgeUpload::maxKilobytes(KnowledgeAttachmentKind::Image),
-                'pdf_kb' => KnowledgeUpload::maxKilobytes(KnowledgeAttachmentKind::Pdf),
+                'file_kb' => KnowledgeUpload::maxKilobytes(KnowledgeAttachmentKind::Pdf),
             ],
         ]);
     }

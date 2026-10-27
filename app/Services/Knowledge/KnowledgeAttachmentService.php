@@ -64,6 +64,17 @@ class KnowledgeAttachmentService
     }
 
     /**
+     * Remember where the built-in reader was left in a paged file.
+     */
+    public function recordReading(KnowledgeAttachment $attachment, int $page, int $pages): void
+    {
+        KnowledgeAttachment::withoutTimestamps(fn () => $attachment->update([
+            'reading_page' => max(1, min($page, $pages)),
+            'page_count' => $pages,
+        ]));
+    }
+
+    /**
      * Copy an attachment (file included) onto another page.
      */
     public function duplicate(KnowledgeAttachment $attachment, KnowledgePage $page): KnowledgeAttachment

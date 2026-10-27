@@ -427,3 +427,42 @@
         border-top-color: var(--ink);
     }
 }
+
+/*
+ * Built-in reader for PDFs, slides and Word files
+ * (resources/js/components/knowledge/document-reader.tsx). Pages are white
+ * sheets on the muted background in both themes, like paper.
+ */
+@layer components {
+    .knowledge-reader-page {
+        @apply mx-auto mb-3 max-w-none overflow-hidden rounded-sm bg-white shadow-sm;
+    }
+
+    .knowledge-reader-page canvas {
+        @apply block h-full w-full;
+    }
+
+    /* docx-preview and pptx-preview bring their own grey frame; ours is enough. */
+    .knowledge-reader-docx .docx-wrapper {
+        @apply bg-transparent p-0;
+    }
+
+    .knowledge-reader-docx .docx-wrapper > section.docx {
+        @apply mx-auto mb-3 shadow-sm;
+    }
+
+    .knowledge-reader-slides {
+        @apply mx-auto;
+    }
+
+    /* pptx-preview sets a fixed-height scrolling box inline; the reader scrolls. */
+    .knowledge-reader-slides .pptx-preview-wrapper {
+        height: auto !important;
+        overflow: visible !important;
+        background: transparent !important;
+    }
+
+    .knowledge-reader-slides .pptx-preview-slide-wrapper {
+        @apply mb-3 shadow-sm;
+    }
+}

@@ -16,10 +16,15 @@ import { KnowledgeEditorContext } from './context';
 import type { KnowledgeEditorContextValue } from './context';
 import { KnowledgeFile, KnowledgeImage, KnowledgeUpload } from './nodes';
 import { EditorToolbar } from './toolbar';
-import { sendFile, UploadStore, uploadKind } from './uploads';
+import {
+    sendFile,
+    unsupportedMessage,
+    UploadStore,
+    uploadKind,
+} from './uploads';
 import type { UploadKind } from './uploads';
 
-export type UploadLimits = { image_kb: number; pdf_kb: number };
+export type UploadLimits = { image_kb: number; file_kb: number };
 
 /**
  * The document without upload placeholders, ready to be saved.
@@ -82,10 +87,11 @@ export function KnowledgeEditor({
     /** A message when the file can't be sent, or null when it can. */
     function rejection(file: File, kind: UploadKind | null): string | null {
         if (kind === null) {
-            return `"${file.name}" não é uma imagem (JPEG, PNG, WebP, GIF) nem um PDF.`;
+            return unsupportedMessage(file);
         }
 
-        const max = (kind === 'image' ? limits.image_kb : limits.pdf_kb) * 1024;
+        const max =
+            (kind === 'image' ? limits.image_kb : limits.file_kb) * 1024;
 
         if (file.size > max) {
             return `"${file.name}" tem ${formatBytes(file.size)}; o limite é ${formatBytes(max)}.`;
@@ -292,7 +298,7 @@ export function KnowledgeEditor({
             TableKit.configure({ table: { resizable: false } }),
             Placeholder.configure({
                 placeholder:
-                    'Comece a escrever… Use a barra acima para formatar ou inserir imagens e PDFs.',
+                    'Comece a escrever… Use a barra acima para formatar ou inserir imagens e arquivos (PDF, PowerPoint, Word, Excel).',
             }),
             KnowledgeImage,
             KnowledgeFile,

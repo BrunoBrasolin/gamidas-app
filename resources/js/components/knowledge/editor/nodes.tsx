@@ -9,12 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { formatBytes } from '@/lib/knowledge';
 import {
+    FileCard,
     MissingAttachment,
-    PdfCard,
     KnowledgeFigure,
 } from '../attachment-viewers';
 import { useKnowledgeEditor } from './context';
-import { IMAGE_ACCEPT, PDF_ACCEPT } from './uploads';
+import { FILE_ACCEPT, IMAGE_ACCEPT } from './uploads';
 import type { UploadKind } from './uploads';
 
 function idFrom(element: HTMLElement): number | null {
@@ -33,7 +33,7 @@ function BlockActions({
     onRemove: () => void;
 }) {
     const input = useRef<HTMLInputElement>(null);
-    const label = kind === 'image' ? 'imagem' : 'PDF';
+    const label = kind === 'image' ? 'imagem' : 'arquivo';
 
     return (
         <>
@@ -64,7 +64,7 @@ function BlockActions({
                 type="file"
                 className="sr-only"
                 tabIndex={-1}
-                accept={kind === 'image' ? IMAGE_ACCEPT : PDF_ACCEPT}
+                accept={kind === 'image' ? IMAGE_ACCEPT : FILE_ACCEPT}
                 onChange={(event) => {
                     const file = event.target.files?.[0];
                     event.target.value = '';
@@ -79,7 +79,7 @@ function BlockActions({
 }
 
 /**
- * Shared node view of an attachment block (image or PDF), with replace and
+ * Shared node view of an attachment block (image or file), with replace and
  * remove controls always visible (no hover-only actions on touch screens).
  */
 function AttachmentBlockView({
@@ -104,7 +104,7 @@ function AttachmentBlockView({
                 toast.success(
                     kind === 'image'
                         ? 'Imagem substituída.'
-                        : 'PDF substituído.',
+                        : 'Arquivo substituído.',
                 );
             }
         });
@@ -153,7 +153,7 @@ function AttachmentBlockView({
                     />
                 </div>
             ) : (
-                <PdfCard attachment={attachment} actions={actions} />
+                <FileCard attachment={attachment} actions={actions} />
             )}
         </NodeViewWrapper>
     );
@@ -164,7 +164,7 @@ function ImageView(props: NodeViewProps) {
 }
 
 function FileView(props: NodeViewProps) {
-    return <AttachmentBlockView {...props} kind="pdf" />;
+    return <AttachmentBlockView {...props} kind="file" />;
 }
 
 /**
@@ -209,7 +209,8 @@ export const KnowledgeImage = Node.create({
 });
 
 /**
- * A PDF attached at a place of the text, shown as a document card.
+ * A file (PDF, PowerPoint, Word, Excel) attached at a place of the text,
+ * shown as a document card.
  */
 export const KnowledgeFile = Node.create({
     name: 'knowledgeFile',

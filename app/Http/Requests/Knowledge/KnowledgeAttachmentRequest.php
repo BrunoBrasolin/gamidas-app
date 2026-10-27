@@ -8,8 +8,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Validator;
 
 /**
- * An image or PDF uploaded into a page. The type is detected from the file
- * contents; the name and MIME type sent by the browser are not trusted.
+ * An image, PDF or Office file uploaded into a page. The type is detected from
+ * the file contents; the name and MIME type sent by the browser are not trusted.
  */
 class KnowledgeAttachmentRequest extends KnowledgeRequest
 {
@@ -63,7 +63,7 @@ class KnowledgeAttachmentRequest extends KnowledgeRequest
             $info = KnowledgeUpload::inspect($file);
 
             if ($info === null) {
-                $validator->errors()->add('file', 'Envie uma imagem (JPEG, PNG, WebP ou GIF) ou um PDF.');
+                $validator->errors()->add('file', 'Envie uma imagem (JPEG, PNG, WebP ou GIF), um PDF ou um arquivo do PowerPoint, Word ou Excel (.pptx, .docx, .xlsx).');
 
                 return;
             }
@@ -71,8 +71,7 @@ class KnowledgeAttachmentRequest extends KnowledgeRequest
             $max = KnowledgeUpload::maxKilobytes($info['kind']);
 
             if ((int) $file->getSize() > $max * 1024) {
-                $label = $info['kind'] === KnowledgeAttachmentKind::Image ? 'A imagem' : 'O PDF';
-                $validator->errors()->add('file', $label.' pode ter no máximo '.intdiv($max, 1024).' MB.');
+                $validator->errors()->add('file', $info['kind']->label().' pode ter no máximo '.intdiv($max, 1024).' MB.');
 
                 return;
             }

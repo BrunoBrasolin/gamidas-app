@@ -7,8 +7,8 @@ use Illuminate\Http\UploadedFile;
 
 /**
  * Inspects an uploaded knowledge file by its contents, never by the name or the
- * MIME type sent by the browser. Only raster images (no SVG) and real PDFs
- * are accepted.
+ * MIME type sent by the browser. Only raster images (no SVG), real PDFs and
+ * Office Open XML files (PowerPoint, Word, Excel) are accepted.
  */
 final class KnowledgeUpload
 {
@@ -18,6 +18,28 @@ final class KnowledgeUpload
         'image/png' => 'png',
         'image/webp' => 'webp',
         'image/gif' => 'gif',
+    ];
+
+    /**
+     * Office Open XML files: the part that identifies each one inside the ZIP,
+     * the MIME type libmagic reports for it, and what is stored.
+     */
+    private const OFFICE_TYPES = [
+        'ppt/presentation.xml' => [
+            'detected' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'kind' => KnowledgeAttachmentKind::Slides,
+            'extension' => 'pptx',
+        ],
+        'word/document.xml' => [
+            'detected' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'kind' => KnowledgeAttachmentKind::Document,
+            'extension' => 'docx',
+        ],
+        'xl/workbook.xml' => [
+            'detected' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'kind' => KnowledgeAttachmentKind::Sheet,
+            'extension' => 'xlsx',
+        ],
     ];
 
     /**
@@ -65,7 +87,53 @@ final class KnowledgeUpload
             return ['kind' => KnowledgeAttachmentKind::Pdf, 'mime' => 'application/pdf', 'extension' => 'pdf', 'width' => null, 'height' => null];
         }
 
-        return null;
+        return self::office($path, $mime);
+    }
+
+    /**
+     * An Office Open XML file is a ZIP whose parts say what it is. With the zip
+     * extension the parts are looked up (nothing is decompressed); without it
+     * libmagic's answer, which also reads the parts, is used.
+     *
+     * @return array{kind: KnowledgeAttachmentKind, mime: string, extension: string, width: null, height: null}|null
+     */
+    private static function office(string $path, string $mime): ?array
+    {
+        if (! class_exists(\ZipArchive::class)) {
+            foreach (self::OFFICE_TYPES as $type) {
+                if ($type['detected'] === $mime) {
+                    return ['kind' => $type['kind'], 'mime' => $type['detected'], 'extension' => $type['extension'], 'width' => null, 'height' => null];
+                }
+            }
+
+            return null;
+        }
+
+        if (! in_array($mime, ['application/zip', 'application/octet-stream', ...array_column(self::OFFICE_TYPES, 'detected')], true)) {
+            return null;
+        }
+
+        $zip = new \ZipArchive;
+
+        if ($zip->open($path, \ZipArchive::RDONLY) !== true) {
+            return null;
+        }
+
+        try {
+            if ($zip->locateName('[Content_Types].xml') === false) {
+                return null;
+            }
+
+            foreach (self::OFFICE_TYPES as $part => $type) {
+                if ($zip->locateName($part) !== false) {
+                    return ['kind' => $type['kind'], 'mime' => $type['detected'], 'extension' => $type['extension'], 'width' => null, 'height' => null];
+                }
+            }
+
+            return null;
+        } finally {
+            $zip->close();
+        }
     }
 
     /**
@@ -75,7 +143,7 @@ final class KnowledgeUpload
     {
         return $kind === KnowledgeAttachmentKind::Image
             ? (int) config('knowledge.max_image_kb')
-            : (int) config('knowledge.max_pdf_kb');
+            : (int) config('knowledge.max_file_kb');
     }
 
     /**
@@ -89,7 +157,7 @@ final class KnowledgeUpload
         $base = trim((string) preg_replace('/\.[A-Za-z0-9]{1,5}$/', '', $name));
 
         if ($base === '') {
-            $base = $extension === 'pdf' ? 'documento' : 'imagem';
+            $base = in_array($extension, self::IMAGE_TYPES, true) ? 'imagem' : 'documento';
         }
 
         return mb_substr($base, 0, 190).'.'.$extension;

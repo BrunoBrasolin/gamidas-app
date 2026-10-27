@@ -3,7 +3,7 @@ import { useEditorState } from '@tiptap/react';
 import {
     Bold,
     Code,
-    FileText,
+    Paperclip,
     ImagePlus,
     Italic,
     Link2,
@@ -41,7 +41,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
-import { IMAGE_ACCEPT, PDF_ACCEPT } from './uploads';
+import { FILE_ACCEPT, IMAGE_ACCEPT } from './uploads';
 
 function ToolButton({
     icon: Icon,
@@ -241,7 +241,7 @@ export function EditorToolbar({
 }) {
     const [linkOpen, setLinkOpen] = useState(false);
     const images = useRef<HTMLInputElement>(null);
-    const pdfs = useRef<HTMLInputElement>(null);
+    const files = useRef<HTMLInputElement>(null);
 
     const state = useEditorState({
         editor,
@@ -492,10 +492,11 @@ export function EditorToolbar({
                 variant="ghost"
                 className="h-10 shrink-0 px-3"
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => pdfs.current?.click()}
+                onClick={() => files.current?.click()}
+                title="PDF, PowerPoint, Word ou Excel"
             >
-                <FileText />
-                PDF
+                <Paperclip />
+                Arquivo
             </Button>
             <input
                 ref={images}
@@ -507,10 +508,10 @@ export function EditorToolbar({
                 onChange={pick}
             />
             <input
-                ref={pdfs}
+                ref={files}
                 type="file"
                 multiple
-                accept={PDF_ACCEPT}
+                accept={FILE_ACCEPT}
                 className="sr-only"
                 tabIndex={-1}
                 onChange={pick}

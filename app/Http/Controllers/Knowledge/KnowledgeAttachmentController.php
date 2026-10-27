@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Knowledge;
 
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\KnowledgePresenter;
+use App\Http\Requests\Knowledge\KnowledgeAttachmentReadingRequest;
 use App\Http\Requests\Knowledge\KnowledgeAttachmentRequest;
 use App\Models\KnowledgeAttachment;
 use App\Models\KnowledgePage;
@@ -22,13 +23,23 @@ class KnowledgeAttachmentController extends Controller
     }
 
     /**
-     * Upload an image or PDF into a page (JSON, sent by the editor).
+     * Upload an image, PDF or Office file into a page (JSON, sent by the editor).
      */
     public function store(KnowledgeAttachmentRequest $request, KnowledgePage $page): JsonResponse
     {
         $attachment = $this->attachments->store($page->subject, $page, $request->upload(), $request->info());
 
         return response()->json(KnowledgePresenter::attachment($attachment), 201);
+    }
+
+    /**
+     * Where the built-in reader was left (JSON, sent while paging).
+     */
+    public function reading(KnowledgeAttachmentReadingRequest $request, KnowledgeAttachment $attachment): JsonResponse
+    {
+        $this->attachments->recordReading($attachment, (int) $request->validated('page'), (int) $request->validated('pages'));
+
+        return response()->json(['ok' => true]);
     }
 
     /**

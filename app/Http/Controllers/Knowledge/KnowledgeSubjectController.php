@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Knowledge;
 
+use App\Enums\KnowledgeAttachmentKind;
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\KnowledgePresenter;
@@ -13,6 +14,7 @@ use App\Models\KnowledgePage;
 use App\Models\KnowledgeSubject;
 use App\Services\Knowledge\KnowledgePageService;
 use App\Services\Knowledge\KnowledgeSubjectService;
+use App\Support\KnowledgeUpload;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -53,6 +55,11 @@ class KnowledgeSubjectController extends Controller
             'categories' => $subject->categories->map(fn (KnowledgeCategory $category) => KnowledgePresenter::category($category))->values(),
             'pages' => $pages->map(fn (KnowledgePage $page) => KnowledgePresenter::pageSummary($page))->values(),
             'continue_page' => $continue === null ? null : ['id' => $continue->id, 'title' => $continue->title],
+            // For "Enviar arquivo", which creates a page holding the file.
+            'limits' => [
+                'image_kb' => KnowledgeUpload::maxKilobytes(KnowledgeAttachmentKind::Image),
+                'file_kb' => KnowledgeUpload::maxKilobytes(KnowledgeAttachmentKind::Pdf),
+            ],
             // Where a page can be moved to.
             'destinations' => $this->user($request)->knowledgeSubjects()
                 ->whereNull('archived_at')

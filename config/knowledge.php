@@ -7,8 +7,9 @@ return [
     | Knowledge base files
     |--------------------------------------------------------------------------
     |
-    | Images and PDFs attached to knowledge pages live on a private disk and are
-    | only ever served through an authorized controller. Sizes are in KB.
+    | Images, PDFs and Office files (PowerPoint, Word, Excel) attached to
+    | knowledge pages live on a private disk and are only ever served through
+    | an authorized controller. Sizes are in KB.
     | The PHP limits (upload_max_filesize / post_max_size) on the server must
     | be at least as large as the biggest limit below.
     |
@@ -18,7 +19,8 @@ return [
 
     'max_image_kb' => (int) env('KNOWLEDGE_MAX_IMAGE_KB', 10 * 1024),
 
-    'max_pdf_kb' => (int) env('KNOWLEDGE_MAX_PDF_KB', 30 * 1024),
+    // PDFs and Office files. KNOWLEDGE_MAX_PDF_KB is the older name.
+    'max_file_kb' => (int) env('KNOWLEDGE_MAX_FILE_KB', env('KNOWLEDGE_MAX_PDF_KB', 30 * 1024)),
 
     // Size of the editor document (JSON) of a single page.
     'max_content_kb' => (int) env('KNOWLEDGE_MAX_CONTENT_KB', 2 * 1024),

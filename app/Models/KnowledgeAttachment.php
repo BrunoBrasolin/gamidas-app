@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * An image or PDF stored on the private knowledge disk. Page attachments are
+ * An image, PDF or Office file stored on the private knowledge disk. Page attachments are
  * placed in the page text by id; a subject cover has no page. Attachments no
  * longer referenced by their page are marked detached and pruned later.
  *
@@ -25,13 +25,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $width
  * @property int|null $height
  * @property int $sort_order
+ * @property int|null $reading_page Page (or slide) where the reader was left.
+ * @property int|null $page_count Pages (or slides) the reader found.
  * @property CarbonImmutable|null $detached_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read KnowledgeSubject $subject
  * @property-read KnowledgePage|null $page
  */
-#[Fillable(['subject_id', 'page_id', 'kind', 'filename', 'mime_type', 'size', 'disk', 'path', 'width', 'height', 'sort_order', 'detached_at'])]
+#[Fillable(['subject_id', 'page_id', 'kind', 'filename', 'mime_type', 'size', 'disk', 'path', 'width', 'height', 'sort_order', 'reading_page', 'page_count', 'detached_at'])]
 class KnowledgeAttachment extends Model
 {
     /**
@@ -45,6 +47,8 @@ class KnowledgeAttachment extends Model
             'width' => 'integer',
             'height' => 'integer',
             'sort_order' => 'integer',
+            'reading_page' => 'integer',
+            'page_count' => 'integer',
             'detached_at' => 'datetime',
         ];
     }

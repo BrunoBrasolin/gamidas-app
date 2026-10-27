@@ -10,6 +10,7 @@ import {
     OptionButton,
     TimerBar,
     useDeadline,
+    useSecondsLeft,
 } from '@/components/attention/game-kit';
 import {
     GameButton,
@@ -67,6 +68,9 @@ type Stage =
     | { name: 'finished' };
 
 const GUESS_MS = 15_000;
+/** Time the instruction stays on screen before "Estou pronto!" works. */
+const READ_MS = 4_000;
+const COUNTDOWN_MS = 3_000;
 const GUESS_TIMEOUT = 'timeout';
 
 const CHALLENGES: Record<
@@ -279,6 +283,7 @@ export default function GamePlay({ game: room, types, scoring }: Props) {
 
             {stage.name === 'countdown' && (
                 <Countdown
+                    type={stage.type}
                     onDone={() =>
                         setStage({ name: 'playing', type: stage.type })
                     }
@@ -441,6 +446,8 @@ function Intro({
     onStart: () => void;
 }) {
     const info = ATTENTION_INFO[type];
+    // A tap meant for the previous screen must not skip the instruction.
+    const reading = useSecondsLeft(READ_MS);
 
     return (
         <div className="flex flex-1 flex-col justify-center gap-5">
@@ -469,32 +476,39 @@ function Intro({
                 </h2>
                 <p className="text-lg leading-relaxed">{info.instruction}</p>
             </GameCard>
-            <GameButton onClick={onStart}>Estou pronto!</GameButton>
+            <GameButton onClick={onStart} disabled={reading > 0}>
+                {reading > 0 ? `Leia com calma… ${reading}` : 'Estou pronto!'}
+            </GameButton>
         </div>
     );
 }
 
-function Countdown({ onDone }: { onDone: () => void }) {
-    const [count, setCount] = useState(3);
+/**
+ * 3, 2, 1 with the instruction still on screen, so it can be read again
+ * right before the challenge starts.
+ */
+function Countdown({
+    type,
+    onDone,
+}: {
+    type: AttentionType;
+    onDone: () => void;
+}) {
+    const info = ATTENTION_INFO[type];
+    const count = useSecondsLeft(COUNTDOWN_MS);
 
-    useDeadline(2_100, onDone);
-
-    useEffect(() => {
-        const timer = window.setInterval(
-            () => setCount((value) => Math.max(1, value - 1)),
-            700,
-        );
-
-        return () => window.clearInterval(timer);
-    }, []);
+    useDeadline(COUNTDOWN_MS, onDone);
 
     return (
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+            <p className="text-lg leading-relaxed text-white/80">
+                {info.instruction}
+            </p>
             <span
                 key={count}
-                className="animate-in text-[10rem] leading-none font-black duration-300 zoom-in-50 fade-in"
+                className="animate-in text-[9rem] leading-none font-black duration-300 zoom-in-50 fade-in"
             >
-                {count}
+                {Math.max(1, count)}
             </span>
         </div>
     );

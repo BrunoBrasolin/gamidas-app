@@ -124,7 +124,7 @@ export function AlternatingChallenge({
             summary:
                 `Você acertou ${hits} de ${TARGETS_PER_PHASE * 2} alvos e fez ${plural(errors, 'toque errado', 'toques errados')}` +
                 (perseverations > 0
-                    ? ` — ${plural(perseverations, 'deles foi', 'deles foram')} no círculo depois que a regra mudou.`
+                    ? ` — ${perseverations === errors ? (errors === 1 ? 'foi' : 'todos foram') : plural(perseverations, 'foi', 'foram')} no círculo depois que a regra mudou.`
                     : '.'),
         });
     }

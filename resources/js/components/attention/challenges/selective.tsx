@@ -30,7 +30,9 @@ export function SelectiveChallenge({
     );
     const [found, setFound] = useState<Set<number>>(() => new Set());
     const [wrong, setWrong] = useState<Set<number>>(() => new Set());
-    const [errors, setErrors] = useState(0);
+    // Counted in refs too, so taps faster than a render are never lost.
+    const foundRef = useRef(new Set<number>());
+    const errorsRef = useRef(0);
     const done = useRef(false);
 
     function finish(hits: number, errorCount: number, elapsed: number) {
@@ -61,28 +63,28 @@ export function SelectiveChallenge({
     }
 
     const elapsed = useDeadline(TIME_MS, () =>
-        finish(found.size, errors, TIME_MS),
+        finish(foundRef.current.size, errorsRef.current, TIME_MS),
     );
     const left = useSecondsLeft(TIME_MS);
 
     function tap(index: number) {
-        if (done.current || found.has(index)) {
+        if (done.current || foundRef.current.has(index)) {
             return;
         }
 
         if (letters[index] === 'Q') {
-            const next = new Set(found).add(index);
-            setFound(next);
+            foundRef.current.add(index);
+            setFound(new Set(foundRef.current));
 
-            if (next.size === TARGETS) {
-                finish(next.size, errors, elapsed());
+            if (foundRef.current.size === TARGETS) {
+                finish(TARGETS, errorsRef.current, elapsed());
             }
 
             return;
         }
 
-        setErrors(errors + 1);
-        setWrong(new Set(wrong).add(index));
+        errorsRef.current++;
+        setWrong((current) => new Set(current).add(index));
         window.setTimeout(() => {
             setWrong((current) => {
                 const next = new Set(current);

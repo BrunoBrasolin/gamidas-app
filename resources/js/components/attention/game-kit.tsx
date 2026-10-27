@@ -32,8 +32,7 @@ export function Shape({
     color?: string;
     className?: string;
 }) {
-    const star =
-        '50,6 61,38 95,38 67,58 78,91 50,71 22,91 33,58 5,38 39,38';
+    const star = '50,6 61,38 95,38 67,58 78,91 50,71 22,91 33,58 5,38 39,38';
 
     return (
         <svg
@@ -41,9 +40,18 @@ export function Shape({
             className={cn('size-16', className)}
             aria-hidden
         >
-            {kind === 'circle' && <circle cx="50" cy="50" r="42" fill={color} />}
+            {kind === 'circle' && (
+                <circle cx="50" cy="50" r="42" fill={color} />
+            )}
             {kind === 'square' && (
-                <rect x="10" y="10" width="80" height="80" rx="6" fill={color} />
+                <rect
+                    x="10"
+                    y="10"
+                    width="80"
+                    height="80"
+                    rx="6"
+                    fill={color}
+                />
             )}
             {kind === 'triangle' && (
                 <polygon points="50,8 94,90 6,90" fill={color} />
@@ -194,7 +202,11 @@ export function OptionButton({
 }
 
 /** Percentage from 0 to 100 that drops a fixed amount per unit missed. */
-export function closeness(expected: number, answer: number | null, step: number) {
+export function closeness(
+    expected: number,
+    answer: number | null,
+    step: number,
+) {
     if (answer === null) {
         return 0;
     }

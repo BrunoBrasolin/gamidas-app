@@ -221,8 +221,7 @@ export function VoluntaryChallenge({
 
         shownAt.current = performance.now();
         const timer = window.setTimeout(
-            () =>
-                recordRef.current(list[index].wait ? 'hit' : 'miss', limit),
+            () => recordRef.current(list[index].wait ? 'hit' : 'miss', limit),
             limit,
         );
 

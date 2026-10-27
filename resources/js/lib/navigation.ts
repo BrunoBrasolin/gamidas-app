@@ -143,7 +143,8 @@ export const knowledgeNavItems: NavItem[] = [
 ];
 
 /**
- * College complementary hours (private to each user).
+ * College: complementary hours (private to each user) and the attention
+ * game (shared by the household).
  */
 export const collegeNavItems: NavItem[] = [
     {
@@ -151,6 +152,12 @@ export const collegeNavItems: NavItem[] = [
         href: complementaryHours.index(),
         icon: GraduationCap,
         activePrefix: '/complementary-hours',
+    },
+    {
+        title: 'Jogo da Atenção',
+        href: attention.index(),
+        icon: Brain,
+        activePrefix: '/attention',
     },
 ];
 

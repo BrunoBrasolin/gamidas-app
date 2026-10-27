@@ -47,11 +47,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
  * The Jellyfin webhook setup: the URL and token to paste in the Webhook
  * plugin, with the steps to configure it.
  */
-export function JellyfinConnectionCard({
-    jellyfin,
-}: {
-    jellyfin: Connection;
-}) {
+export function JellyfinConnectionCard({ jellyfin }: { jellyfin: Connection }) {
     const [issuing, setIssuing] = useState(false);
 
     function issue() {
@@ -96,7 +92,10 @@ export function JellyfinConnectionCard({
                     </div>
                 )}
 
-                <CopyField label="URL do webhook" value={jellyfin.webhook_url} />
+                <CopyField
+                    label="URL do webhook"
+                    value={jellyfin.webhook_url}
+                />
 
                 <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
                     <li>
@@ -113,16 +112,16 @@ export function JellyfinConnectionCard({
                     <li>
                         Marque só <strong>Playback Stop</strong> nos tipos de
                         notificação, o seu usuário em{' '}
-                        <strong>User Filter</strong> e os tipos Movies,
-                        Episodes e Videos.
+                        <strong>User Filter</strong> e os tipos Movies, Episodes
+                        e Videos.
                     </li>
                     <li>
                         Marque <strong>Send All Properties</strong>.
                     </li>
                     <li>
                         Em <strong>Headers</strong>, adicione a chave{' '}
-                        <code className="font-mono">X-Gamidas-Token</code> com
-                        o seu token como valor e salve.
+                        <code className="font-mono">X-Gamidas-Token</code> com o
+                        seu token como valor e salve.
                     </li>
                 </ol>
 
@@ -139,7 +138,9 @@ export function JellyfinConnectionCard({
                         ) : (
                             <Plug />
                         )}
-                        {jellyfin.connected ? 'Gerar novo token' : 'Gerar token'}
+                        {jellyfin.connected
+                            ? 'Gerar novo token'
+                            : 'Gerar token'}
                     </Button>
                     {jellyfin.connected && (
                         <ConfirmDialog

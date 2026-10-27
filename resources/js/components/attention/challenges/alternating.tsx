@@ -195,9 +195,7 @@ export function AlternatingChallenge({
                     Agora toque SÓ nos quadrados
                 </p>
                 <Shape kind="square" color="#0f172a" className="size-24" />
-                <p className="text-sm font-medium">
-                    Círculos não valem mais!
-                </p>
+                <p className="text-sm font-medium">Círculos não valem mais!</p>
             </div>
         );
     }

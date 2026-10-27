@@ -54,7 +54,6 @@ export function AppSidebar() {
                 />
                 <NavMain items={collegeNavItems} label="Faculdade" />
                 <NavMain items={showNavItems} label="Lazer" />
-                <NavMain items={activityNavItems} label="Atividades" />
             </SidebarContent>
 
             <SidebarFooter>

@@ -17,7 +17,10 @@ export function GameShell({
             <div className="mx-auto flex min-h-svh w-full max-w-md flex-col gap-4 px-4 py-4">
                 <header className="flex items-center justify-between gap-3">
                     <span className="flex items-center gap-2 text-sm font-semibold tracking-wide text-white/80">
-                        <Brain className="size-5 text-fuchsia-300" aria-hidden />
+                        <Brain
+                            className="size-5 text-fuchsia-300"
+                            aria-hidden
+                        />
                         Jogo da Atenção
                     </span>
                     {header}

@@ -140,14 +140,16 @@ export default function GamePlay({ game: room, types, scoring }: Props) {
 
     function advance(state: AttentionPlayerState) {
         const type = nextType(state.answered);
-        setStage(type === null ? { name: 'finished' } : { name: 'intro', type });
+        setStage(
+            type === null ? { name: 'finished' } : { name: 'intro', type },
+        );
     }
 
     useEffect(() => {
         const saved = readToken(room.code);
 
         if (saved === null) {
-            setStage({ name: room.open ? 'join' : 'closed' });
+            setStage(room.open ? { name: 'join' } : { name: 'closed' });
 
             return;
         }
@@ -166,13 +168,15 @@ export default function GamePlay({ game: room, types, scoring }: Props) {
                     setStage({ name: 'finished' });
                 } else {
                     setStage(
-                        room.open ? { name: 'intro', type } : { name: 'closed' },
+                        room.open
+                            ? { name: 'intro', type }
+                            : { name: 'closed' },
                     );
                 }
             })
             .catch(() => {
                 writeToken(room.code, null);
-                setStage({ name: room.open ? 'join' : 'closed' });
+                setStage(room.open ? { name: 'join' } : { name: 'closed' });
             });
     }, [room.code, room.open]);
 
@@ -216,8 +220,8 @@ export default function GamePlay({ game: room, types, scoring }: Props) {
                 if (
                     error instanceof HttpError &&
                     error.status === 422 &&
-                    (error.body as { errors?: Record<string, unknown> })
-                        ?.errors?.game
+                    (error.body as { errors?: Record<string, unknown> })?.errors
+                        ?.game
                 ) {
                     setStage({ name: 'closed' });
 
@@ -388,8 +392,8 @@ function JoinForm({
                 <p className="text-5xl">🧠</p>
                 <h1 className="text-3xl font-black">{room.title}</h1>
                 <p className="text-white/70">
-                    5 desafios rápidos. Em cada um, descubra também qual tipo
-                    de atenção você usou!
+                    5 desafios rápidos. Em cada um, descubra também qual tipo de
+                    atenção você usou!
                 </p>
             </div>
             <GameCard>
@@ -400,7 +404,9 @@ function JoinForm({
                         </span>
                         <input
                             value={nickname}
-                            onChange={(event) => setNickname(event.target.value)}
+                            onChange={(event) =>
+                                setNickname(event.target.value)
+                            }
                             maxLength={24}
                             autoFocus
                             autoComplete="off"
@@ -503,9 +509,9 @@ function Guess({
     concept: number;
     onGuess: (guess: AttentionType | null) => void;
 }) {
-    const [picked, setPicked] = useState<AttentionType | typeof GUESS_TIMEOUT | null>(
-        null,
-    );
+    const [picked, setPicked] = useState<
+        AttentionType | typeof GUESS_TIMEOUT | null
+    >(null);
 
     function pick(guess: AttentionType | null) {
         if (picked !== null) {
@@ -558,7 +564,10 @@ function useCountUp(target: number, durationMs = 700): number {
         const start = performance.now();
         let frame = 0;
         const tick = () => {
-            const progress = Math.min(1, (performance.now() - start) / durationMs);
+            const progress = Math.min(
+                1,
+                (performance.now() - start) / durationMs,
+            );
             setValue(Math.round(target * progress));
 
             if (progress < 1) {
@@ -747,18 +756,14 @@ function Ranking({
     );
 }
 
-function RankingItem({
-    row,
-    own,
-}: {
-    row: AttentionRankingRow;
-    own: boolean;
-}) {
+function RankingItem({ row, own }: { row: AttentionRankingRow; own: boolean }) {
     return (
         <li
             className={cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2 text-sm',
-                own ? 'bg-fuchsia-500/30 ring-1 ring-fuchsia-300' : 'bg-white/5',
+                own
+                    ? 'bg-fuchsia-500/30 ring-1 ring-fuchsia-300'
+                    : 'bg-white/5',
             )}
         >
             <span className="w-6 text-center font-bold">
@@ -802,8 +807,9 @@ function Finished({
         (round) => round.guess_correct,
     ).length;
     const known = Object.keys(results).length === ATTENTION_ORDER.length;
-    const position = ranking?.ranking.find((row) => row.id === player.id)
-        ?.position;
+    const position = ranking?.ranking.find(
+        (row) => row.id === player.id,
+    )?.position;
 
     return (
         <div className="flex flex-1 flex-col gap-4">

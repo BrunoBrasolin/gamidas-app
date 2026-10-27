@@ -22,10 +22,15 @@ function downloadUrl(attachment: KnowledgeAttachment): string {
 
 const DocumentReader = lazy(() => import('./document-reader'));
 
-type FileKind = Exclude<KnowledgeAttachmentKind, 'image'>;
-
 /** Badge of each kind of file, in the colors of their usual apps. */
-const FILE_BADGES: Record<FileKind, { label: string; className: string }> = {
+const FILE_BADGES: Record<
+    KnowledgeAttachmentKind,
+    { label: string; className: string }
+> = {
+    image: {
+        label: 'IMG',
+        className: 'bg-violet-600/10 text-violet-700 dark:text-violet-400',
+    },
     pdf: {
         label: 'PDF',
         className: 'bg-red-600/10 text-red-700 dark:text-red-400',
@@ -126,31 +131,35 @@ function useFileReading(attachment: KnowledgeAttachment) {
 }
 
 /**
- * A file shown in the text as a document card: PDFs, presentations and Word
- * files open in the built-in reader (at the page where it was left);
- * spreadsheets are downloaded.
+ * A file shown as a document card: PDFs, presentations and Word files open in
+ * the built-in reader (at the page where it was left), images in the image
+ * viewer; spreadsheets are downloaded.
  */
 export function FileCard({
     attachment,
     actions,
+    details,
     className,
 }: {
     attachment: KnowledgeAttachment;
     /** Extra controls (the editor puts replace/remove here). */
     actions?: ReactNode;
+    /** An extra line under the name (where the file lives, say). */
+    details?: ReactNode;
     className?: string;
 }) {
     const [viewing, setViewing] = useState(false);
     const { reading, report, flush } = useFileReading(attachment);
-    const kind: FileKind =
-        attachment.kind === 'image' ? 'pdf' : attachment.kind;
+    const kind = attachment.kind;
     const badge = FILE_BADGES[kind];
     const readable = isReadable(kind);
     const unit = kind === 'slides' ? 'Slide' : 'Página';
 
     let hint: string;
 
-    if (!readable) {
+    if (kind === 'image') {
+        hint = 'toque para ampliar';
+    } else if (!readable) {
         hint = 'toque para baixar';
     } else if (reading && reading.page > 1) {
         hint = `${unit} ${reading.page} de ${reading.pages} · toque para continuar`;
@@ -170,7 +179,7 @@ export function FileCard({
                 type="button"
                 className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
                 onClick={() => {
-                    if (readable) {
+                    if (readable || kind === 'image') {
                         setViewing(true);
                     } else {
                         window.location.assign(downloadUrl(attachment));
@@ -195,6 +204,11 @@ export function FileCard({
                     <span className="block text-xs text-ink-soft">
                         {formatBytes(attachment.size)} · {hint}
                     </span>
+                    {details && (
+                        <span className="mt-0.5 block truncate text-xs text-ink-soft">
+                            {details}
+                        </span>
+                    )}
                     {readable && reading && reading.pages > 1 && (
                         <span
                             className="mt-1.5 block h-1 max-w-48 overflow-hidden rounded-full bg-paper-edge"
@@ -221,6 +235,14 @@ export function FileCard({
                 </Button>
                 {actions}
             </div>
+            {kind === 'image' && (
+                <ImageViewerDialog
+                    attachment={attachment}
+                    alt=""
+                    open={viewing}
+                    onOpenChange={setViewing}
+                />
+            )}
             {readable && (
                 <Dialog
                     open={viewing}

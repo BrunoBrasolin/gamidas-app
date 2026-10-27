@@ -82,6 +82,16 @@ class KnowledgeSubject extends Model
     }
 
     /**
+     * Files attached to the subject itself, in the order they were added.
+     *
+     * @return HasMany<KnowledgeAttachment, $this>
+     */
+    public function files(): HasMany
+    {
+        return $this->attachments()->where('is_subject_file', true)->orderBy('id');
+    }
+
+    /**
      * @return BelongsTo<KnowledgeAttachment, $this>
      */
     public function cover(): BelongsTo

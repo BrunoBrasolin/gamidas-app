@@ -27,7 +27,8 @@ class KnowledgePresenter
         return [
             'pages' => $live,
             'categories',
-            'attachments' => fn (Builder $query) => $query->whereNotNull('page_id')->whereNull('detached_at'),
+            'attachments' => fn (Builder $query) => $query->whereNull('detached_at')
+                ->where(fn (Builder $listed) => $listed->whereNotNull('page_id')->orWhere('is_subject_file', true)),
             'pages as reviewed_count' => fn (Builder $query) => $live($query)->where('status', KnowledgePageStatus::Reviewed),
             'pages as in_progress_count' => fn (Builder $query) => $live($query)->where('status', KnowledgePageStatus::InProgress),
         ];
@@ -146,6 +147,31 @@ class KnowledgePresenter
             'reading_page' => $attachment->reading_page,
             'page_count' => $attachment->page_count,
             'url' => self::fileUrl($attachment->id),
+        ];
+    }
+
+    /**
+     * A file with where it lives: its subject and, when placed in a page,
+     * that page.
+     *
+     * @return array<string, mixed>
+     */
+    public static function fileWithPlace(KnowledgeAttachment $attachment): array
+    {
+        return [
+            ...self::attachment($attachment),
+            'added_at' => $attachment->created_at?->toIso8601String(),
+            'subject' => [
+                'id' => $attachment->subject->id,
+                'title' => $attachment->subject->title,
+                'accent_color' => $attachment->subject->accent_color->value,
+                'archived' => $attachment->subject->archived_at !== null,
+            ],
+            'page' => $attachment->page === null ? null : [
+                'id' => $attachment->page->id,
+                'title' => $attachment->page->title,
+                'archived' => $attachment->page->archived_at !== null,
+            ],
         ];
     }
 

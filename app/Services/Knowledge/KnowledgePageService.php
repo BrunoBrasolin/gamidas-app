@@ -2,15 +2,12 @@
 
 namespace App\Services\Knowledge;
 
-use App\Enums\KnowledgeAttachmentKind;
 use App\Enums\KnowledgePageStatus;
 use App\Models\KnowledgeAttachment;
 use App\Models\KnowledgeCategory;
 use App\Models\KnowledgePage;
 use App\Models\KnowledgeSubject;
 use App\Support\KnowledgeContent;
-use App\Support\KnowledgeUpload;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,32 +37,6 @@ class KnowledgePageService
         $subject->touch();
 
         return $page;
-    }
-
-    /**
-     * A new page holding an uploaded file, named after it. The text below the
-     * file is left empty for notes.
-     *
-     * @param  array{kind: KnowledgeAttachmentKind, mime: string, extension: string, width: int|null, height: int|null}  $info
-     */
-    public function createFromFile(KnowledgeSubject $subject, ?KnowledgeCategory $category, UploadedFile $file, array $info): KnowledgePage
-    {
-        $title = pathinfo(KnowledgeUpload::displayName($file->getClientOriginalName(), $info['extension']), PATHINFO_FILENAME);
-
-        return DB::transaction(function () use ($subject, $category, $file, $info, $title) {
-            $page = $this->create($subject, mb_substr($title, 0, 200), $category);
-            $attachment = $this->attachments->store($subject, $page, $file, $info);
-
-            $document = ['type' => 'doc', 'content' => [
-                ['type' => $info['kind'] === KnowledgeAttachmentKind::Image ? 'knowledgeImage' : 'knowledgeFile', 'attrs' => ['attachmentId' => $attachment->id]],
-                ['type' => 'paragraph'],
-            ]];
-
-            $page->update(['content' => $document, 'content_text' => KnowledgeContent::text($document)]);
-            $this->attachments->syncPage($page, [$attachment->id]);
-
-            return $page;
-        });
     }
 
     /**

@@ -48,6 +48,14 @@ class Household extends Model
     }
 
     /**
+     * @return HasMany<AttentionGame, $this>
+     */
+    public function attentionGames(): HasMany
+    {
+        return $this->hasMany(AttentionGame::class);
+    }
+
+    /**
      * @return BelongsToMany<User, $this>
      */
     public function users(): BelongsToMany

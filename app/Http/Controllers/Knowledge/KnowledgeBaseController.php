@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Knowledge;
 
+use App\Enums\KnowledgeAttachmentKind;
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\KnowledgePresenter;
+use App\Models\KnowledgeAttachment;
 use App\Models\KnowledgeCategory;
 use App\Models\KnowledgePage;
 use App\Models\KnowledgeSubject;
@@ -15,13 +17,38 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The bookshelf of the user's knowledge base and the search across it.
+ * The bookshelf of the user's knowledge base, its files and the search
+ * across it.
  */
 class KnowledgeBaseController extends Controller
 {
     use InteractsWithHousehold;
 
     private const SEARCH_LIMIT = 50;
+
+    /**
+     * Every file of the knowledge base, newest first: those attached to a
+     * subject and those placed in a page. Images in the text and covers are
+     * left out.
+     */
+    public function files(Request $request): Response
+    {
+        $user = $this->user($request);
+
+        $files = KnowledgeAttachment::query()
+            ->whereHas('subject', fn (Builder $query) => $query->where('user_id', $user->id))
+            ->whereNull('detached_at')
+            ->where(fn (Builder $query) => $query
+                ->where('is_subject_file', true)
+                ->orWhere(fn (Builder $placed) => $placed->whereNotNull('page_id')->where('kind', '!=', KnowledgeAttachmentKind::Image->value)))
+            ->with(['subject', 'page'])
+            ->orderByDesc('id')
+            ->get();
+
+        return Inertia::render('knowledge/files', [
+            'files' => $files->map(fn (KnowledgeAttachment $file) => KnowledgePresenter::fileWithPlace($file))->values(),
+        ]);
+    }
 
     public function index(Request $request): Response
     {

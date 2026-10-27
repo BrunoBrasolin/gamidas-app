@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\Attention\AttentionGameController;
+use App\Http\Controllers\Attention\PlayController;
 use App\Http\Controllers\Calendar\CalendarEventController;
+use App\Http\Controllers\ComplementaryHours\ComplementaryActivityController;
 use App\Http\Controllers\Finance\DashboardController;
 use App\Http\Controllers\Finance\ExpensePaymentController;
 use App\Http\Controllers\Finance\HouseholdExpenseController;
@@ -22,9 +25,25 @@ use App\Http\Controllers\Time\TimeLogController;
 use App\Http\Controllers\Time\TimeReportController;
 use App\Http\Controllers\Time\TimeSheetController;
 use App\Http\Controllers\Time\TimeTimerController;
+use App\Http\Controllers\Watched\JellyfinConnectionController;
+use App\Http\Controllers\Watched\WatchedItemController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
+
+// The attention game, played on phones without an account by anyone with
+// the room code. Players are identified by the token they got on joining.
+Route::prefix('jogo')->name('game.')->group(function () {
+    Route::get('/', [PlayController::class, 'landing'])->name('landing');
+    Route::get('{game:code}', [PlayController::class, 'show'])->name('show');
+    Route::get('{game:code}/ranking', [PlayController::class, 'ranking'])->middleware('throttle:game-reads')->name('ranking');
+
+    Route::middleware('throttle:game-writes')->group(function () {
+        Route::post('{game:code}/players', [PlayController::class, 'join'])->name('join');
+        Route::post('{game:code}/resume', [PlayController::class, 'resume'])->name('resume');
+        Route::post('{game:code}/rounds', [PlayController::class, 'round'])->name('rounds.store');
+    });
+});
 
 Route::middleware(['auth', 'verified', 'household'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
@@ -106,6 +125,55 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
         Route::put('shows/{show}/checklist/{item}', [ShowChecklistController::class, 'check'])->name('shows.checklist.check');
     });
 
+    // What the user watched on Jellyfin, recorded by its webhook
+    // (routes/api.php). Every entry belongs to the signed-in user.
+    Route::prefix('watched')->name('watched.')->group(function () {
+        Route::get('/', [WatchedItemController::class, 'index'])->name('index');
+
+        Route::middleware('throttle:finance-writes')->group(function () {
+            Route::post('jellyfin', [JellyfinConnectionController::class, 'store'])->name('jellyfin.store');
+            Route::delete('jellyfin', [JellyfinConnectionController::class, 'destroy'])->name('jellyfin.destroy');
+            Route::delete('{item}', [WatchedItemController::class, 'destroy'])->name('destroy');
+        });
+    });
+
+    // College complementary hours: the hours required and the activities that
+    // count, each with its certificate and an optional report. Everything
+    // belongs to the signed-in user; certificates are served only through the
+    // authorized route.
+    Route::prefix('complementary-hours')->name('complementary-hours.')->group(function () {
+        Route::get('/', [ComplementaryActivityController::class, 'index'])->name('index');
+        Route::get('create', [ComplementaryActivityController::class, 'create'])->name('create');
+        Route::get('{activity}', [ComplementaryActivityController::class, 'show'])->name('show');
+        Route::get('{activity}/edit', [ComplementaryActivityController::class, 'edit'])->name('edit');
+        Route::get('{activity}/certificate', [ComplementaryActivityController::class, 'certificate'])->name('certificate');
+        Route::get('{activity}/report.pdf', [ComplementaryActivityController::class, 'report'])->name('report');
+
+        Route::middleware('throttle:finance-writes')->group(function () {
+            Route::put('goal', [ComplementaryActivityController::class, 'goal'])->name('goal.update');
+            Route::post('/', [ComplementaryActivityController::class, 'store'])->name('store');
+            // Sent as POST with _method=PUT, since it may carry a file.
+            Route::put('{activity}', [ComplementaryActivityController::class, 'update'])->name('update');
+            Route::delete('{activity}', [ComplementaryActivityController::class, 'destroy'])->name('destroy');
+        });
+    });
+
+    // Rooms of the attention game, shared by the household: live report,
+    // projector screen with the QR code and the spreadsheet export.
+    Route::prefix('attention')->name('attention.')->group(function () {
+        Route::get('/', [AttentionGameController::class, 'index'])->name('index');
+        Route::get('{game}', [AttentionGameController::class, 'show'])->name('show');
+        Route::get('{game}/present', [AttentionGameController::class, 'present'])->name('present');
+        Route::get('{game}/export', [AttentionGameController::class, 'export'])->name('export');
+
+        Route::middleware('throttle:finance-writes')->group(function () {
+            Route::post('/', [AttentionGameController::class, 'store'])->name('store');
+            Route::post('{game}/close', [AttentionGameController::class, 'close'])->name('close');
+            Route::delete('{game}/close', [AttentionGameController::class, 'reopen'])->name('reopen');
+            Route::delete('{game}', [AttentionGameController::class, 'destroy'])->name('destroy');
+        });
+    });
+
     // Knowledge base: subjects (books), categories, pages and their files.
     // Everything belongs to the signed-in user; files are served only through
     // the authorized attachment route.
@@ -115,6 +183,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
     Route::prefix('knowledge')->name('knowledge.')->group(function () {
         Route::get('/', [KnowledgeBaseController::class, 'index'])->name('index');
         Route::get('search', [KnowledgeBaseController::class, 'search'])->name('search');
+        Route::get('files', [KnowledgeBaseController::class, 'files'])->name('files');
         Route::get('subjects/{subject}', [KnowledgeSubjectController::class, 'show'])->name('subjects.show');
         Route::get('pages/{page}', [KnowledgePageController::class, 'show'])->name('pages.show');
         Route::get('pages/{page}/edit', [KnowledgePageController::class, 'edit'])->name('pages.edit');
@@ -137,7 +206,6 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             Route::delete('categories/{category}', [KnowledgeCategoryController::class, 'destroy'])->name('categories.destroy');
 
             Route::post('subjects/{subject}/pages', [KnowledgePageController::class, 'store'])->name('pages.store');
-            Route::post('subjects/{subject}/files', [KnowledgePageController::class, 'upload'])->name('pages.upload');
             Route::put('pages/{page}', [KnowledgePageController::class, 'update'])->name('pages.update');
             Route::put('pages/{page}/content', [KnowledgePageController::class, 'content'])->name('pages.content');
             Route::put('pages/{page}/status', [KnowledgePageController::class, 'status'])->name('pages.status');
@@ -152,6 +220,9 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
 
             Route::post('pages/{page}/attachments', [KnowledgeAttachmentController::class, 'store'])->name('attachments.store');
             Route::put('files/{attachment}/reading', [KnowledgeAttachmentController::class, 'reading'])->name('attachments.reading');
+            Route::post('subjects/{subject}/files', [KnowledgeAttachmentController::class, 'storeForSubject'])->name('subjects.files.store');
+            Route::put('files/{attachment}', [KnowledgeAttachmentController::class, 'update'])->name('attachments.update');
+            Route::delete('files/{attachment}', [KnowledgeAttachmentController::class, 'destroy'])->name('attachments.destroy');
         });
     });
 });

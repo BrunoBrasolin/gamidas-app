@@ -14,4 +14,6 @@ export type NavItem = {
     items?: NavItem[];
     /** Path prefix that also marks the item as active, e.g. "/household". */
     activePrefix?: string;
+    /** Path prefix inside activePrefix that belongs to another item. */
+    inactivePrefix?: string;
 };

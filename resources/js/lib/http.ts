@@ -22,7 +22,7 @@ function xsrfToken(): string | null {
  * TypeError when the network fails.
  */
 export async function jsonRequest<T>(
-    method: 'GET' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT',
     url: string,
     body?: unknown,
     signal?: AbortSignal,

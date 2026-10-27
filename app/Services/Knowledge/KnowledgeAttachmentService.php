@@ -27,11 +27,11 @@ class KnowledgeAttachmentService
 
     /**
      * Store an uploaded file. Page attachments start detached until the page
-     * text that places them is saved.
+     * text that places them is saved; subject files are listed right away.
      *
      * @param  array{kind: KnowledgeAttachmentKind, mime: string, extension: string, width: int|null, height: int|null}  $info
      */
-    public function store(KnowledgeSubject $subject, ?KnowledgePage $page, UploadedFile $file, array $info): KnowledgeAttachment
+    public function store(KnowledgeSubject $subject, ?KnowledgePage $page, UploadedFile $file, array $info, bool $subjectFile = false): KnowledgeAttachment
     {
         $disk = (string) config('knowledge.disk');
         $path = self::DIRECTORY.'/'.$subject->user_id.'/'.Str::ulid()->toBase32().'.'.$info['extension'];
@@ -46,6 +46,7 @@ class KnowledgeAttachmentService
             return KnowledgeAttachment::query()->create([
                 'subject_id' => $subject->id,
                 'page_id' => $page?->id,
+                'is_subject_file' => $page === null && $subjectFile,
                 'kind' => $info['kind'],
                 'filename' => KnowledgeUpload::displayName($file->getClientOriginalName(), $info['extension']),
                 'mime_type' => $info['mime'],
@@ -61,6 +62,14 @@ class KnowledgeAttachmentService
 
             throw $exception;
         }
+    }
+
+    /**
+     * Rename a file, keeping its extension.
+     */
+    public function rename(KnowledgeAttachment $attachment, string $name): void
+    {
+        $attachment->update(['filename' => KnowledgeUpload::displayName($name, pathinfo($attachment->path, PATHINFO_EXTENSION))]);
     }
 
     /**

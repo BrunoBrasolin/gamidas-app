@@ -10,12 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * An image, PDF or Office file stored on the private knowledge disk. Page attachments are
- * placed in the page text by id; a subject cover has no page. Attachments no
+ * placed in the page text by id; subject files (is_subject_file) belong to the
+ * subject itself and are listed in its "Anexos"; a subject cover has neither. Attachments no
  * longer referenced by their page are marked detached and pruned later.
  *
  * @property int $id
  * @property int $subject_id
  * @property int|null $page_id
+ * @property bool $is_subject_file
  * @property KnowledgeAttachmentKind $kind
  * @property string $filename
  * @property string $mime_type
@@ -33,7 +35,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read KnowledgeSubject $subject
  * @property-read KnowledgePage|null $page
  */
-#[Fillable(['subject_id', 'page_id', 'kind', 'filename', 'mime_type', 'size', 'disk', 'path', 'width', 'height', 'sort_order', 'reading_page', 'page_count', 'detached_at'])]
+#[Fillable(['subject_id', 'page_id', 'is_subject_file', 'kind', 'filename', 'mime_type', 'size', 'disk', 'path', 'width', 'height', 'sort_order', 'reading_page', 'page_count', 'detached_at'])]
 class KnowledgeAttachment extends Model
 {
     /**
@@ -43,6 +45,7 @@ class KnowledgeAttachment extends Model
     {
         return [
             'kind' => KnowledgeAttachmentKind::class,
+            'is_subject_file' => 'boolean',
             'size' => 'integer',
             'width' => 'integer',
             'height' => 'integer',

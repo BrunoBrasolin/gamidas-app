@@ -34,7 +34,8 @@ import {
 } from '@/components/knowledge/status-control';
 import type { UploadLimits } from '@/components/knowledge/editor/knowledge-editor';
 import { SubjectFormDialog } from '@/components/knowledge/subject-form-dialog';
-import { UploadFileButton } from '@/components/knowledge/upload-file-button';
+import { AddAttachmentButton } from '@/components/knowledge/add-attachment-button';
+import { SubjectFiles } from '@/components/knowledge/subject-files';
 import { Button } from '@/components/ui/button';
 import {
     Collapsible,
@@ -71,6 +72,7 @@ import type {
     KnowledgePageStatus,
     KnowledgePageSummary,
     KnowledgeSubject,
+    KnowledgeSubjectFile,
 } from '@/types';
 
 type Dialog =
@@ -483,6 +485,7 @@ export default function KnowledgeSubjectPage({
     pages,
     continue_page: continuePage,
     destinations,
+    files,
     limits,
 }: {
     subject: KnowledgeSubject;
@@ -490,6 +493,7 @@ export default function KnowledgeSubjectPage({
     pages: KnowledgePageSummary[];
     continue_page: KnowledgePageLink | null;
     destinations: KnowledgeDestination[];
+    files: KnowledgeSubjectFile[];
     limits: UploadLimits;
 }) {
     const [query, setQuery] = useState('');
@@ -653,10 +657,6 @@ export default function KnowledgeSubjectPage({
                                     <Plus />
                                     Nova página
                                 </Button>
-                                <UploadFileButton
-                                    subjectId={subject.id}
-                                    limits={limits}
-                                />
                                 <Button
                                     variant="outline"
                                     className="h-11"
@@ -670,6 +670,10 @@ export default function KnowledgeSubjectPage({
                                     <FolderPlus />
                                     Nova categoria
                                 </Button>
+                                <AddAttachmentButton
+                                    subjectId={subject.id}
+                                    limits={limits}
+                                />
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button
@@ -730,6 +734,8 @@ export default function KnowledgeSubjectPage({
                         </div>
                     </header>
 
+                    <SubjectFiles files={files} />
+
                     {live.length === 0 && !hasCategories ? (
                         <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-paper-edge px-6 py-14 text-center">
                             <FileText
@@ -741,25 +747,19 @@ export default function KnowledgeSubjectPage({
                                     Nenhuma página ainda
                                 </p>
                                 <p className="max-w-md text-sm text-ink-soft">
-                                    Escreva a primeira página ou envie um
-                                    arquivo (PDF, PowerPoint, Word, Excel).
-                                    Categorias (e subcategorias) são opcionais —
-                                    crie quando a matéria crescer.
+                                    Escreva a primeira página. Categorias (e
+                                    subcategorias) são opcionais — crie quando a
+                                    matéria crescer. Slides e apostilas podem ir
+                                    direto na matéria, em “Adicionar anexo”.
                                 </p>
                             </div>
-                            <div className="flex flex-wrap justify-center gap-2">
-                                <Button
-                                    className="h-11 px-5"
-                                    onClick={() => createPage(subject.id, null)}
-                                >
-                                    <Plus />
-                                    Escrever a primeira página
-                                </Button>
-                                <UploadFileButton
-                                    subjectId={subject.id}
-                                    limits={limits}
-                                />
-                            </div>
+                            <Button
+                                className="h-11 px-5"
+                                onClick={() => createPage(subject.id, null)}
+                            >
+                                <Plus />
+                                Escrever a primeira página
+                            </Button>
                         </div>
                     ) : (
                         <section
@@ -1032,7 +1032,7 @@ export default function KnowledgeSubjectPage({
                                 </Button>
                             }
                             title="Excluir matéria?"
-                            description={`“${subject.title}” será excluída com ${plural(pages.length, 'página', 'páginas')}, imagens e PDFs. Não dá para desfazer — se quiser só tirar da estante, arquive.`}
+                            description={`“${subject.title}” será excluída com ${plural(pages.length, 'página', 'páginas')}, anexos e arquivos. Não dá para desfazer — se quiser só tirar da estante, arquive.`}
                             confirmLabel="Excluir"
                             url={knowledge.subjects.destroy.url(subject.id)}
                         />
@@ -1096,7 +1096,7 @@ export default function KnowledgeSubjectPage({
                     open
                     onOpenChange={(open) => !open && setDialog(null)}
                     title="Excluir página?"
-                    description={`“${dialog.page.title}” será excluída com as imagens e PDFs dela. Não dá para desfazer.`}
+                    description={`“${dialog.page.title}” será excluída com as imagens e arquivos dela. Não dá para desfazer.`}
                     confirmLabel="Excluir"
                     url={knowledge.pages.destroy.url(dialog.page.id)}
                 />

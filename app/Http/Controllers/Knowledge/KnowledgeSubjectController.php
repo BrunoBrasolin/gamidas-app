@@ -9,6 +9,7 @@ use App\Http\Presenters\KnowledgePresenter;
 use App\Http\Requests\Knowledge\KnowledgeArrangeRequest;
 use App\Http\Requests\Knowledge\KnowledgeSubjectOrderRequest;
 use App\Http\Requests\Knowledge\KnowledgeSubjectRequest;
+use App\Models\KnowledgeAttachment;
 use App\Models\KnowledgeCategory;
 use App\Models\KnowledgePage;
 use App\Models\KnowledgeSubject;
@@ -55,7 +56,11 @@ class KnowledgeSubjectController extends Controller
             'categories' => $subject->categories->map(fn (KnowledgeCategory $category) => KnowledgePresenter::category($category))->values(),
             'pages' => $pages->map(fn (KnowledgePage $page) => KnowledgePresenter::pageSummary($page))->values(),
             'continue_page' => $continue === null ? null : ['id' => $continue->id, 'title' => $continue->title],
-            // For "Enviar arquivo", which creates a page holding the file.
+            // Files attached to the subject itself ("Anexos").
+            'files' => $subject->files()->get()->map(fn (KnowledgeAttachment $file) => [
+                ...KnowledgePresenter::attachment($file),
+                'added_at' => $file->created_at?->toIso8601String(),
+            ])->values(),
             'limits' => [
                 'image_kb' => KnowledgeUpload::maxKilobytes(KnowledgeAttachmentKind::Image),
                 'file_kb' => KnowledgeUpload::maxKilobytes(KnowledgeAttachmentKind::Pdf),

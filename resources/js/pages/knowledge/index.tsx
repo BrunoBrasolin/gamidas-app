@@ -469,9 +469,9 @@ export default function KnowledgeLibrary({
                                     </p>
                                     <p className="max-w-md text-sm text-ink-soft">
                                         Crie uma matéria para cada assunto.
-                                        Dentro dela, organize categorias e
-                                        escreva páginas com texto, imagens e
-                                        PDFs.
+                                        Dentro dela, organize categorias,
+                                        escreva páginas e guarde anexos como
+                                        slides e apostilas.
                                     </p>
                                 </div>
                                 <Button
@@ -636,7 +636,7 @@ export default function KnowledgeLibrary({
                                                     </Button>
                                                 }
                                                 title="Excluir matéria?"
-                                                description={`“${subject.title}” será excluída com todas as páginas, imagens e PDFs. Não dá para desfazer.`}
+                                                description={`“${subject.title}” será excluída com todas as páginas e arquivos. Não dá para desfazer.`}
                                                 confirmLabel="Excluir"
                                                 url={knowledge.subjects.destroy.url(
                                                     subject.id,

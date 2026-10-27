@@ -104,6 +104,19 @@ export type KnowledgeAttachment = {
     url: string;
 };
 
+/** A file attached to a subject itself (its "Anexos"). */
+export type KnowledgeSubjectFile = KnowledgeAttachment & {
+    /** ISO timestamp */
+    added_at: string | null;
+};
+
+/** A file of the "Arquivos" list, with the subject (and page) it lives in. */
+export type KnowledgeFileEntry = KnowledgeSubjectFile & {
+    subject: KnowledgeSubjectRef & { archived: boolean };
+    /** Null for files attached to the subject itself. */
+    page: { id: number; title: string; archived: boolean } | null;
+};
+
 /** Attachments keyed by id (an empty map comes as an empty array). */
 export type KnowledgeAttachmentMap = Record<string, KnowledgeAttachment>;
 

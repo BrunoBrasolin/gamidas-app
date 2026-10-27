@@ -42,6 +42,14 @@ class AppServiceProvider extends ServiceProvider
 
         // The knowledge editor autosaves, uploads files and records the reading position.
         RateLimiter::for('knowledge-writes', fn (Request $request) => Limit::perMinute(240)->by($request->user()?->id ?: $request->ip()));
+
+        // The attention game is public and a whole classroom may share one
+        // IP (school Wi-Fi), so the limits are per IP but generous.
+        RateLimiter::for('game-writes', fn (Request $request) => Limit::perMinute(600)->by($request->ip()));
+        RateLimiter::for('game-reads', fn (Request $request) => Limit::perMinute(1200)->by($request->ip()));
+
+        // Webhooks from the user's own servers (Jellyfin), before the token is checked.
+        RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(120)->by($request->ip()));
     }
 
     /**

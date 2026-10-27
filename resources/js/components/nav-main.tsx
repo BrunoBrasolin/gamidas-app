@@ -24,7 +24,11 @@ export function NavMain({
     const isActive = (item: NavItem) =>
         isCurrentUrl(item.href) ||
         (item.activePrefix !== undefined &&
-            currentUrl.startsWith(item.activePrefix)) ||
+            currentUrl.startsWith(item.activePrefix) &&
+            !(
+                item.inactivePrefix !== undefined &&
+                currentUrl.startsWith(item.inactivePrefix)
+            )) ||
         (item.items?.some((child) => isCurrentOrParentUrl(child.href)) ??
             false);
 

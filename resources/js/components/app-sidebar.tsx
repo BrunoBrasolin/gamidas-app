@@ -14,6 +14,7 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import {
+    collegeNavItems,
     mainNavItems,
     showNavItems,
     knowledgeNavItems,
@@ -51,7 +52,9 @@ export function AppSidebar() {
                     items={knowledgeNavItems}
                     label="Base de Conhecimento"
                 />
+                <NavMain items={collegeNavItems} label="Faculdade" />
                 <NavMain items={showNavItems} label="Lazer" />
+                <NavMain items={activityNavItems} label="Atividades" />
             </SidebarContent>
 
             <SidebarFooter>

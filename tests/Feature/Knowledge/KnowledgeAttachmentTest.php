@@ -8,6 +8,7 @@ use App\Models\KnowledgeSubject;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesHousehold;
 use Tests\Concerns\CreatesKnowledgeFiles;
 use Tests\TestCase;
@@ -135,6 +136,114 @@ class KnowledgeAttachmentTest extends TestCase
             ->assertNotFound();
 
         $this->assertSame(12, $attachment->fresh()?->reading_page);
+    }
+
+    public function test_files_can_be_attached_to_a_subject_without_a_page(): void
+    {
+        $subject = $this->page->subject;
+
+        $id = $this->actingAs($this->leticia)
+            ->postJson(route('knowledge.subjects.files.store', $subject), ['file' => $this->office('Aula 3.pptx', 'ppt/presentation.xml')])
+            ->assertCreated()
+            ->assertJson(['kind' => 'slides', 'name' => 'Aula 3.pptx'])
+            ->json('id');
+
+        $attachment = KnowledgeAttachment::query()->findOrFail($id);
+        $this->assertTrue($attachment->is_subject_file);
+        $this->assertNull($attachment->page_id);
+        $this->assertNull($attachment->detached_at);
+
+        // A page attachment is not a subject file.
+        $this->actingAs($this->leticia)->postJson(route('knowledge.attachments.store', $this->page), ['file' => $this->pdf()])->assertCreated();
+
+        $this->actingAs($this->leticia)
+            ->get(route('knowledge.subjects.show', $subject))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('files', 1)
+                ->where('files.0.id', $id)
+                ->where('subject.counts.attachments', 1));
+
+        // Pruning never touches them.
+        $this->travel(3)->days();
+        $this->artisan('knowledge:prune-attachments');
+        Storage::disk('local')->assertExists($attachment->path);
+    }
+
+    public function test_subject_files_are_renamed_keeping_the_extension_and_deleted(): void
+    {
+        $id = $this->actingAs($this->leticia)
+            ->postJson(route('knowledge.subjects.files.store', $this->page->subject), ['file' => $this->pdf('apostila.pdf')])
+            ->json('id');
+        $attachment = KnowledgeAttachment::query()->findOrFail($id);
+
+        $this->actingAs($this->leticia)
+            ->put(route('knowledge.attachments.update', $id), ['title' => 'Aula 1 - Introdução.docx'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('Aula 1 - Introdução.pdf', $attachment->fresh()?->filename);
+
+        $this->actingAs($this->bruno)->put(route('knowledge.attachments.update', $id), ['title' => 'X'])->assertNotFound();
+        $this->actingAs($this->bruno)->delete(route('knowledge.attachments.destroy', $id))->assertNotFound();
+
+        $this->actingAs($this->leticia)->delete(route('knowledge.attachments.destroy', $id))->assertRedirect();
+        $this->assertNull($attachment->fresh());
+        Storage::disk('local')->assertMissing($attachment->path);
+    }
+
+    public function test_page_files_are_not_deleted_on_their_own(): void
+    {
+        $id = $this->actingAs($this->leticia)
+            ->postJson(route('knowledge.attachments.store', $this->page), ['file' => $this->pdf()])
+            ->json('id');
+
+        $this->actingAs($this->leticia)->delete(route('knowledge.attachments.destroy', $id))->assertForbidden();
+        $this->assertNotNull(KnowledgeAttachment::query()->find($id));
+    }
+
+    public function test_subject_files_of_other_users_are_refused(): void
+    {
+        $theirs = KnowledgeSubject::factory()->for($this->bruno)->create();
+
+        $this->actingAs($this->leticia)
+            ->postJson(route('knowledge.subjects.files.store', $theirs), ['file' => $this->pdf()])
+            ->assertNotFound();
+
+        $this->actingAs($this->leticia)
+            ->postJson(route('knowledge.subjects.files.store', $this->page->subject), ['file' => $this->office('x.pptx', null)])
+            ->assertUnprocessable();
+
+        $this->assertSame(0, KnowledgeAttachment::query()->count());
+    }
+
+    public function test_the_files_page_lists_every_file_with_its_subject(): void
+    {
+        $subject = $this->page->subject;
+        $slides = $this->actingAs($this->leticia)
+            ->postJson(route('knowledge.subjects.files.store', $subject), ['file' => $this->office('Aula.pptx', 'ppt/presentation.xml')])
+            ->json('id');
+        $placed = $this->actingAs($this->leticia)
+            ->postJson(route('knowledge.attachments.store', $this->page), ['file' => $this->pdf()])
+            ->json('id');
+        $this->actingAs($this->leticia)
+            ->putJson(route('knowledge.pages.content', $this->page), ['title' => 'Mitose', 'revision' => 0, 'content' => ['type' => 'doc', 'content' => [
+                ['type' => 'knowledgeFile', 'attrs' => ['attachmentId' => $placed]],
+                ['type' => 'knowledgeImage', 'attrs' => ['attachmentId' => $this->actingAs($this->leticia)->postJson(route('knowledge.attachments.store', $this->page), ['file' => $this->png()])->json('id')]],
+            ]]])
+            ->assertOk();
+        // Detached files, covers and other users' files are not listed.
+        $this->actingAs($this->leticia)->postJson(route('knowledge.attachments.store', $this->page), ['file' => $this->pdf()]);
+        $this->actingAs($this->bruno)->postJson(route('knowledge.subjects.files.store', KnowledgeSubject::factory()->for($this->bruno)->create()), ['file' => $this->pdf()]);
+
+        $this->actingAs($this->leticia)
+            ->get(route('knowledge.files'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('knowledge/files', false)
+                ->has('files', 2)
+                ->where('files.0.id', $placed)
+                ->where('files.0.subject.title', $subject->title)
+                ->where('files.0.page.title', 'Mitose')
+                ->where('files.1.id', $slides)
+                ->where('files.1.page', null));
     }
 
     public function test_files_are_checked_by_content_not_by_name(): void

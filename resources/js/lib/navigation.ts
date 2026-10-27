@@ -1,7 +1,11 @@
 import {
+    Brain,
+    FolderOpen,
     LibraryBig,
     BarChart3,
     CalendarDays,
+    Clapperboard,
+    GraduationCap,
     Home,
     LayoutGrid,
     Receipt,
@@ -13,7 +17,9 @@ import {
     Wallet,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
+import attention from '@/routes/attention';
 import calendar from '@/routes/calendar';
+import complementaryHours from '@/routes/complementary-hours';
 import expenses from '@/routes/expenses';
 import household from '@/routes/household';
 import personal from '@/routes/personal';
@@ -22,6 +28,7 @@ import reports from '@/routes/reports';
 import shows from '@/routes/shows';
 import knowledge from '@/routes/knowledge';
 import time from '@/routes/time';
+import watched from '@/routes/watched';
 import type { NavItem } from '@/types';
 
 export const mainNavItems: NavItem[] = [
@@ -98,7 +105,8 @@ export const timeNavItems: NavItem[] = [
 ];
 
 /**
- * Concerts the user attended (private to each user).
+ * Leisure: concerts of the household and what the user watched on Jellyfin
+ * (private to each user).
  */
 export const showNavItems: NavItem[] = [
     {
@@ -106,6 +114,12 @@ export const showNavItems: NavItem[] = [
         href: shows.index(),
         icon: Ticket,
         activePrefix: '/shows',
+    },
+    {
+        title: 'Assistidos',
+        href: watched.index(),
+        icon: Clapperboard,
+        activePrefix: '/watched',
     },
 ];
 
@@ -118,6 +132,25 @@ export const knowledgeNavItems: NavItem[] = [
         href: knowledge.index(),
         icon: LibraryBig,
         activePrefix: '/knowledge',
+        inactivePrefix: '/knowledge/files',
+    },
+    {
+        title: 'Arquivos',
+        href: knowledge.files(),
+        icon: FolderOpen,
+        activePrefix: '/knowledge/files',
+    },
+];
+
+/**
+ * College complementary hours (private to each user).
+ */
+export const collegeNavItems: NavItem[] = [
+    {
+        title: 'Horas complementares',
+        href: complementaryHours.index(),
+        icon: GraduationCap,
+        activePrefix: '/complementary-hours',
     },
 ];
 
@@ -125,5 +158,6 @@ export const allNavItems: NavItem[] = [
     ...mainNavItems,
     ...timeNavItems,
     ...knowledgeNavItems,
+    ...collegeNavItems,
     ...showNavItems,
 ];

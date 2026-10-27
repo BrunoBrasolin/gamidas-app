@@ -23,8 +23,18 @@ class KnowledgeAttachmentPolicy
         return $this->view($user, $attachment);
     }
 
+    /**
+     * Only subject files are deleted on their own: page files leave with
+     * their block in the editor, covers through the subject form.
+     */
     public function delete(User $user, KnowledgeAttachment $attachment): Response
     {
-        return $this->view($user, $attachment);
+        $view = $this->view($user, $attachment);
+
+        if ($view->denied() || $attachment->is_subject_file) {
+            return $view;
+        }
+
+        return Response::deny('Este arquivo está dentro de uma página: remova-o pelo editor da página.');
     }
 }

@@ -171,7 +171,7 @@ export default function ShowFormPage({ show }: { show: Show | null }) {
                                 id="show-venue"
                                 required
                                 maxLength={160}
-                                placeholder="Ex.: Allianz Parque"
+                                placeholder="Ex.: Nubank Parque"
                                 value={form.data.venue}
                                 onChange={(event) =>
                                     form.setData('venue', event.target.value)

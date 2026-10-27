@@ -1,4 +1,5 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
+import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -10,6 +11,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import {
     mainNavItems,
@@ -20,6 +22,14 @@ import {
 import { dashboard } from '@/routes';
 
 export function AppSidebar() {
+    const { url } = usePage();
+    const { setOpenMobile } = useSidebar();
+
+    // Layouts are persistent, so the mobile sheet would stay open across visits.
+    useEffect(() => {
+        setOpenMobile(false);
+    }, [url, setOpenMobile]);
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>

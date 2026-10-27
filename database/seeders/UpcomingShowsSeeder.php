@@ -17,7 +17,7 @@ class UpcomingShowsSeeder extends ShowsSeeder
         [
             'band' => 'Iron Maiden',
             'tour' => 'Run For Your Lives',
-            'venue' => 'Allianz Parque, São Paulo',
+            'venue' => 'Nubank Parque, São Paulo',
             'show_date' => '2026-10-25',
             'setlist' => [],
             'photos_url' => null,
@@ -29,7 +29,7 @@ class UpcomingShowsSeeder extends ShowsSeeder
         [
             'band' => 'Rush',
             'tour' => 'Fifty Something',
-            'venue' => 'Allianz Parque, São Paulo',
+            'venue' => 'Nubank Parque, São Paulo',
             'show_date' => '2027-01-24',
             'setlist' => [],
             'photos_url' => null,

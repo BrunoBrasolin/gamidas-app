@@ -86,6 +86,22 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
+     * @return HasMany<ComplementaryActivity, $this>
+     */
+    public function complementaryActivities(): HasMany
+    {
+        return $this->hasMany(ComplementaryActivity::class);
+    }
+
+    /**
+     * @return HasOne<ComplementaryHoursGoal, $this>
+     */
+    public function complementaryHoursGoal(): HasOne
+    {
+        return $this->hasOne(ComplementaryHoursGoal::class);
+    }
+
+    /**
      * @return HasMany<TimeLog, $this>
      */
     public function timeLogs(): HasMany

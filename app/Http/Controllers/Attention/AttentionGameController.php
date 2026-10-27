@@ -7,8 +7,6 @@ use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attention\AttentionGameRequest;
 use App\Models\AttentionGame;
-use App\Models\AttentionPlayer;
-use App\Models\AttentionRound;
 use App\Services\Attention\AttentionGameService;
 use App\Services\Attention\AttentionReport;
 use BaconQrCode\Renderer\Color\Rgb;
@@ -119,9 +117,7 @@ class AttentionGameController extends Controller
             ], ';', escape: '');
 
             foreach ($players as $player) {
-                /** @var AttentionPlayer $player */
                 foreach ($player->rounds as $round) {
-                    /** @var AttentionRound $round */
                     $details = $round->details ?? [];
                     fputcsv($out, [
                         $player->nickname,

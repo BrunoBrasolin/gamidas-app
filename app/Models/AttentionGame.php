@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
  * A room of the attention game, shared by every member of the household.
@@ -34,14 +36,18 @@ class AttentionGame extends Model
 
     /**
      * Codes are typed by hand on the phone, so lowercase finds them too.
+     *
+     * @param  Model|Builder|Relation<self, *, *>  $query
+     * @param  mixed  $value
+     * @param  string|null  $field
      */
-    public function resolveRouteBinding($value, $field = null): ?self
+    public function resolveRouteBindingQuery($query, $value, $field = null): Builder
     {
         if ($field === 'code') {
             $value = strtoupper((string) $value);
         }
 
-        return parent::resolveRouteBinding($value, $field);
+        return parent::resolveRouteBindingQuery($query, $value, $field);
     }
 
     public function isOpen(): bool

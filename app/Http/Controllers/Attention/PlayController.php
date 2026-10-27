@@ -133,7 +133,7 @@ class PlayController extends Controller
             'score' => $player->score,
             'correct_rounds' => $player->correct_rounds,
             'finished' => $player->finished_at !== null,
-            'answered' => $player->rounds()->pluck('type')->map(fn (AttentionType $type) => $type->value)->values()->all(),
+            'answered' => array_values($player->rounds()->pluck('type')->map(fn (AttentionType $type) => $type->value)->all()),
         ];
     }
 }

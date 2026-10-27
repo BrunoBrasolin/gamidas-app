@@ -29,6 +29,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class AttentionPlayer extends Model
 {
     /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = ['score' => 0, 'correct_rounds' => 0];
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

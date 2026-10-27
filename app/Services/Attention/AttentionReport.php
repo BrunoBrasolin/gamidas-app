@@ -92,7 +92,7 @@ class AttentionReport
      */
     public function players(): array
     {
-        return $this->players->values()->map(fn (AttentionPlayer $player, int $index) => [
+        return array_values($this->players->values()->map(fn (AttentionPlayer $player, int $index) => [
             'id' => $player->id,
             'position' => $index + 1,
             'nickname' => $player->nickname,
@@ -120,7 +120,7 @@ class AttentionReport
                 'points' => $round->points,
                 'details' => $round->details,
             ])->values()->all(),
-        ])->all();
+        ])->all());
     }
 
     /**
@@ -132,7 +132,7 @@ class AttentionReport
     {
         $players = $limit === null ? $this->players : $this->players->take($limit);
 
-        return $players->values()->map(fn (AttentionPlayer $player, int $index) => [
+        return array_values($players->values()->map(fn (AttentionPlayer $player, int $index) => [
             'id' => $player->id,
             'position' => $index + 1,
             'nickname' => $player->nickname,
@@ -140,7 +140,7 @@ class AttentionReport
             'correct_rounds' => $player->correct_rounds,
             'answered' => $player->rounds->count(),
             'finished' => $player->finished_at !== null,
-        ])->all();
+        ])->all());
     }
 
     /**

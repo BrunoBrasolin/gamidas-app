@@ -16,6 +16,7 @@ Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React
 - **Tempo** (`/time`, privado de cada usuário): categorias (um trabalho ou cliente por categoria), planilha de horas por dia × categoria (semana e mês) com tempo em h:mm:ss e nota em Markdown em cada célula, e relatórios de tempo registrado.
 - **Base de Conhecimento** (`/knowledge`, privado de cada usuário): matérias em forma de livros (capa, cor, fixar, arquivar, ordem manual), categorias opcionais com subcategorias, páginas escritas num editor rico (atalhos de Markdown e barra de formatação, tabelas, imagens entre parágrafos e arquivos anexados — PDF, PowerPoint, Word, Excel), anexos da própria matéria (slides de aula, apostilas) e uma lista de todos os arquivos com a matéria de cada um (`/knowledge/files`), leitor embutido de PDF, apresentações e documentos do Word que retoma na página onde você parou, salvamento automático, modo de leitura com sumário, tamanho de letra e largura ajustáveis, marcadores, status de estudo e busca no texto das páginas.
 - **Shows** (`/shows`, compartilhado pela casa): shows que vocês foram, com banda, nome da tour, local, data, setlist, shows de abertura (cada um com seu setlist) link do álbum do Google Fotos e link da playlist do Spotify; lista por ano com busca e totais de shows, bandas, locais e músicas.
+- **Assistidos** (`/watched`, privado de cada usuário): filmes, episódios e vídeos terminados no Jellyfin, registrados automaticamente pelo plugin Webhook; lista por ano e mês com busca e totais de filmes, episódios, séries e tempo assistido.
 
 ## Requisitos
 
@@ -249,6 +250,17 @@ Em **Settings › Secrets and variables › Actions**:
 - Os links do álbum e da playlist precisam ser `https` (ex.: o link de compartilhamento do Google Fotos / do Spotify) e abrem em nova aba.
 - Nos totais, bandas contam atrações principais e aberturas uma vez cada, ignorando maiúsculas e acentos; locais idem.
 - **Importação do site antigo**: `php artisan shows:import [residência] [--from=url-ou-arquivo] [--dry-run]` lê a página do GitHub Pages (padrão `https://brunobrasolin.github.io/shows/`) e importa para a residência informada (sem id: a única que existe, ou escolhida numa lista): cada `h1` "Banda | Tour" é um show, com `Data: dd/mm/aaaa`, `Local:` e o setlist; cada título menor seguinte ("Banda | Show Abertura") é uma abertura. Shows que a residência já tem (mesma banda e data) são pulados, então dá para rodar de novo. Se o servidor não alcançar o site, passe um arquivo HTML salvo em `--from`.
+
+### Assistidos (Jellyfin)
+
+- Itens assistidos (`watched_items`) e a conexão com o Jellyfin (`jellyfin_connections`) pertencem a **um usuário**: cada pessoa vê só o próprio histórico; itens alheios respondem **404**.
+- O Jellyfin roda na rede de casa e **envia** os eventos para o Gamidas (o servidor nunca acessa o Jellyfin). Em `/watched`, "Gerar token" cria um token de 48 caracteres mostrado **uma única vez**; só o SHA-256 dele fica no banco. Gerar outro invalida o anterior; "Desconectar" apaga a conexão, mas não o histórico.
+- No Jellyfin: instalar o plugin **Webhook**, criar um **Generic Destination** com a URL `https://<domínio>/api/webhooks/jellyfin`, marcar só **Playback Stop**, filtrar pelo próprio usuário (cada membro cria o seu destino com o seu token), tipos Movies, Episodes e Videos, marcar **Send All Properties** e adicionar o header `X-Gamidas-Token: <token>` (também aceita `Authorization: Bearer <token>`).
+- O endpoint (`routes/api.php`) não usa sessão nem CSRF, é limitado a 120 requisições por minuto por IP e responde: **401** para token ausente ou inválido; **422** quando o corpo não é um evento do Jellyfin (sem `NotificationType`, por exemplo com "Send All Properties" desligado) ou falta `ItemId`/`Name`; **200** com `recorded`, `duplicate` ou `ignored`. Qualquer evento autenticado atualiza "último evento recebido".
+- Só é registrado `PlaybackStop` com `PlayedToCompletion` (o Jellyfin marca ao passar do ponto de "assistido") de filmes, episódios e vídeos (`Video`, `MusicVideo`); o resto (pausas, reprodução incompleta, música, audiolivros) é ignorado. Valores podem vir como JSON ou texto (template próprio).
+- O horário vem de `UtcTimestamp` convertido para `America/Sao_Paulo` (ausente, ilegível ou no futuro: agora). Um item conta **uma vez por dia local** (índice único usuário + item + dia), então eventos repetidos não duplicam; assistir de novo em outro dia registra outra vez.
+- A duração vem de `RunTimeTicks` (ou `RunTime` "hh:mm:ss"); o tempo assistido nos totais soma a duração dos itens, não o tempo real de tela. Séries contam uma vez cada, ignorando maiúsculas e acentos.
+- Eventos enviados com o site fora do ar (por exemplo durante o deploy) se perdem: o plugin não reenvia. Um item pode ser removido do histórico manualmente.
 
 ### Base de Conhecimento
 

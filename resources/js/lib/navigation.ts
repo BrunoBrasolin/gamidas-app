@@ -105,8 +105,7 @@ export const timeNavItems: NavItem[] = [
 ];
 
 /**
- * Leisure: concerts of the household and what the user watched on Jellyfin
- * (private to each user).
+ * Leisure: concerts of the household and what it watched on Jellyfin.
  */
 export const showNavItems: NavItem[] = [
     {

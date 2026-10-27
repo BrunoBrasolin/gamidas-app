@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -45,6 +46,30 @@ class Household extends Model
     public function showChecklistItems(): HasMany
     {
         return $this->hasMany(ShowChecklistItem::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<WatchedItem, $this>
+     */
+    public function watchedItems(): HasMany
+    {
+        return $this->hasMany(WatchedItem::class);
+    }
+
+    /**
+     * @return HasMany<WatchProgress, $this>
+     */
+    public function watchProgress(): HasMany
+    {
+        return $this->hasMany(WatchProgress::class);
+    }
+
+    /**
+     * @return HasOne<JellyfinConnection, $this>
+     */
+    public function jellyfinConnection(): HasOne
+    {
+        return $this->hasOne(JellyfinConnection::class);
     }
 
     /**

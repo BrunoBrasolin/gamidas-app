@@ -3,6 +3,7 @@
 namespace Tests\Feature\Watched;
 
 use App\Enums\WatchType;
+use App\Models\Household;
 use App\Models\JellyfinConnection;
 use App\Models\WatchedItem;
 use App\Services\WatchHistoryService;
@@ -24,7 +25,7 @@ class JellyfinWebhookTest extends TestCase
 
         Date::setTestNow('2026-10-26 12:00:00');
         $this->createHousehold();
-        $this->token = app(WatchHistoryService::class)->issueToken($this->bruno);
+        $this->token = app(WatchHistoryService::class)->issueToken($this->household);
     }
 
     protected function tearDown(): void
@@ -52,6 +53,8 @@ class JellyfinWebhookTest extends TestCase
             'RunTimeTicks' => 101_640_000_000,
             'PlayedToCompletion' => true,
             'UtcTimestamp' => '2026-10-21T01:30:00.0000000Z',
+            'Provider_tmdb' => '157336',
+            'Provider_imdb' => 'tt0816692',
             ...$overrides,
         ];
     }
@@ -64,21 +67,23 @@ class JellyfinWebhookTest extends TestCase
         return $this->postJson(route('webhooks.jellyfin'), $payload, ['X-Gamidas-Token' => $token ?? $this->token]);
     }
 
-    public function test_a_completed_movie_is_recorded_for_the_token_owner(): void
+    public function test_a_completed_movie_is_recorded_for_the_household(): void
     {
         $this->send($this->movie())->assertOk()->assertExactJson(['status' => 'recorded']);
 
         $item = WatchedItem::query()->sole();
-        $this->assertSame($this->bruno->id, $item->user_id);
+        $this->assertSame($this->household->id, $item->household_id);
+        $this->assertSame('bruno', $item->viewer);
         $this->assertSame(WatchType::Movie, $item->type);
         $this->assertSame('Interestelar', $item->title);
         $this->assertSame(2014, $item->year);
         $this->assertSame(10_164, $item->runtime_seconds);
         $this->assertNull($item->series_name);
+        $this->assertSame(['imdb' => 'tt0816692', 'tmdb' => '157336'], $item->provider_ids);
         // 01:30 UTC is still the previous evening in São Paulo.
         $this->assertSame('2026-10-20 22:30:00', $item->watched_at->format('Y-m-d H:i:s'));
         $this->assertSame('2026-10-20', $item->watched_on->toDateString());
-        $this->assertNotNull($this->bruno->jellyfinConnection?->last_received_at);
+        $this->assertNotNull($this->household->jellyfinConnection?->last_received_at);
     }
 
     public function test_a_bearer_token_is_accepted_too(): void
@@ -98,7 +103,7 @@ class JellyfinWebhookTest extends TestCase
 
     public function test_issuing_a_new_token_disables_the_previous_one(): void
     {
-        $new = app(WatchHistoryService::class)->issueToken($this->bruno);
+        $new = app(WatchHistoryService::class)->issueToken($this->household);
 
         $this->send($this->movie())->assertUnauthorized();
         $this->send($this->movie(), $new)->assertOk();
@@ -137,14 +142,37 @@ class JellyfinWebhookTest extends TestCase
             ->map(fn (WatchedItem $item) => $item->watched_on->toDateString())->all());
     }
 
-    public function test_unfinished_playbacks_other_events_and_music_are_ignored(): void
+    public function test_every_member_counts_and_an_item_watched_by_both_on_a_day_counts_once(): void
+    {
+        $this->send($this->movie())->assertJson(['status' => 'recorded']);
+        $this->send($this->movie(['NotificationUsername' => 'leticia', 'UtcTimestamp' => '2026-10-21T02:30:00Z']))->assertJson(['status' => 'duplicate']);
+        $this->send($this->movie(['NotificationUsername' => 'leticia', 'ItemId' => 'outro', 'Name' => 'Duna']))->assertJson(['status' => 'recorded']);
+
+        $this->assertSame(['bruno', 'leticia'], WatchedItem::query()->orderBy('id')->pluck('viewer')->all());
+        $this->assertSame([$this->household->id], WatchedItem::query()->distinct()->pluck('household_id')->all());
+    }
+
+    public function test_tokens_of_other_households_record_there(): void
+    {
+        $outsider = $this->createOutsider();
+        /** @var Household $other */
+        $other = $outsider->household();
+        $theirs = app(WatchHistoryService::class)->issueToken($other);
+
+        $this->send($this->movie(), $theirs)->assertJson(['status' => 'recorded']);
+
+        $this->assertSame($other->id, WatchedItem::query()->sole()->household_id);
+        $this->assertSame(0, $this->household->watchedItems()->count());
+    }
+
+    public function test_barely_started_playbacks_other_events_and_music_are_ignored(): void
     {
         $this->send($this->movie(['PlayedToCompletion' => false]))->assertJson(['status' => 'ignored']);
-        $this->send($this->movie(['NotificationType' => 'PlaybackStart']))->assertJson(['status' => 'ignored']);
+        $this->send($this->movie(['NotificationType' => 'PlaybackProgress']))->assertJson(['status' => 'ignored']);
         $this->send($this->movie(['ItemType' => 'Audio']))->assertJson(['status' => 'ignored']);
 
         $this->assertDatabaseCount('watched_items', 0);
-        $this->assertNotNull($this->bruno->jellyfinConnection?->last_received_at);
+        $this->assertNotNull($this->household->jellyfinConnection?->last_received_at);
     }
 
     public function test_payloads_that_are_not_jellyfin_events_are_rejected(): void

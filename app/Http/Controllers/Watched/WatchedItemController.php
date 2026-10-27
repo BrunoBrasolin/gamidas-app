@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Watched;
 
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
+use App\Http\Presenters\WatchPresenter;
 use App\Models\WatchedItem;
+use App\Models\WatchProgress;
+use App\Services\Tmdb\MediaDetails;
+use App\Services\Tmdb\TmdbClient;
 use App\Services\WatchHistoryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,27 +30,20 @@ class WatchedItemController extends Controller
 
     public function index(Request $request): Response
     {
-        $user = $this->user($request);
-        $years = $this->history->years($user);
+        $household = $this->household($request);
+        $years = $this->history->years($household);
         $year = in_array($request->integer('year'), $years, true) ? $request->integer('year') : $years[0];
-        $items = $this->history->itemsOfYear($user, $year);
-        $connection = $user->jellyfinConnection;
+        $items = $this->history->itemsOfYear($household, $year);
+        $connection = $household->jellyfinConnection;
 
         return Inertia::render('watched/index', [
             'year' => $year,
             'years' => $years,
-            'items' => $items->map(fn (WatchedItem $item) => [
-                'id' => $item->id,
-                'type' => $item->type->value,
-                'title' => $item->title,
-                'series_name' => $item->series_name,
-                'season_number' => $item->season_number,
-                'episode_number' => $item->episode_number,
-                'year' => $item->year,
-                'runtime_seconds' => $item->runtime_seconds,
-                'watched_at' => $item->watched_at->toIso8601String(),
-                'watched_on' => $item->watched_on->toDateString(),
-            ])->values(),
+            'items' => $items->map(fn (WatchedItem $item) => WatchPresenter::item($item))->values(),
+            'in_progress' => $this->history->inProgress($household)
+                ->map(fn (WatchProgress $progress) => WatchPresenter::progress($progress))->values(),
+            'series' => $this->history->seriesInProgress($household)
+                ->map(fn (WatchedItem $item) => WatchPresenter::item($item))->values(),
             'stats' => $this->history->stats($items),
             'jellyfin' => [
                 'connected' => $connection !== null,
@@ -54,6 +51,21 @@ class WatchedItemController extends Controller
                 'webhook_url' => route('webhooks.jellyfin'),
                 'new_token' => $request->session()->get(self::NEW_TOKEN),
             ],
+        ]);
+    }
+
+    /**
+     * The item's page, with its poster, synopsis and cast from TMDB.
+     */
+    public function show(WatchedItem $item, MediaDetails $details, TmdbClient $tmdb): Response
+    {
+        Gate::authorize('view', $item);
+
+        return Inertia::render('watched/show', [
+            'item' => WatchPresenter::item($item),
+            'progress' => null,
+            'details' => $details->for($item),
+            'tmdb_configured' => $tmdb->configured(),
         ]);
     }
 

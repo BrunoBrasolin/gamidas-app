@@ -110,22 +110,6 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
-     * @return HasMany<WatchedItem, $this>
-     */
-    public function watchedItems(): HasMany
-    {
-        return $this->hasMany(WatchedItem::class);
-    }
-
-    /**
-     * @return HasOne<JellyfinConnection, $this>
-     */
-    public function jellyfinConnection(): HasOne
-    {
-        return $this->hasOne(JellyfinConnection::class);
-    }
-
-    /**
      * The id of the user's household, or null when they belong to none.
      */
     public function householdId(): ?int

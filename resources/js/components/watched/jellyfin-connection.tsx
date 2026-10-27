@@ -78,7 +78,7 @@ export function JellyfinConnectionCard({ jellyfin }: { jellyfin: Connection }) {
                         ? jellyfin.last_received_at
                             ? `Último evento recebido em ${formatDateTime(jellyfin.last_received_at)}.`
                             : 'Nenhum evento recebido ainda.'
-                        : 'O plugin Webhook do Jellyfin avisa o Gamidas quando você termina um filme ou episódio.'}
+                        : 'O plugin Webhook do Jellyfin avisa o Gamidas quando alguém da casa começa, para ou termina um filme ou episódio. Uma conexão vale para a casa toda.'}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -110,10 +110,11 @@ export function JellyfinConnectionCard({ jellyfin }: { jellyfin: Connection }) {
                         Cole a URL acima em <strong>Webhook Url</strong>.
                     </li>
                     <li>
-                        Marque só <strong>Playback Stop</strong> nos tipos de
-                        notificação, o seu usuário em{' '}
-                        <strong>User Filter</strong> e os tipos Movies, Episodes
-                        e Videos.
+                        Marque só <strong>Playback Start</strong> e{' '}
+                        <strong>Playback Stop</strong> nos tipos de notificação
+                        e os tipos Movies, Episodes e Videos. Deixe o{' '}
+                        <strong>User Filter</strong> vazio para contar todos da
+                        casa.
                     </li>
                     <li>
                         Marque <strong>Send All Properties</strong>.
@@ -121,7 +122,7 @@ export function JellyfinConnectionCard({ jellyfin }: { jellyfin: Connection }) {
                     <li>
                         Em <strong>Headers</strong>, adicione a chave{' '}
                         <code className="font-mono">X-Gamidas-Token</code> com o
-                        seu token como valor e salve.
+                        token como valor e salve.
                     </li>
                 </ol>
 

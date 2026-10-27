@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\WatchType;
-use App\Models\User;
+use App\Models\Household;
 use App\Models\WatchedItem;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,7 +18,8 @@ class WatchedItemFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
+            'household_id' => Household::factory(),
+            'viewer' => 'bruno',
             'type' => WatchType::Movie,
             'title' => fake()->words(3, true),
             'year' => 2024,

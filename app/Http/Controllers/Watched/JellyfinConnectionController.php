@@ -9,8 +9,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 /**
- * Issues and revokes the signed-in user's Jellyfin webhook token. A new token
- * is flashed to the session so the page shows it once.
+ * Issues and revokes the household's Jellyfin webhook token; any member may.
+ * A new token is flashed to the session so the page shows it once.
  */
 class JellyfinConnectionController extends Controller
 {
@@ -23,7 +23,7 @@ class JellyfinConnectionController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $token = $this->history->issueToken($this->user($request));
+        $token = $this->history->issueToken($this->household($request));
 
         $request->session()->flash(WatchedItemController::NEW_TOKEN, $token);
         $this->toast('Token gerado. Copie agora: ele não será mostrado de novo.');
@@ -33,7 +33,7 @@ class JellyfinConnectionController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
-        $this->history->revokeToken($this->user($request));
+        $this->history->revokeToken($this->household($request));
 
         $this->toast('Jellyfin desconectado.');
 

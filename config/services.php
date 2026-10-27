@@ -28,6 +28,14 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Posters, cast and synopses of what the household watches. Use the
+    // "API Read Access Token" of a themoviedb.org account; without it the
+    // watch history shows only what Jellyfin sends.
+    'tmdb' => [
+        'token' => env('TMDB_TOKEN'),
+        'language' => env('TMDB_LANGUAGE', 'pt-BR'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

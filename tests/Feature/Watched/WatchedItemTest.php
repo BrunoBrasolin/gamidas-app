@@ -34,15 +34,16 @@ class WatchedItemTest extends TestCase
         $this->get(route('watched.index'))->assertRedirect(route('login'));
     }
 
-    public function test_the_page_lists_only_the_users_items_of_the_year(): void
+    public function test_the_page_lists_the_households_items_of_the_year_for_every_member(): void
     {
-        WatchedItem::factory()->for($this->bruno)->create(['title' => 'Interestelar', 'runtime_seconds' => 10_164]);
-        WatchedItem::factory()->for($this->bruno)->episode('Breaking Bad', 5, 14)->create(['watched_at' => '2026-10-21 22:00:00', 'watched_on' => '2026-10-21']);
-        WatchedItem::factory()->for($this->bruno)->episode('breaking bad', 5, 15)->create(['watched_at' => '2026-10-22 22:00:00', 'watched_on' => '2026-10-22']);
-        WatchedItem::factory()->for($this->bruno)->create(['watched_at' => '2024-03-01 20:00:00', 'watched_on' => '2024-03-01']);
-        WatchedItem::factory()->for($this->leticia)->create();
+        WatchedItem::factory()->for($this->household)->create(['title' => 'Interestelar', 'runtime_seconds' => 10_164]);
+        WatchedItem::factory()->for($this->household)->episode('Breaking Bad', 5, 14)->create(['watched_at' => '2026-10-21 22:00:00', 'watched_on' => '2026-10-21']);
+        WatchedItem::factory()->for($this->household)->episode('breaking bad', 5, 15)->create(['viewer' => 'leticia', 'watched_at' => '2026-10-22 22:00:00', 'watched_on' => '2026-10-22']);
+        WatchedItem::factory()->for($this->household)->create(['watched_at' => '2024-03-01 20:00:00', 'watched_on' => '2024-03-01']);
+        $outsider = $this->createOutsider();
+        WatchedItem::factory()->create(['household_id' => $outsider->householdId()]);
 
-        $this->actingAs($this->bruno)
+        $this->actingAs($this->leticia)
             ->get(route('watched.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -51,6 +52,7 @@ class WatchedItemTest extends TestCase
                 ->where('years', [2026, 2025, 2024])
                 ->has('items', 3)
                 ->where('items.0.series_name', 'breaking bad')
+                ->where('items.0.viewer', 'leticia')
                 ->where('items.0.episode_number', 15)
                 ->where('items.2.title', 'Interestelar')
                 ->where('stats', ['items' => 3, 'movies' => 1, 'episodes' => 2, 'series' => 1, 'seconds' => 15_564])
@@ -85,20 +87,21 @@ class WatchedItemTest extends TestCase
         $this->assertIsString($token);
         $this->assertSame(48, strlen($token));
         $connection = JellyfinConnection::query()->sole();
-        $this->assertSame($this->bruno->id, $connection->user_id);
+        $this->assertSame($this->household->id, $connection->household_id);
         $this->assertSame(hash('sha256', $token), $connection->token_hash);
 
-        $this->actingAs($this->bruno)
+        // The connection is the household's: the other member sees it too.
+        $this->actingAs($this->leticia)
             ->get(route('watched.index'))
-            ->assertInertia(fn (Assert $page) => $page->where('jellyfin.new_token', null));
+            ->assertInertia(fn (Assert $page) => $page->where('jellyfin.connected', true)->where('jellyfin.new_token', null));
     }
 
-    public function test_disconnecting_removes_the_token_but_keeps_the_history(): void
+    public function test_any_member_can_disconnect_and_the_history_stays(): void
     {
         $this->actingAs($this->bruno)->post(route('watched.jellyfin.store'));
-        WatchedItem::factory()->for($this->bruno)->create();
+        WatchedItem::factory()->for($this->household)->create();
 
-        $this->actingAs($this->bruno)
+        $this->actingAs($this->leticia)
             ->delete(route('watched.jellyfin.destroy'))
             ->assertRedirect(route('watched.index'));
 
@@ -106,15 +109,15 @@ class WatchedItemTest extends TestCase
         $this->assertDatabaseCount('watched_items', 1);
     }
 
-    public function test_items_can_be_removed_only_by_their_owner(): void
+    public function test_items_can_be_removed_by_any_member_of_their_household(): void
     {
-        $mine = WatchedItem::factory()->for($this->bruno)->create();
-        $theirs = WatchedItem::factory()->for($this->leticia)->create();
+        $ours = WatchedItem::factory()->for($this->household)->create(['viewer' => 'bruno']);
+        $theirs = WatchedItem::factory()->create(['household_id' => $this->createOutsider()->householdId()]);
 
         $this->actingAs($this->bruno)->delete(route('watched.destroy', $theirs))->assertNotFound();
-        $this->actingAs($this->bruno)->delete(route('watched.destroy', $mine))->assertRedirect();
+        $this->actingAs($this->leticia)->delete(route('watched.destroy', $ours))->assertRedirect();
 
-        $this->assertModelMissing($mine);
+        $this->assertModelMissing($ours);
         $this->assertModelExists($theirs);
     }
 }

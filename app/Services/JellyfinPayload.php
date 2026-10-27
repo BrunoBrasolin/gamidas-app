@@ -62,19 +62,53 @@ final class JellyfinPayload
      */
     public function runtimeSeconds(): ?int
     {
-        $ticks = $this->data['RunTimeTicks'] ?? null;
-
-        if (is_string($ticks) && preg_match('/^\d+$/', $ticks) === 1) {
-            $ticks = (int) $ticks;
-        }
-
-        $seconds = is_int($ticks) ? intdiv($ticks, self::TICKS_PER_SECOND) : null;
+        $seconds = $this->ticksToSeconds('RunTimeTicks');
 
         if ($seconds === null && preg_match('/^(\d+):(\d{2}):(\d{2})/', $this->string('RunTime') ?? '', $parts) === 1) {
             $seconds = (int) $parts[1] * 3600 + (int) $parts[2] * 60 + (int) $parts[3];
         }
 
         return $seconds !== null && $seconds > 0 && $seconds <= 1_000_000 ? $seconds : null;
+    }
+
+    /**
+     * Where playback is or stopped, in seconds (0 at the start).
+     */
+    public function positionSeconds(): int
+    {
+        return min($this->ticksToSeconds('PlaybackPositionTicks') ?? 0, 1_000_000);
+    }
+
+    /**
+     * The external ids Jellyfin knows the item by ("Provider_tmdb",
+     * "Provider_imdb"…), keyed by provider in lowercase.
+     *
+     * @return array<string, string>
+     */
+    public function providerIds(): array
+    {
+        $ids = [];
+
+        foreach ($this->data as $key => $value) {
+            if (is_string($key) && preg_match('/^Provider_([A-Za-z0-9]{1,32})$/', $key, $match) === 1 && (is_string($value) || is_int($value)) && trim((string) $value) !== '') {
+                $ids[strtolower($match[1])] = mb_substr(trim((string) $value), 0, 64);
+            }
+        }
+
+        ksort($ids);
+
+        return array_slice($ids, 0, 10, true);
+    }
+
+    private function ticksToSeconds(string $key): ?int
+    {
+        $ticks = $this->data[$key] ?? null;
+
+        if (is_string($ticks) && preg_match('/^\d+$/', $ticks) === 1) {
+            $ticks = (int) $ticks;
+        }
+
+        return is_int($ticks) && $ticks >= 0 ? intdiv($ticks, self::TICKS_PER_SECOND) : null;
     }
 
     /**

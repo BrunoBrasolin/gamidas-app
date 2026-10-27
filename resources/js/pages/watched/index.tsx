@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Clapperboard,
     Clock,
@@ -7,9 +7,8 @@ import {
     Settings2,
     Trash2,
     Tv,
-    Video,
+    User,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
@@ -19,22 +18,21 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
+import {
+    ContinueWatching,
+    SeriesInProgress,
+} from '@/components/watched/continue-watching';
 import { JellyfinConnectionCard } from '@/components/watched/jellyfin-connection';
 import { capitalize, formatDateTime, formatMonth } from '@/lib/format';
 import { formatDuration } from '@/lib/time';
+import { WATCH_TYPE_ICONS, watchHeading } from '@/lib/watched';
 import watched from '@/routes/watched';
 import type {
     JellyfinConnection,
     WatchedItem,
     WatchedStats,
-    WatchType,
+    WatchProgress,
 } from '@/types';
-
-const TYPE_ICONS: Record<WatchType, LucideIcon> = {
-    movie: Film,
-    episode: Tv,
-    video: Video,
-};
 
 /** Lowercase without accents, for searching. */
 function normalize(text: string): string {
@@ -44,29 +42,8 @@ function normalize(text: string): string {
         .toLowerCase();
 }
 
-/** "T01E03", or whichever part is known. */
-function episodeCode(item: WatchedItem): string | null {
-    const pad = (value: number) => String(value).padStart(2, '0');
-    const parts = [
-        item.season_number !== null ? `T${pad(item.season_number)}` : '',
-        item.episode_number !== null ? `E${pad(item.episode_number)}` : '',
-    ].join('');
-
-    return parts === '' ? null : parts;
-}
-
-function heading(item: WatchedItem): string {
-    if (item.type === 'episode' && item.series_name) {
-        return [item.series_name, episodeCode(item), item.title]
-            .filter(Boolean)
-            .join(' · ');
-    }
-
-    return item.year ? `${item.title} (${item.year})` : item.title;
-}
-
 function ItemCard({ item }: { item: WatchedItem }) {
-    const Icon = TYPE_ICONS[item.type];
+    const Icon = WATCH_TYPE_ICONS[item.type];
 
     return (
         <Card className="py-3">
@@ -76,9 +53,20 @@ function ItemCard({ item }: { item: WatchedItem }) {
                     aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{heading(item)}</p>
+                    <Link
+                        href={watched.show(item.id)}
+                        className="block truncate font-medium hover:underline"
+                    >
+                        {watchHeading(item)}
+                    </Link>
                     <p className="flex flex-wrap gap-x-4 text-sm text-muted-foreground">
                         <span>{formatDateTime(item.watched_at)}</span>
+                        {item.viewer && (
+                            <span className="flex items-center gap-1.5">
+                                <User className="size-3.5" aria-hidden />
+                                {item.viewer}
+                            </span>
+                        )}
                         {item.runtime_seconds !== null && (
                             <span className="flex items-center gap-1.5">
                                 <Clock className="size-3.5" aria-hidden />
@@ -98,7 +86,7 @@ function ItemCard({ item }: { item: WatchedItem }) {
                         </Button>
                     }
                     title="Remover do histórico?"
-                    description={`“${heading(item)}” sai do histórico. Se for assistido de novo, volta a ser registrado.`}
+                    description={`“${watchHeading(item)}” sai do histórico. Se for assistido de novo, volta a ser registrado.`}
                     confirmLabel="Remover"
                     url={watched.destroy.url(item.id)}
                 />
@@ -111,12 +99,16 @@ export default function WatchedIndex({
     year,
     years,
     items,
+    in_progress: inProgress,
+    series,
     stats,
     jellyfin,
 }: {
     year: number;
     years: number[];
     items: WatchedItem[];
+    in_progress: WatchProgress[];
+    series: WatchedItem[];
     stats: WatchedStats;
     jellyfin: JellyfinConnection;
 }) {
@@ -130,7 +122,11 @@ export default function WatchedIndex({
         const groups = new Map<string, WatchedItem[]>();
 
         for (const item of items) {
-            const haystack = [item.title, item.series_name ?? ''];
+            const haystack = [
+                item.title,
+                item.series_name ?? '',
+                item.viewer ?? '',
+            ];
 
             if (
                 needle !== '' &&
@@ -152,7 +148,7 @@ export default function WatchedIndex({
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <PageHeader
                     title="Assistidos"
-                    description="Filmes e episódios que você terminou no Jellyfin."
+                    description="Filmes e episódios que a casa terminou no Jellyfin."
                 >
                     <NativeSelect
                         aria-label="Ano"
@@ -188,6 +184,12 @@ export default function WatchedIndex({
 
                 {showSetup && <JellyfinConnectionCard jellyfin={jellyfin} />}
 
+                {inProgress.length > 0 && (
+                    <ContinueWatching items={inProgress} />
+                )}
+
+                {series.length > 0 && <SeriesInProgress episodes={series} />}
+
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <StatCard
                         title="Assistidos"
@@ -215,8 +217,8 @@ export default function WatchedIndex({
                         title={`Nada assistido em ${year}`}
                         description={
                             jellyfin.connected
-                                ? 'Quando você terminar um filme ou episódio no Jellyfin, ele aparece aqui.'
-                                : 'Conecte o Jellyfin para registrar automaticamente o que você assiste.'
+                                ? 'Quando alguém da casa terminar um filme ou episódio no Jellyfin, ele aparece aqui.'
+                                : 'Conecte o Jellyfin para registrar automaticamente o que a casa assiste.'
                         }
                     />
                 ) : (
@@ -228,7 +230,7 @@ export default function WatchedIndex({
                             />
                             <Input
                                 type="search"
-                                placeholder="Buscar filme, série ou episódio"
+                                placeholder="Buscar filme, série, episódio ou pessoa"
                                 aria-label="Buscar no histórico"
                                 className="pl-9"
                                 value={query}

@@ -9,17 +9,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * The link between a user and their Jellyfin server: the hash of the token
- * the webhook sends and when it last delivered an event.
+ * The link between a household and its Jellyfin server: the hash of the
+ * token the webhook sends and when it last delivered an event.
  *
  * @property int $id
- * @property int $user_id
+ * @property int $household_id
  * @property string $token_hash
  * @property CarbonImmutable|null $last_received_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['user_id', 'token_hash', 'last_received_at'])]
+#[Fillable(['household_id', 'token_hash', 'last_received_at'])]
 #[Hidden(['token_hash'])]
 class JellyfinConnection extends Model
 {
@@ -32,11 +32,11 @@ class JellyfinConnection extends Model
     }
 
     /**
-     * @return BelongsTo<User, $this>
+     * @return BelongsTo<Household, $this>
      */
-    public function user(): BelongsTo
+    public function household(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Household::class);
     }
 
     public static function hashToken(string $token): string

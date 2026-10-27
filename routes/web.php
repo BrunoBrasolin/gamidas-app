@@ -27,6 +27,7 @@ use App\Http\Controllers\Time\TimeSheetController;
 use App\Http\Controllers\Time\TimeTimerController;
 use App\Http\Controllers\Watched\JellyfinConnectionController;
 use App\Http\Controllers\Watched\WatchedItemController;
+use App\Http\Controllers\Watched\WatchProgressController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
@@ -125,15 +126,18 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
         Route::put('shows/{show}/checklist/{item}', [ShowChecklistController::class, 'check'])->name('shows.checklist.check');
     });
 
-    // What the user watched on Jellyfin, recorded by its webhook
-    // (routes/api.php). Every entry belongs to the signed-in user.
+    // What the household watched on Jellyfin, recorded by its webhook
+    // (routes/api.php). Shared by every member of the household.
     Route::prefix('watched')->name('watched.')->group(function () {
         Route::get('/', [WatchedItemController::class, 'index'])->name('index');
+        Route::get('progress/{progress}', [WatchProgressController::class, 'show'])->whereNumber('progress')->name('progress.show');
+        Route::get('{item}', [WatchedItemController::class, 'show'])->whereNumber('item')->name('show');
 
         Route::middleware('throttle:finance-writes')->group(function () {
             Route::post('jellyfin', [JellyfinConnectionController::class, 'store'])->name('jellyfin.store');
             Route::delete('jellyfin', [JellyfinConnectionController::class, 'destroy'])->name('jellyfin.destroy');
-            Route::delete('{item}', [WatchedItemController::class, 'destroy'])->name('destroy');
+            Route::delete('progress/{progress}', [WatchProgressController::class, 'destroy'])->whereNumber('progress')->name('progress.destroy');
+            Route::delete('{item}', [WatchedItemController::class, 'destroy'])->whereNumber('item')->name('destroy');
         });
     });
 

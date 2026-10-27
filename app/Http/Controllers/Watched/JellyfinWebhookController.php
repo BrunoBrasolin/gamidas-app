@@ -9,9 +9,9 @@ use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 /**
- * Receives the events of the Jellyfin Webhook plugin. The user is identified
- * by the token in the X-Gamidas-Token header (or a bearer token), since the
- * request comes from the Jellyfin server and carries no session.
+ * Receives the events of the Jellyfin Webhook plugin. The household is
+ * identified by the token in the X-Gamidas-Token header (or a bearer token),
+ * since the request comes from the Jellyfin server and carries no session.
  */
 class JellyfinWebhookController extends Controller
 {

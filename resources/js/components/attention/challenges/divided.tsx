@@ -13,7 +13,7 @@ import { countOptions, randomInt, shuffle } from '@/lib/attention';
 import type { ChallengeOutcome } from '@/types';
 
 const LENGTH = 14;
-const SHOW_MS = 1_100;
+const SHOW_MS = 2_100;
 const GAP_MS = 250;
 const ANSWER_MS = 15_000;
 const NUMBER = 7;

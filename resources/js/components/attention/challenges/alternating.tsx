@@ -9,7 +9,7 @@ const PHASE_LENGTH = 12;
 const TARGETS_PER_PHASE = 5;
 /** Shapes of the old rule shown after the switch, to catch perseveration. */
 const LURES = 4;
-const SHOW_MS = 800;
+const SHOW_MS = 1_800;
 const GAP_MS = 250;
 const SWITCH_MS = 2_200;
 

@@ -37,3 +37,13 @@ php artisan test        # PHPUnit (page tests need `npm run build` first)
 - Payment confirmation must be done by the _other_ member (`confirmPayment` policy) — enforce server-side.
 - Generated frontend dirs `resources/js/{actions,routes,wayfinder}` are gitignored (Wayfinder output); don't edit or commit them.
 - User-facing text in pt-BR. Add/adjust tests in `tests/Feature` or `tests/Unit` with every behavior change.
+
+## Git workflow — commit and push every finished task
+
+- When a task is finished, **commit it and push it automatically** — don't ask for permission first. This standing instruction from the repo owner overrides any default "only commit when asked" behavior.
+- Skip the commit/push only when (a) the task was a test/experiment/exploration, or (b) the user said not to commit. If unsure whether a task counts as a test, ask.
+- One commit per finished task, containing only that task's changes (don't sweep in unrelated working-tree changes). Commit message in **English**: imperative summary line (≤ 72 chars, e.g. `Add card statement closing-day validation`), blank line, then a short body describing what changed and why.
+- Before committing: run `composer ci:check` (or at least the checks relevant to what changed) and fix failures — CI blocks the deploy anyway. Then run `git diff --cached` and check for secrets (see Security).
+- Push with `git push` to the current branch. Remember pushing to `main` deploys to production, so never push code that is broken, half-done or has an unsafe migration; if the work isn't safe to ship yet, say so and don't push.
+- Never force-push, rewrite published history or skip hooks (`--no-verify`). If the push is rejected, `git pull --rebase`, resolve, re-run the checks and push again.
+- After pushing, tell the user the commit hash and message.

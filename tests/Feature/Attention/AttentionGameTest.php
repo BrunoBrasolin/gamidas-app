@@ -126,6 +126,18 @@ class AttentionGameTest extends TestCase
         $this->get('/jogo/NOPE1')->assertNotFound();
     }
 
+    public function test_the_public_pages_are_titled_without_the_app_name(): void
+    {
+        $game = $this->createGame();
+
+        foreach (['/jogo', '/jogo/'.$game->code] as $url) {
+            $this->get($url)
+                ->assertOk()
+                ->assertSee('>Jogo da Atenção</title>', false)
+                ->assertDontSee(config('app.name').'</title>', false);
+        }
+    }
+
     public function test_players_join_with_a_nickname_unique_in_the_room(): void
     {
         $game = $this->createGame();

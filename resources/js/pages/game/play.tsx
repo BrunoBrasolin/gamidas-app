@@ -255,7 +255,7 @@ export default function GamePlay({ game: room, types, scoring }: Props) {
 
     return (
         <GameShell header={header}>
-            <Head title={`${room.title} · Jogo da Atenção`} />
+            <Head title="Jogo da Atenção" />
 
             {stage.name === 'loading' && (
                 <div className="flex flex-1 items-center justify-center text-white/60">

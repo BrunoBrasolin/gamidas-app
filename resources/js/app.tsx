@@ -11,7 +11,15 @@ import KnowledgeFocusLayout from '@/layouts/knowledge/focus-layout';
 const appName = import.meta.env.VITE_APP_NAME || 'Maggie Castle';
 
 void createInertiaApp({
-    title: (title) => (title ? `${title} - ${appName}` : appName),
+    title: (title, page) => {
+        // The public game pages are opened by guests, so they don't carry
+        // the household's name.
+        if (page?.component.startsWith('game/')) {
+            return title || 'Jogo da Atenção';
+        }
+
+        return title ? `${title} - ${appName}` : appName;
+    },
     layout: (name) => {
         switch (true) {
             case name.startsWith('errors/'):

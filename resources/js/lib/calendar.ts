@@ -120,6 +120,9 @@ export const EVENT_ICONS: Record<
     medicine: { label: 'Remédio', emoji: '💊' },
     swimming: { label: 'Natação', emoji: '🏊' },
     gymnastics: { label: 'Ginástica', emoji: '🤸' },
+    nails: { label: 'Unhas', emoji: '💅' },
+    coding: { label: 'Programação', emoji: '👩‍💻' },
+    trash: { label: 'Lixo', emoji: '🗑️' },
 };
 
 export const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];

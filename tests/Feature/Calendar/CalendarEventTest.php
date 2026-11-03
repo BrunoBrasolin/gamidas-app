@@ -79,13 +79,13 @@ class CalendarEventTest extends TestCase
 
     public function test_emoji_icons_are_accepted(): void
     {
-        foreach (['beach', 'surf', 'medicine', 'swimming', 'gymnastics'] as $icon) {
+        foreach (['beach', 'surf', 'medicine', 'swimming', 'gymnastics', 'nails', 'coding', 'trash'] as $icon) {
             $this->actingAs($this->bruno)
                 ->post(route('calendar.events.store'), $this->payload(['icon' => $icon]))
                 ->assertSessionHasNoErrors();
         }
 
-        $this->assertSame(5, CalendarEvent::query()->count());
+        $this->assertSame(8, CalendarEvent::query()->count());
     }
 
     public function test_time_and_description_are_optional(): void

@@ -31,7 +31,10 @@ export type EventIcon =
     | 'surf'
     | 'medicine'
     | 'swimming'
-    | 'gymnastics';
+    | 'gymnastics'
+    | 'nails'
+    | 'coding'
+    | 'trash';
 
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 

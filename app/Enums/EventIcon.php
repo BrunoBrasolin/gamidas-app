@@ -30,4 +30,7 @@ enum EventIcon: string
     case Medicine = 'medicine';
     case Swimming = 'swimming';
     case Gymnastics = 'gymnastics';
+    case Nails = 'nails';
+    case Coding = 'coding';
+    case Trash = 'trash';
 }

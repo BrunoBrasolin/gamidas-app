@@ -1,7 +1,32 @@
 import { Repeat } from 'lucide-react';
 import { EVENT_COLORS, EVENT_ICONS } from '@/lib/calendar';
 import { cn } from '@/lib/utils';
-import type { CalendarEvent } from '@/types';
+import type { CalendarEvent, EventIcon as EventIconName } from '@/types';
+
+/**
+ * Renders an event icon: the Lucide icon, or the emoji for emoji-based ones.
+ */
+export function EventGlyph({
+    name,
+    className,
+    emojiClassName,
+}: {
+    name: EventIconName;
+    className?: string;
+    emojiClassName?: string;
+}) {
+    const { icon: Icon, emoji } = EVENT_ICONS[name];
+
+    if (Icon) {
+        return <Icon className={className} aria-hidden />;
+    }
+
+    return (
+        <span className={cn('leading-none', emojiClassName)} aria-hidden>
+            {emoji}
+        </span>
+    );
+}
 
 /**
  * The event's icon inside a tile tinted with its badge color.
@@ -13,8 +38,6 @@ export function EventIcon({
     event: Pick<CalendarEvent, 'color' | 'icon'>;
     className?: string;
 }) {
-    const Icon = EVENT_ICONS[event.icon].icon;
-
     return (
         <span
             className={cn(
@@ -24,7 +47,11 @@ export function EventIcon({
             )}
             aria-hidden
         >
-            <Icon className={cn('size-4', EVENT_COLORS[event.color].icon)} />
+            <EventGlyph
+                name={event.icon}
+                className={cn('size-4', EVENT_COLORS[event.color].icon)}
+                emojiClassName="text-base"
+            />
         </span>
     );
 }
@@ -41,7 +68,6 @@ export function EventChip({
     onClick?: () => void;
     className?: string;
 }) {
-    const Icon = EVENT_ICONS[event.icon].icon;
     const label = event.time ? `${event.time} ${event.title}` : event.title;
 
     return (
@@ -58,12 +84,13 @@ export function EventChip({
                 className,
             )}
         >
-            <Icon
+            <EventGlyph
+                name={event.icon}
                 className={cn(
                     'size-3 shrink-0 print:mt-px',
                     EVENT_COLORS[event.color].icon,
                 )}
-                aria-hidden
+                emojiClassName="shrink-0 text-xs print:mt-px"
             />
             {event.time && (
                 <span className="shrink-0 font-semibold tabular-nums">

@@ -26,7 +26,12 @@ export type EventIcon =
     | 'reminder'
     | 'pet'
     | 'sport'
-    | 'music';
+    | 'music'
+    | 'beach'
+    | 'surf'
+    | 'medicine'
+    | 'swimming'
+    | 'gymnastics';
 
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 

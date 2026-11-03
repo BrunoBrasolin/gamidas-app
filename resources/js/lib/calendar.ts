@@ -96,7 +96,7 @@ export const EVENT_COLORS: Record<
  */
 export const EVENT_ICONS: Record<
     EventIcon,
-    { label: string; icon: LucideIcon }
+    { label: string; icon?: LucideIcon; emoji?: string }
 > = {
     calendar: { label: 'Evento', icon: Calendar },
     reminder: { label: 'Lembrete', icon: Bell },
@@ -115,6 +115,11 @@ export const EVENT_ICONS: Record<
     money: { label: 'Finanças', icon: Wallet },
     pet: { label: 'Pet', icon: PawPrint },
     music: { label: 'Show', icon: Music },
+    beach: { label: 'Praia', emoji: '🏖️' },
+    surf: { label: 'Surf', emoji: '🏄' },
+    medicine: { label: 'Remédio', emoji: '💊' },
+    swimming: { label: 'Natação', emoji: '🏊' },
+    gymnastics: { label: 'Ginástica', emoji: '🤸' },
 };
 
 export const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];

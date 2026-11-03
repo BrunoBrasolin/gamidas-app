@@ -77,6 +77,17 @@ class CalendarEventTest extends TestCase
         $this->assertSame(EventIcon::Cake, $event->icon);
     }
 
+    public function test_emoji_icons_are_accepted(): void
+    {
+        foreach (['beach', 'surf', 'medicine', 'swimming', 'gymnastics'] as $icon) {
+            $this->actingAs($this->bruno)
+                ->post(route('calendar.events.store'), $this->payload(['icon' => $icon]))
+                ->assertSessionHasNoErrors();
+        }
+
+        $this->assertSame(5, CalendarEvent::query()->count());
+    }
+
     public function test_time_and_description_are_optional(): void
     {
         $this->actingAs($this->bruno)

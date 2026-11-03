@@ -13,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { EventGlyph } from '@/components/calendar/event-badge';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
@@ -374,12 +375,14 @@ function EventForm({
                                                 : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                                         )}
                                     >
-                                        <option.icon
+                                        <EventGlyph
+                                            name={value}
                                             className={cn(
                                                 'size-4',
                                                 icon === value &&
                                                     EVENT_COLORS[color].icon,
                                             )}
+                                            emojiClassName="text-base"
                                         />
                                     </span>
                                 </label>

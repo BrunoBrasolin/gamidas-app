@@ -267,7 +267,7 @@ function MonthGrid({
                 ))}
             </div>
             <div
-                className="grid auto-rows-fr grid-cols-7 gap-px border-t print:h-[155mm] print:grid-rows-[repeat(var(--weeks),minmax(0,1fr))] print:border-neutral-400"
+                className="grid auto-rows-fr grid-cols-7 gap-px border-t print:grid-rows-[repeat(var(--weeks),minmax(26mm,auto))] print:border-neutral-400"
                 style={{ '--weeks': weeks.length } as CSSProperties}
             >
                 {weeks.flat().map((date) => {
@@ -280,7 +280,7 @@ function MonthGrid({
                         <div
                             key={date}
                             className={cn(
-                                'group relative flex min-h-16 min-w-0 flex-col gap-1 bg-card p-1 md:min-h-28 md:p-1.5 print:min-h-0 print:overflow-hidden print:bg-white',
+                                'group relative flex min-h-16 min-w-0 flex-col gap-1 bg-card p-1 md:min-h-28 md:p-1.5 print:min-h-0 print:break-inside-avoid print:overflow-hidden print:bg-white',
                                 outside &&
                                     'bg-muted/60 dark:bg-card print:bg-neutral-50',
                             )}

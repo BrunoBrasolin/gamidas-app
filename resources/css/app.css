@@ -188,6 +188,14 @@
         -webkit-print-color-adjust: exact;
     }
 
+    html,
+    body {
+        width: auto !important;
+        min-width: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
     [data-slot='sidebar'],
     [data-sonner-toaster] {
         display: none !important;
@@ -200,6 +208,10 @@
         margin: 0 !important;
         border-radius: 0 !important;
         box-shadow: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
     }
 }
 

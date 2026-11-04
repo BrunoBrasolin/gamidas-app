@@ -314,21 +314,23 @@ function MonthGrid({
                                     outside && 'opacity-60',
                                 )}
                             >
-                                {dayEvents
-                                    .slice(0, VISIBLE_PER_DAY)
-                                    .map((event) => (
-                                        <EventChip
-                                            key={eventKey(event)}
-                                            event={event}
-                                            onClick={() => onEventClick(event)}
-                                            className="print:text-[7.5pt]"
-                                        />
-                                    ))}
+                                {dayEvents.map((event, index) => (
+                                    <EventChip
+                                        key={eventKey(event)}
+                                        event={event}
+                                        onClick={() => onEventClick(event)}
+                                        className={cn(
+                                            'print:text-[7.5pt]',
+                                            index >= VISIBLE_PER_DAY &&
+                                                'hidden print:flex',
+                                        )}
+                                    />
+                                ))}
                                 {hidden > 0 && (
                                     <button
                                         type="button"
                                         onClick={() => onShowDay(date)}
-                                        className="w-fit rounded-sm px-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground print:text-[7.5pt]"
+                                        className="w-fit rounded-sm px-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground print:hidden"
                                     >
                                         +{hidden} mais
                                     </button>

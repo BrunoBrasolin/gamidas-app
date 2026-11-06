@@ -1,7 +1,7 @@
-import { router } from "@inertiajs/react";
-import { Pause, Play, Plus, RotateCcw, SquareArrowDown } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { router } from '@inertiajs/react';
+import { Pause, Play, Plus, RotateCcw, SquareArrowDown } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -9,11 +9,11 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { formatClock } from "@/lib/time";
-import time from "@/routes/time";
-import type { CategoryTimer, TimerList } from "@/types";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { formatClock } from '@/lib/time';
+import time from '@/routes/time';
+import type { CategoryTimer, TimerList } from '@/types';
 
 /**
  * One stopwatch per category. The server owns the clock; the browser counts
@@ -70,7 +70,7 @@ function TimerCard({ item, now }: { item: CategoryTimer; now: number }) {
             : Math.max(0, Math.floor((now - item.started_at) / 1000)));
     const category = { category: item.category_id };
 
-    const post = (action: "start" | "pause" | "commit") =>
+    const post = (action: 'start' | 'pause' | 'commit') =>
         router.post(
             time.timer[action].url(category),
             {},
@@ -95,7 +95,7 @@ function TimerCard({ item, now }: { item: CategoryTimer; now: number }) {
                         size="icon"
                         variant="outline"
                         aria-label={`Pausar ${item.name}`}
-                        onClick={() => post("pause")}
+                        onClick={() => post('pause')}
                     >
                         <Pause />
                     </Button>
@@ -104,7 +104,7 @@ function TimerCard({ item, now }: { item: CategoryTimer; now: number }) {
                         size="icon"
                         aria-label={`Iniciar ${item.name}`}
                         disabled={item.archived}
-                        onClick={() => post("start")}
+                        onClick={() => post('start')}
                     >
                         <Play />
                     </Button>
@@ -116,7 +116,7 @@ function TimerCard({ item, now }: { item: CategoryTimer; now: number }) {
                     aria-label={`Lançar ${item.name} na planilha de hoje`}
                     title="Lançar na planilha de hoje"
                     disabled={elapsed === 0}
-                    onClick={() => post("commit")}
+                    onClick={() => post('commit')}
                 >
                     <SquareArrowDown />
                 </Button>
@@ -144,7 +144,7 @@ const PRESETS = [5, 10, 15, 20, 30, 60];
 /** Adds forgotten minutes to a timer, from a preset or a custom amount. */
 function AddTime({ item }: { item: CategoryTimer }) {
     const [open, setOpen] = useState(false);
-    const [custom, setCustom] = useState("");
+    const [custom, setCustom] = useState('');
 
     const add = (minutes: number) => {
         if (!Number.isInteger(minutes) || minutes < 1) {
@@ -158,7 +158,7 @@ function AddTime({ item }: { item: CategoryTimer }) {
                 preserveScroll: true,
                 onSuccess: () => {
                     setOpen(false);
-                    setCustom("");
+                    setCustom('');
                 },
             },
         );

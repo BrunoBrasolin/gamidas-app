@@ -1,10 +1,19 @@
-import { router } from '@inertiajs/react';
-import { Pause, Play, RotateCcw, SquareArrowDown } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { formatClock } from '@/lib/time';
-import time from '@/routes/time';
-import type { CategoryTimer, TimerList } from '@/types';
+import { router } from "@inertiajs/react";
+import { Pause, Play, Plus, RotateCcw, SquareArrowDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { formatClock } from "@/lib/time";
+import time from "@/routes/time";
+import type { CategoryTimer, TimerList } from "@/types";
 
 /**
  * One stopwatch per category. The server owns the clock; the browser counts
@@ -61,7 +70,7 @@ function TimerCard({ item, now }: { item: CategoryTimer; now: number }) {
             : Math.max(0, Math.floor((now - item.started_at) / 1000)));
     const category = { category: item.category_id };
 
-    const post = (action: 'start' | 'pause' | 'commit') =>
+    const post = (action: "start" | "pause" | "commit") =>
         router.post(
             time.timer[action].url(category),
             {},
@@ -86,7 +95,7 @@ function TimerCard({ item, now }: { item: CategoryTimer; now: number }) {
                         size="icon"
                         variant="outline"
                         aria-label={`Pausar ${item.name}`}
-                        onClick={() => post('pause')}
+                        onClick={() => post("pause")}
                     >
                         <Pause />
                     </Button>
@@ -95,18 +104,19 @@ function TimerCard({ item, now }: { item: CategoryTimer; now: number }) {
                         size="icon"
                         aria-label={`Iniciar ${item.name}`}
                         disabled={item.archived}
-                        onClick={() => post('start')}
+                        onClick={() => post("start")}
                     >
                         <Play />
                     </Button>
                 )}
+                <AddTime item={item} />
                 <Button
                     size="icon"
                     variant="outline"
                     aria-label={`Lançar ${item.name} na planilha de hoje`}
                     title="Lançar na planilha de hoje"
                     disabled={elapsed === 0}
-                    onClick={() => post('commit')}
+                    onClick={() => post("commit")}
                 >
                     <SquareArrowDown />
                 </Button>
@@ -126,5 +136,88 @@ function TimerCard({ item, now }: { item: CategoryTimer; now: number }) {
                 </Button>
             </div>
         </div>
+    );
+}
+
+const PRESETS = [5, 10, 15, 20, 30, 60];
+
+/** Adds forgotten minutes to a timer, from a preset or a custom amount. */
+function AddTime({ item }: { item: CategoryTimer }) {
+    const [open, setOpen] = useState(false);
+    const [custom, setCustom] = useState("");
+
+    const add = (minutes: number) => {
+        if (!Number.isInteger(minutes) || minutes < 1) {
+            return;
+        }
+
+        router.post(
+            time.timer.add.url({ category: item.category_id }),
+            { minutes },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setOpen(false);
+                    setCustom("");
+                },
+            },
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button
+                    size="icon"
+                    variant="outline"
+                    aria-label={`Adicionar tempo a ${item.name}`}
+                    title="Adicionar tempo"
+                    disabled={item.archived}
+                >
+                    <Plus />
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Adicionar tempo</DialogTitle>
+                    <DialogDescription>
+                        Esqueceu de iniciar {item.name}? Some minutos ao
+                        cronômetro.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-3 gap-2">
+                    {PRESETS.map((minutes) => (
+                        <Button
+                            key={minutes}
+                            variant="outline"
+                            onClick={() => add(minutes)}
+                        >
+                            +{minutes} min
+                        </Button>
+                    ))}
+                </div>
+                <form
+                    className="flex gap-2"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        add(Number(custom));
+                    }}
+                >
+                    <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={1440}
+                        value={custom}
+                        placeholder="Outro valor (minutos)"
+                        aria-label="Minutos a adicionar"
+                        onChange={(event) => setCustom(event.target.value)}
+                    />
+                    <Button type="submit" disabled={Number(custom) < 1}>
+                        Adicionar
+                    </Button>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

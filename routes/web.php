@@ -103,6 +103,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
 
             Route::post('categories/{category}/timer/start', [TimeTimerController::class, 'start'])->name('timer.start');
             Route::post('categories/{category}/timer/pause', [TimeTimerController::class, 'pause'])->name('timer.pause');
+            Route::post('categories/{category}/timer/add', [TimeTimerController::class, 'add'])->name('timer.add');
             Route::post('categories/{category}/timer/commit', [TimeTimerController::class, 'commit'])->name('timer.commit');
             Route::delete('categories/{category}/timer', [TimeTimerController::class, 'reset'])->name('timer.reset');
 

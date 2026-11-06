@@ -65,6 +65,33 @@ class TimeTimerService
         });
     }
 
+    /**
+     * Bank extra seconds on the timer (e.g. when the user forgot to start it).
+     * Works on running and stopped timers and never exceeds one day.
+     */
+    public function add(TimeCategory $category, int $seconds): TimeTimer
+    {
+        if ($category->isArchived()) {
+            throw ValidationException::withMessages([
+                'category' => 'Categoria arquivada não pode receber tempo no cronômetro.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($category, $seconds) {
+            $timer = $this->locked($category) ?? new TimeTimer([
+                'user_id' => $category->user_id,
+                'time_category_id' => $category->id,
+                'accumulated_seconds' => 0,
+            ]);
+
+            $room = max(0, TimeLog::MAX_SECONDS - $timer->elapsedSeconds());
+            $timer->accumulated_seconds += min($seconds, $room);
+            $timer->save();
+
+            return $timer;
+        });
+    }
+
     public function reset(TimeCategory $category): void
     {
         $category->timer()->delete();

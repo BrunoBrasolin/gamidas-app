@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\TimeCategory;
 use App\Services\TimeTimerService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -35,6 +36,19 @@ class TimeTimerController extends Controller
         Gate::authorize('update', $category);
 
         $this->timers->pause($category);
+
+        return back();
+    }
+
+    public function add(Request $request, TimeCategory $category): RedirectResponse
+    {
+        Gate::authorize('update', $category);
+
+        $data = $request->validate([
+            'minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+        ], [], ['minutes' => 'minutos']);
+
+        $this->timers->add($category, $data['minutes'] * 60);
 
         return back();
     }

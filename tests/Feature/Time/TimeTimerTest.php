@@ -129,4 +129,38 @@ class TimeTimerTest extends TestCase
                 ->where('timers.items.0.name', 'MegaZap')
                 ->where('timers.items.0.started_at', Date::now()->getTimestampMs()));
     }
+
+    public function test_minutes_can_be_added_to_a_stopped_or_running_timer(): void
+    {
+        $category = TimeCategory::factory()->for($this->bruno)->create();
+
+        $this->actingAs($this->bruno)
+            ->post(route('time.timer.add', $category), ['minutes' => 20])
+            ->assertRedirect();
+
+        $timer = TimeTimer::query()->sole();
+        $this->assertFalse($timer->isRunning());
+        $this->assertSame(1200, $timer->accumulated_seconds);
+
+        $this->actingAs($this->bruno)->post(route('time.timer.start', $category));
+        Date::setTestNow('2026-10-21 10:00:30');
+        $this->actingAs($this->bruno)->post(route('time.timer.add', $category), ['minutes' => 5]);
+
+        $this->assertSame(1530, TimeTimer::query()->sole()->elapsedSeconds());
+    }
+
+    public function test_adding_time_validates_the_amount_and_the_owner(): void
+    {
+        $category = TimeCategory::factory()->for($this->bruno)->create();
+
+        $this->actingAs($this->bruno)
+            ->post(route('time.timer.add', $category), ['minutes' => 0])
+            ->assertSessionHasErrors('minutes');
+
+        $this->actingAs($this->leticia)
+            ->post(route('time.timer.add', $category), ['minutes' => 10])
+            ->assertNotFound();
+
+        $this->assertSame(0, TimeTimer::query()->count());
+    }
 }

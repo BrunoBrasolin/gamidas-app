@@ -4,6 +4,7 @@ namespace App\Http\Requests\Roulette;
 
 use App\Enums\RouletteCategory;
 use App\Http\Requests\Finance\FinanceRequest;
+use App\Models\RoulettePlace;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -21,6 +22,7 @@ class RoulettePlaceRequest extends FinanceRequest
         return [
             'category' => ['required', Rule::enum(RouletteCategory::class)],
             'name' => ['required', 'string', 'max:80'],
+            'weight' => ['required', 'integer', 'between:'.RoulettePlace::MIN_WEIGHT.','.RoulettePlace::MAX_WEIGHT],
         ];
     }
 
@@ -29,7 +31,7 @@ class RoulettePlaceRequest extends FinanceRequest
      */
     public function attributes(): array
     {
-        return ['category' => 'categoria', 'name' => 'nome'];
+        return ['category' => 'categoria', 'name' => 'nome', 'weight' => 'peso'];
     }
 
     /**
@@ -42,7 +44,10 @@ class RoulettePlaceRequest extends FinanceRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge(['name' => trim((string) preg_replace('/\s+/u', ' ', (string) $this->input('name')))]);
+        $this->merge([
+            'name' => trim((string) preg_replace('/\s+/u', ' ', (string) $this->input('name'))),
+            'weight' => $this->input('weight', RoulettePlace::MIN_WEIGHT),
+        ]);
     }
 
     /**
@@ -66,6 +71,11 @@ class RoulettePlaceRequest extends FinanceRequest
                 }
             },
         ];
+    }
+
+    public function weight(): int
+    {
+        return (int) $this->validated('weight');
     }
 
     public function category(): RouletteCategory

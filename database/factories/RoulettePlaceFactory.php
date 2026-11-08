@@ -21,6 +21,7 @@ class RoulettePlaceFactory extends Factory
             'household_id' => Household::factory(),
             'category' => RouletteCategory::Lunch,
             'name' => fake()->unique()->words(2, true),
+            'weight' => 1,
         ];
     }
 }

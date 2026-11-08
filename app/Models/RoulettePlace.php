@@ -17,13 +17,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $household_id
  * @property RouletteCategory $category
  * @property string $name
+ * @property int $weight
  * @property int|null $created_by_user_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['household_id', 'category', 'name', 'created_by_user_id'])]
+#[Fillable(['household_id', 'category', 'name', 'weight', 'created_by_user_id'])]
 class RoulettePlace extends Model
 {
+    public const MIN_WEIGHT = 1;
+
+    public const MAX_WEIGHT = 10;
+
     /** @use HasFactory<RoulettePlaceFactory> */
     use HasFactory;
 
@@ -32,7 +37,7 @@ class RoulettePlace extends Model
      */
     protected function casts(): array
     {
-        return ['category' => RouletteCategory::class];
+        return ['category' => RouletteCategory::class, 'weight' => 'integer'];
     }
 
     /**
@@ -52,13 +57,14 @@ class RoulettePlace extends Model
     }
 
     /**
-     * @return array{id: int, name: string, created_by: string|null}
+     * @return array{id: int, name: string, weight: int, created_by: string|null}
      */
     public function toPresenter(): array
     {
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'weight' => $this->weight,
             'created_by' => $this->creator?->firstName(),
         ];
     }

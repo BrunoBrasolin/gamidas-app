@@ -41,6 +41,7 @@ class RoulettePlaceTest extends TestCase
                 ->where('categories.0.label', 'Almoço')
                 ->has('categories.0.places', 1)
                 ->where('categories.0.places.0.name', 'Cantina')
+                ->where('categories.0.places.0.weight', 1)
                 ->where('categories.0.places.0.created_by', 'Letícia')
                 ->where('categories.1.value', 'dessert')
                 ->where('categories.1.label', 'Sobremesa')
@@ -125,5 +126,66 @@ class RoulettePlaceTest extends TestCase
             ->assertNotFound();
 
         $this->assertModelExists($place);
+    }
+
+    public function test_a_place_is_added_with_a_weight_that_defaults_to_one(): void
+    {
+        $this->actingAs($this->bruno)
+            ->post(route('roulette.places.store'), ['category' => 'lunch', 'name' => 'Cantina', 'weight' => 4])
+            ->assertSessionHasNoErrors();
+        $this->actingAs($this->bruno)
+            ->post(route('roulette.places.store'), ['category' => 'lunch', 'name' => 'Sushi'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            ['Cantina' => 4, 'Sushi' => 1],
+            RoulettePlace::query()->pluck('weight', 'name')->all(),
+        );
+
+        $this->actingAs($this->leticia)
+            ->get(route('roulette.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('categories.0.places.0.weight', 4)
+                ->where('categories.0.places.1.weight', 1));
+    }
+
+    public function test_the_weight_must_be_between_one_and_ten(): void
+    {
+        foreach ([0, 11, -1, 'muito', 2.5] as $weight) {
+            $this->actingAs($this->bruno)
+                ->post(route('roulette.places.store'), ['category' => 'lunch', 'name' => 'Cantina', 'weight' => $weight])
+                ->assertSessionHasErrors('weight');
+        }
+
+        $this->assertSame(0, RoulettePlace::query()->count());
+    }
+
+    public function test_any_member_can_change_the_weight_of_a_place(): void
+    {
+        $place = RoulettePlace::factory()->for($this->household)->create(['created_by_user_id' => $this->bruno->id]);
+
+        $this->actingAs($this->leticia)
+            ->put(route('roulette.places.update', $place), ['weight' => 7])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $this->assertSame(7, $place->fresh()?->weight);
+
+        $this->actingAs($this->leticia)
+            ->put(route('roulette.places.update', $place), ['weight' => 11])
+            ->assertSessionHasErrors('weight');
+
+        $this->assertSame(7, $place->fresh()?->weight);
+    }
+
+    public function test_the_weight_of_places_of_another_household_cannot_be_changed(): void
+    {
+        $place = RoulettePlace::factory()->create(['household_id' => $this->createOutsider()->householdId()]);
+
+        $this->actingAs($this->bruno)
+            ->put(route('roulette.places.update', $place), ['weight' => 5])
+            ->assertNotFound();
+
+        $this->assertSame(1, $place->fresh()?->weight);
     }
 }

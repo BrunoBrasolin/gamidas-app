@@ -48,6 +48,26 @@ function slicePath(start: number, end: number): string {
     return `M0 0 L${x1} ${y1} A${RADIUS} ${RADIUS} 0 ${large} 1 ${x2} ${y2} Z`;
 }
 
+/** Where each place's slice starts and how wide it is, in degrees: proportional to its weight. */
+function layoutSlices(places: RoulettePlace[]): {
+    totalWeight: number;
+    slices: { start: number; size: number }[];
+} {
+    const totalWeight = places.reduce((sum, place) => sum + place.weight, 0);
+    let start = 0;
+
+    const slices = places.map((place) => {
+        const size = (place.weight / totalWeight) * 360;
+        const slice = { start, size };
+
+        start += size;
+
+        return slice;
+    });
+
+    return { totalWeight, slices };
+}
+
 /** Slices alternate between two hues that stay readable behind white text. */
 function sliceColor(index: number, total: number): string {
     const hue = (index * 360) / total;
@@ -90,9 +110,10 @@ function fitName(name: string, base: number): { text: string; size: number } {
 }
 
 /**
- * The wheel: one slice per place, spun with a CSS transition that decelerates
- * until the chosen slice is under the pointer at the top. The winner is
- * drawn first and the wheel is then rotated to land on it.
+ * The wheel: one slice per place, as wide as its weight, spun with a CSS
+ * transition that decelerates until the chosen slice is under the pointer at
+ * the top. The winner is drawn first (each place is picked with a chance
+ * proportional to its weight) and the wheel is then rotated to land on it.
  */
 export const RouletteWheel = forwardRef<
     RouletteWheelHandle,
@@ -117,17 +138,23 @@ export const RouletteWheel = forwardRef<
         () => ({
             spin() {
                 return new Promise<RoulettePlace>((resolve) => {
-                    const total = places.length;
-                    const slice = 360 / total;
-                    const winner = randomInt(total);
+                    const layout = layoutSlices(places);
+                    let ticket = randomInt(layout.totalWeight);
+                    let winner = 0;
+
+                    while (ticket >= places[winner].weight) {
+                        ticket -= places[winner].weight;
+                        winner++;
+                    }
+
+                    const { start, size } = layout.slices[winner];
                     const reduced = window.matchMedia(
                         '(prefers-reduced-motion: reduce)',
                     ).matches;
 
                     // Stop anywhere inside the winning slice, not always at its middle.
                     const stop =
-                        (winner + 0.5) * slice +
-                        (Math.random() - 0.5) * slice * 0.7;
+                        start + size / 2 + (Math.random() - 0.5) * size * 0.7;
                     const target = (((360 - stop) % 360) + 360) % 360;
                     const base = Math.ceil(rotationRef.current / 360) * 360;
                     const turns = reduced ? 1 : 5 + randomInt(3);
@@ -152,7 +179,7 @@ export const RouletteWheel = forwardRef<
     );
 
     const total = places.length;
-    const slice = total > 0 ? 360 / total : 360;
+    const { slices } = layoutSlices(places);
     const fontSize = fontSizeFor(total);
 
     return (
@@ -182,9 +209,13 @@ export const RouletteWheel = forwardRef<
                         <circle r={RADIUS} fill={sliceColor(0, 1)} />
                     )}
                     {places.map((place, index) => {
-                        const start = index * slice;
-                        const middle = start + slice / 2;
-                        const label = fitName(place.name, fontSize);
+                        const { start, size } = slices[index];
+                        const middle = start + size / 2;
+                        // Thin slices (low weight, many places) get smaller text.
+                        const label = fitName(
+                            place.name,
+                            Math.min(fontSize, Math.max(2.5, size * 0.5)),
+                        );
                         const dimmed =
                             highlightId !== null && highlightId !== place.id;
 
@@ -198,7 +229,7 @@ export const RouletteWheel = forwardRef<
                             >
                                 {total > 1 && (
                                     <path
-                                        d={slicePath(start, start + slice)}
+                                        d={slicePath(start, start + size)}
                                         fill={sliceColor(index, total)}
                                         stroke="white"
                                         strokeWidth={0.6}

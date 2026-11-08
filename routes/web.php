@@ -135,6 +135,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
 
         Route::middleware('throttle:finance-writes')->group(function () {
             Route::post('places', [RoulettePlaceController::class, 'store'])->name('places.store');
+            Route::put('places/{place}', [RoulettePlaceController::class, 'update'])->name('places.update');
             Route::delete('places/{place}', [RoulettePlaceController::class, 'destroy'])->name('places.destroy');
         });
     });

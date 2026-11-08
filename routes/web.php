@@ -143,21 +143,20 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
     });
 
     // College complementary hours: the hours required and the activities that
-    // count, each with its certificate and an optional report. Everything
-    // belongs to the signed-in user; certificates are served only through the
-    // authorized route.
+    // count, each with its attachments (certificates, the filled-in report and
+    // other files) and whether the report was filled in. Everything belongs to
+    // the signed-in user; files are served only through the authorized route.
     Route::prefix('complementary-hours')->name('complementary-hours.')->group(function () {
         Route::get('/', [ComplementaryActivityController::class, 'index'])->name('index');
         Route::get('create', [ComplementaryActivityController::class, 'create'])->name('create');
         Route::get('{activity}', [ComplementaryActivityController::class, 'show'])->name('show');
         Route::get('{activity}/edit', [ComplementaryActivityController::class, 'edit'])->name('edit');
-        Route::get('{activity}/certificate', [ComplementaryActivityController::class, 'certificate'])->name('certificate');
-        Route::get('{activity}/report.pdf', [ComplementaryActivityController::class, 'report'])->name('report');
+        Route::get('{activity}/attachments/{attachment}', [ComplementaryActivityController::class, 'attachment'])->scopeBindings()->name('attachments.show');
 
         Route::middleware('throttle:finance-writes')->group(function () {
             Route::put('goal', [ComplementaryActivityController::class, 'goal'])->name('goal.update');
             Route::post('/', [ComplementaryActivityController::class, 'store'])->name('store');
-            // Sent as POST with _method=PUT, since it may carry a file.
+            // Sent as POST with _method=PUT, since it may carry files.
             Route::put('{activity}', [ComplementaryActivityController::class, 'update'])->name('update');
             Route::delete('{activity}', [ComplementaryActivityController::class, 'destroy'])->name('destroy');
         });

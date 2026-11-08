@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\ComplementaryAttachmentKind;
 use App\Models\ComplementaryActivity;
+use App\Models\ComplementaryActivityAttachment;
 use App\Models\User;
 use App\Support\KnowledgeUpload;
 use Illuminate\Http\UploadedFile;
@@ -12,12 +14,13 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Keeps complementary activities and their certificate files in step: a new
- * file is written before its row, and an old one is removed only after the
- * row stopped pointing to it and the transaction committed.
+ * Keeps complementary activities and their attachment files in step: new
+ * files are written before their rows, and old ones are removed only after
+ * no row points to them and the transaction committed.
  *
- * @phpstan-type ActivityData array{title: string, completed_on: string|null, minutes: int, report: string|null}
- * @phpstan-type CertificateInfo array{mime: string, extension: string}
+ * @phpstan-type ActivityData array{title: string, completed_on: string|null, minutes: int, report_done: bool}
+ * @phpstan-type Upload array{kind: ComplementaryAttachmentKind, file: UploadedFile, mime: string, extension: string}
+ * @phpstan-type StoredFile array{kind: ComplementaryAttachmentKind, disk: string, path: string, filename: string, mime: string, size: int}
  */
 class ComplementaryHoursService
 {
@@ -30,56 +33,65 @@ class ComplementaryHoursService
 
     /**
      * @param  ActivityData  $data
-     * @param  CertificateInfo  $info
+     * @param  list<Upload>  $uploads
      */
-    public function create(User $user, array $data, UploadedFile $certificate, array $info): ComplementaryActivity
+    public function create(User $user, array $data, array $uploads): ComplementaryActivity
     {
-        $file = $this->storeCertificate($user, $certificate, $info);
+        $files = $this->storeAll($user, $uploads);
 
         try {
-            return $user->complementaryActivities()->create([...$data, ...$file]);
+            return DB::transaction(function () use ($user, $data, $files) {
+                $activity = $user->complementaryActivities()->create($data);
+                $activity->attachments()->createMany($files);
+
+                return $activity;
+            });
         } catch (Throwable $exception) {
-            Storage::disk($file['certificate_disk'])->delete($file['certificate_path']);
+            $this->deleteNow($files);
 
             throw $exception;
         }
     }
 
     /**
-     * Update an activity, replacing its certificate when a new one is sent.
+     * Update an activity, adding the files sent and removing the attachments
+     * listed (only the activity's own ones).
      *
      * @param  ActivityData  $data
-     * @param  CertificateInfo|null  $info
+     * @param  list<Upload>  $uploads
+     * @param  list<int>  $removeIds
      */
-    public function update(ComplementaryActivity $activity, array $data, ?UploadedFile $certificate = null, ?array $info = null): ComplementaryActivity
+    public function update(ComplementaryActivity $activity, array $data, array $uploads = [], array $removeIds = []): ComplementaryActivity
     {
-        if ($certificate === null || $info === null) {
-            $activity->update($data);
-
-            return $activity;
-        }
-
-        $old = [$activity->certificate_disk, $activity->certificate_path];
-        $file = $this->storeCertificate($activity->user, $certificate, $info);
+        $files = $this->storeAll($activity->user, $uploads);
 
         try {
-            $activity->update([...$data, ...$file]);
+            DB::transaction(function () use ($activity, $data, $files, $removeIds) {
+                $activity->update($data);
+                $activity->attachments()->createMany($files);
+
+                $removed = $activity->attachments()->whereIn('id', $removeIds)->get();
+                $activity->attachments()->whereKey($removed->modelKeys())->delete();
+
+                $removed->each(fn (ComplementaryActivityAttachment $attachment) => $this->deleteFileAfterCommit($attachment->disk, $attachment->path));
+            });
         } catch (Throwable $exception) {
-            Storage::disk($file['certificate_disk'])->delete($file['certificate_path']);
+            $this->deleteNow($files);
 
             throw $exception;
         }
-
-        $this->deleteFileAfterCommit(...$old);
 
         return $activity;
     }
 
     public function delete(ComplementaryActivity $activity): void
     {
-        $activity->delete();
+        DB::transaction(function () use ($activity) {
+            $attachments = $activity->attachments()->get();
+            $activity->delete();
 
-        $this->deleteFileAfterCommit($activity->certificate_disk, $activity->certificate_path);
+            $attachments->each(fn (ComplementaryActivityAttachment $attachment) => $this->deleteFileAfterCommit($attachment->disk, $attachment->path));
+        });
     }
 
     /**
@@ -90,7 +102,7 @@ class ComplementaryHoursService
     public function summary(User $user): array
     {
         $required = $user->complementaryHoursGoal?->required_minutes;
-        $activities = $user->complementaryActivities()->get(['minutes', 'report']);
+        $activities = $user->complementaryActivities()->get(['minutes', 'report_done']);
         $done = (int) $activities->sum('minutes');
 
         return [
@@ -98,30 +110,62 @@ class ComplementaryHoursService
             'done_minutes' => $done,
             'remaining_minutes' => $required === null ? null : max(0, $required - $done),
             'activities' => $activities->count(),
-            'without_report' => $activities->reject(fn (ComplementaryActivity $activity) => $activity->hasReport())->count(),
+            'without_report' => $activities->where('report_done', false)->count(),
         ];
     }
 
     /**
-     * @param  CertificateInfo  $info
-     * @return array{certificate_disk: string, certificate_path: string, certificate_filename: string, certificate_mime: string, certificate_size: int}
+     * @param  list<Upload>  $uploads
+     * @return list<StoredFile>
      */
-    private function storeCertificate(User $user, UploadedFile $certificate, array $info): array
+    private function storeAll(User $user, array $uploads): array
+    {
+        $files = [];
+
+        try {
+            foreach ($uploads as $upload) {
+                $files[] = $this->store($user, $upload);
+            }
+        } catch (Throwable $exception) {
+            $this->deleteNow($files);
+
+            throw $exception;
+        }
+
+        return $files;
+    }
+
+    /**
+     * @param  Upload  $upload
+     * @return StoredFile
+     */
+    private function store(User $user, array $upload): array
     {
         $disk = (string) config('complementary_hours.disk');
-        $path = self::DIRECTORY.'/'.$user->id.'/'.Str::ulid()->toBase32().'.'.$info['extension'];
+        $path = self::DIRECTORY.'/'.$user->id.'/'.Str::ulid()->toBase32().'.'.$upload['extension'];
 
-        if (Storage::disk($disk)->putFileAs(dirname($path), $certificate, basename($path)) === false) {
-            throw new \RuntimeException('Could not store the certificate.');
+        if (Storage::disk($disk)->putFileAs(dirname($path), $upload['file'], basename($path)) === false) {
+            throw new \RuntimeException('Could not store the attachment.');
         }
 
         return [
-            'certificate_disk' => $disk,
-            'certificate_path' => $path,
-            'certificate_filename' => KnowledgeUpload::displayName($certificate->getClientOriginalName(), $info['extension']),
-            'certificate_mime' => $info['mime'],
-            'certificate_size' => (int) $certificate->getSize(),
+            'kind' => $upload['kind'],
+            'disk' => $disk,
+            'path' => $path,
+            'filename' => KnowledgeUpload::displayName($upload['file']->getClientOriginalName(), $upload['extension']),
+            'mime' => $upload['mime'],
+            'size' => (int) $upload['file']->getSize(),
         ];
+    }
+
+    /**
+     * @param  list<StoredFile>  $files
+     */
+    private function deleteNow(array $files): void
+    {
+        foreach ($files as $file) {
+            Storage::disk($file['disk'])->delete($file['path']);
+        }
     }
 
     private function deleteFileAfterCommit(string $disk, string $path): void

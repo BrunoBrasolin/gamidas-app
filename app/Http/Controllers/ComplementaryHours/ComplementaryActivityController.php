@@ -7,15 +7,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ComplementaryHours\ComplementaryActivityRequest;
 use App\Http\Requests\ComplementaryHours\ComplementaryHoursGoalRequest;
 use App\Models\ComplementaryActivity;
+use App\Models\ComplementaryActivityAttachment;
 use App\Services\ComplementaryHoursService;
-use App\Services\ComplementaryReportPdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ComplementaryActivityController extends Controller
@@ -32,6 +31,7 @@ class ComplementaryActivityController extends Controller
         $user = $this->user($request);
 
         $activities = $user->complementaryActivities()
+            ->with('attachments')
             ->orderByRaw('completed_on is null')
             ->orderByDesc('completed_on')
             ->orderByDesc('id')
@@ -56,21 +56,13 @@ class ComplementaryActivityController extends Controller
     {
         return Inertia::render('complementary-hours/form', [
             'activity' => null,
-            'maxCertificateMb' => $this->maxCertificateMb(),
+            ...$this->limits(),
         ]);
     }
 
     public function store(ComplementaryActivityRequest $request): RedirectResponse
     {
-        /** @var array{mime: string, extension: string} $info */
-        $info = $request->certificateInfo();
-
-        $activity = $this->hours->create(
-            $this->user($request),
-            $request->activity(),
-            $request->certificate() ?? abort(422),
-            $info,
-        );
+        $activity = $this->hours->create($this->user($request), $request->activity(), $request->uploads());
 
         $this->toast('Atividade cadastrada.');
 
@@ -82,7 +74,7 @@ class ComplementaryActivityController extends Controller
         Gate::authorize('view', $activity);
 
         return Inertia::render('complementary-hours/show', [
-            'activity' => $this->present($activity, withReport: true),
+            'activity' => $this->present($activity),
         ]);
     }
 
@@ -91,14 +83,14 @@ class ComplementaryActivityController extends Controller
         Gate::authorize('update', $activity);
 
         return Inertia::render('complementary-hours/form', [
-            'activity' => $this->present($activity, withReport: true),
-            'maxCertificateMb' => $this->maxCertificateMb(),
+            'activity' => $this->present($activity),
+            ...$this->limits(),
         ]);
     }
 
     public function update(ComplementaryActivityRequest $request, ComplementaryActivity $activity): RedirectResponse
     {
-        $this->hours->update($activity, $request->activity(), $request->certificate(), $request->certificateInfo());
+        $this->hours->update($activity, $request->activity(), $request->uploads(), $request->removedAttachmentIds());
 
         $this->toast('Atividade atualizada.');
 
@@ -117,69 +109,67 @@ class ComplementaryActivityController extends Controller
     }
 
     /**
-     * Serve the certificate to its owner only, inline unless ?download=1. The
-     * stored type was detected on upload, and nosniff stops the browser from
-     * guessing another one.
+     * Serve an attachment to the activity's owner only, inline unless
+     * ?download=1. The stored type was detected on upload, and nosniff stops
+     * the browser from guessing another one.
      */
-    public function certificate(Request $request, ComplementaryActivity $activity): StreamedResponse
+    public function attachment(Request $request, ComplementaryActivity $activity, ComplementaryActivityAttachment $attachment): StreamedResponse
     {
         Gate::authorize('view', $activity);
 
-        $disk = Storage::disk($activity->certificate_disk);
+        $disk = Storage::disk($attachment->disk);
 
-        abort_unless($disk->exists($activity->certificate_path), 404);
+        abort_unless($disk->exists($attachment->path), 404);
 
         $headers = [
-            'Content-Type' => $activity->certificate_mime,
+            'Content-Type' => $attachment->mime,
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'private, max-age=604800',
         ];
 
         return $request->boolean('download')
-            ? $disk->download($activity->certificate_path, $activity->certificate_filename, $headers)
-            : $disk->response($activity->certificate_path, $activity->certificate_filename, $headers);
-    }
-
-    /**
-     * Download the report as a PDF.
-     */
-    public function report(ComplementaryActivity $activity, ComplementaryReportPdf $pdf): HttpResponse
-    {
-        Gate::authorize('view', $activity);
-
-        abort_unless($activity->hasReport(), 404);
-
-        return response($pdf->render($activity), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$pdf->filename($activity).'"',
-            'X-Content-Type-Options' => 'nosniff',
-            'Cache-Control' => 'private, no-store',
-        ]);
+            ? $disk->download($attachment->path, $attachment->filename, $headers)
+            : $disk->response($attachment->path, $attachment->filename, $headers);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function present(ComplementaryActivity $activity, bool $withReport = false): array
+    private function present(ComplementaryActivity $activity): array
     {
+        $attachments = $activity->attachments
+            ->sortBy([
+                fn (ComplementaryActivityAttachment $a, ComplementaryActivityAttachment $b) => $a->kind->position() <=> $b->kind->position(),
+                fn (ComplementaryActivityAttachment $a, ComplementaryActivityAttachment $b) => $a->id <=> $b->id,
+            ]);
+
         return [
             'id' => $activity->id,
             'title' => $activity->title,
             'completed_on' => $activity->completed_on?->toDateString(),
             'minutes' => $activity->minutes,
-            'has_report' => $activity->hasReport(),
-            'report' => $withReport ? $activity->report : null,
-            'certificate' => [
-                'name' => $activity->certificate_filename,
-                'mime' => $activity->certificate_mime,
-                'size' => $activity->certificate_size,
-                'is_image' => $activity->certificateIsImage(),
-            ],
+            'report_done' => $activity->report_done,
+            'attachments' => $attachments->map(fn (ComplementaryActivityAttachment $attachment) => [
+                'id' => $attachment->id,
+                'kind' => $attachment->kind->value,
+                'name' => $attachment->filename,
+                'mime' => $attachment->mime,
+                'size' => $attachment->size,
+                'is_image' => $attachment->isImage(),
+                'is_pdf' => $attachment->isPdf(),
+            ])->values(),
         ];
     }
 
-    private function maxCertificateMb(): int
+    /**
+     * @return array{maxAttachmentMb: int, maxUploads: int, maxAttachments: int}
+     */
+    private function limits(): array
     {
-        return intdiv((int) config('complementary_hours.max_certificate_kb'), 1024);
+        return [
+            'maxAttachmentMb' => intdiv((int) config('complementary_hours.max_attachment_kb'), 1024),
+            'maxUploads' => (int) config('complementary_hours.max_uploads'),
+            'maxAttachments' => (int) config('complementary_hours.max_attachments'),
+        ];
     }
 }

@@ -5,29 +5,28 @@ namespace App\Models;
 use App\Casts\DateOnly;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * An activity counted as complementary hours: its certificate (a PDF or an
- * image on the private disk), the hours it is worth and an optional Markdown
- * report. Private to its owner.
+ * An activity counted as complementary hours: the hours it is worth, its
+ * attachments (certificates, the filled-in report and other files on the
+ * private disk) and whether the report was already filled in. Private to its
+ * owner.
  *
  * @property int $id
  * @property int $user_id
  * @property string $title
  * @property CarbonImmutable|null $completed_on
  * @property int $minutes
- * @property string $certificate_disk
- * @property string $certificate_path
- * @property string $certificate_filename
- * @property string $certificate_mime
- * @property int $certificate_size
- * @property string|null $report
+ * @property bool $report_done
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
+ * @property-read Collection<int, ComplementaryActivityAttachment> $attachments
  */
-#[Fillable(['user_id', 'title', 'completed_on', 'minutes', 'certificate_disk', 'certificate_path', 'certificate_filename', 'certificate_mime', 'certificate_size', 'report'])]
+#[Fillable(['user_id', 'title', 'completed_on', 'minutes', 'report_done'])]
 class ComplementaryActivity extends Model
 {
     /**
@@ -38,7 +37,7 @@ class ComplementaryActivity extends Model
         return [
             'completed_on' => DateOnly::class,
             'minutes' => 'integer',
-            'certificate_size' => 'integer',
+            'report_done' => 'boolean',
         ];
     }
 
@@ -50,13 +49,11 @@ class ComplementaryActivity extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function hasReport(): bool
+    /**
+     * @return HasMany<ComplementaryActivityAttachment, $this>
+     */
+    public function attachments(): HasMany
     {
-        return $this->report !== null && trim($this->report) !== '';
-    }
-
-    public function certificateIsImage(): bool
-    {
-        return str_starts_with($this->certificate_mime, 'image/');
+        return $this->hasMany(ComplementaryActivityAttachment::class);
     }
 }

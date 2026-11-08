@@ -4,16 +4,18 @@ import {
     Clock,
     Download,
     ExternalLink,
-    FileDown,
-    FileWarning,
+    Paperclip,
     Pencil,
     Trash2,
 } from 'lucide-react';
+import {
+    attachmentKindGroups,
+    attachmentKinds,
+} from '@/components/complementary-hours/attachment-kinds';
 import { ReportBadge } from '@/components/complementary-hours/report-badge';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
 import { PageHeader } from '@/components/finance/page-header';
-import { MarkdownView } from '@/components/time/markdown';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -25,17 +27,84 @@ import {
 import { formatDate } from '@/lib/format';
 import { formatFileSize, formatHours } from '@/lib/hours';
 import complementaryHours from '@/routes/complementary-hours';
-import type { ComplementaryActivity } from '@/types';
+import type { ComplementaryActivity, ComplementaryAttachment } from '@/types';
+
+function AttachmentCard({
+    activity,
+    attachment,
+}: {
+    activity: ComplementaryActivity;
+    attachment: ComplementaryAttachment;
+}) {
+    const params = { activity: activity.id, attachment: attachment.id };
+    const url = complementaryHours.attachments.show.url(params);
+    const downloadUrl = complementaryHours.attachments.show.url(params, {
+        query: { download: 1 },
+    });
+    const previewable = attachment.is_image || attachment.is_pdf;
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1.5">
+                    <CardTitle className="text-base break-all">
+                        {attachment.name}
+                    </CardTitle>
+                    <CardDescription>
+                        {formatFileSize(attachment.size)}
+                    </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                    {previewable && (
+                        <Button variant="outline" size="sm" asChild>
+                            <a href={url} target="_blank" rel="noopener">
+                                <ExternalLink />
+                                Abrir
+                            </a>
+                        </Button>
+                    )}
+                    <Button variant="outline" size="sm" asChild>
+                        <a href={downloadUrl}>
+                            <Download />
+                            Baixar
+                        </a>
+                    </Button>
+                </div>
+            </CardHeader>
+            {previewable && (
+                <CardContent>
+                    {attachment.is_image ? (
+                        <img
+                            src={url}
+                            alt={attachment.name}
+                            className="mx-auto max-h-[36rem] rounded-md border object-contain"
+                        />
+                    ) : (
+                        <iframe
+                            src={url}
+                            title={attachment.name}
+                            className="h-[36rem] w-full rounded-md border"
+                        />
+                    )}
+                </CardContent>
+            )}
+        </Card>
+    );
+}
 
 export default function ComplementaryActivityDetails({
     activity,
 }: {
     activity: ComplementaryActivity;
 }) {
-    const certificateUrl = complementaryHours.certificate.url(activity.id);
-    const downloadUrl = complementaryHours.certificate.url(activity.id, {
-        query: { download: 1 },
-    });
+    const groups = attachmentKinds
+        .map((kind) => ({
+            kind,
+            attachments: activity.attachments.filter(
+                (attachment) => attachment.kind === kind,
+            ),
+        }))
+        .filter((group) => group.attachments.length > 0);
 
     return (
         <>
@@ -58,23 +127,10 @@ export default function ComplementaryActivityDetails({
                                     {formatDate(activity.completed_on)}
                                 </span>
                             )}
-                            <ReportBadge hasReport={activity.has_report} />
+                            <ReportBadge reportDone={activity.report_done} />
                         </span>
                     }
                 >
-                    {activity.has_report && (
-                        <Button variant="outline" asChild>
-                            <a
-                                href={complementaryHours.report.url(
-                                    activity.id,
-                                )}
-                                download
-                            >
-                                <FileDown />
-                                Exportar PDF
-                            </a>
-                        </Button>
-                    )}
                     <Button variant="outline" asChild>
                         <Link href={complementaryHours.edit(activity.id)}>
                             <Pencil />
@@ -92,84 +148,41 @@ export default function ComplementaryActivityDetails({
                             </Button>
                         }
                         title="Excluir atividade?"
-                        description={`“${activity.title}” será removida, com o certificado e o relatório.`}
+                        description={`“${activity.title}” será removida, com todos os anexos.`}
                         confirmLabel="Excluir"
                         url={complementaryHours.destroy.url(activity.id)}
                     />
                 </PageHeader>
 
-                <Card>
-                    <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 space-y-1.5">
-                            <CardTitle>Certificado</CardTitle>
-                            <CardDescription className="break-all">
-                                {activity.certificate.name} ·{' '}
-                                {formatFileSize(activity.certificate.size)}
-                            </CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                                <a
-                                    href={certificateUrl}
-                                    target="_blank"
-                                    rel="noopener"
-                                >
-                                    <ExternalLink />
-                                    Abrir
-                                </a>
-                            </Button>
-                            <Button variant="outline" size="sm" asChild>
-                                <a href={downloadUrl}>
-                                    <Download />
-                                    Baixar
-                                </a>
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {activity.certificate.is_image ? (
-                            <img
-                                src={certificateUrl}
-                                alt={`Certificado de ${activity.title}`}
-                                className="mx-auto max-h-[36rem] rounded-md border object-contain"
-                            />
-                        ) : (
-                            <iframe
-                                src={certificateUrl}
-                                title={`Certificado de ${activity.title}`}
-                                className="h-[36rem] w-full rounded-md border"
-                            />
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Relatório</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {activity.report ? (
-                            <MarkdownView content={activity.report} />
-                        ) : (
-                            <EmptyState
-                                icon={FileWarning}
-                                title="Esta atividade não tem relatório"
-                                description="Escreva o relatório em Markdown para poder exportá-lo em PDF."
-                            >
-                                <Button asChild>
-                                    <Link
-                                        href={complementaryHours.edit(
-                                            activity.id,
-                                        )}
-                                    >
-                                        <Pencil />
-                                        Escrever relatório
-                                    </Link>
-                                </Button>
-                            </EmptyState>
-                        )}
-                    </CardContent>
-                </Card>
+                {groups.length === 0 ? (
+                    <EmptyState
+                        icon={Paperclip}
+                        title="Nenhum anexo"
+                        description="Anexe o certificado, o relatório e outros arquivos da atividade."
+                    >
+                        <Button asChild>
+                            <Link href={complementaryHours.edit(activity.id)}>
+                                <Pencil />
+                                Anexar arquivos
+                            </Link>
+                        </Button>
+                    </EmptyState>
+                ) : (
+                    groups.map((group) => (
+                        <section key={group.kind} className="grid gap-3">
+                            <h2 className="text-lg font-semibold">
+                                {attachmentKindGroups[group.kind]}
+                            </h2>
+                            {group.attachments.map((attachment) => (
+                                <AttachmentCard
+                                    key={attachment.id}
+                                    activity={activity}
+                                    attachment={attachment}
+                                />
+                            ))}
+                        </section>
+                    ))
+                )}
             </div>
         </>
     );

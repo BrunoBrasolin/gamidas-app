@@ -124,19 +124,16 @@ function ActivityCard({ activity }: { activity: ComplementaryActivity }) {
                                     {formatDate(activity.completed_on)}
                                 </span>
                             )}
-                            <span className="flex min-w-0 items-center gap-1.5">
-                                <Paperclip
-                                    className="size-3.5 shrink-0"
-                                    aria-hidden
-                                />
-                                <span className="truncate">
-                                    {activity.certificate.name}
-                                </span>
+                            <span className="flex items-center gap-1.5">
+                                <Paperclip className="size-3.5" aria-hidden />
+                                {activity.attachments.length === 1
+                                    ? '1 anexo'
+                                    : `${activity.attachments.length} anexos`}
                             </span>
                         </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                        <ReportBadge hasReport={activity.has_report} />
+                        <ReportBadge reportDone={activity.report_done} />
                         <Badge className="tabular-nums">
                             <Clock aria-hidden />
                             {formatHours(activity.minutes)}
@@ -161,7 +158,7 @@ export default function ComplementaryHoursIndex({
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <PageHeader
                     title="Horas complementares"
-                    description="As atividades da faculdade com certificado, carga horária e relatório."
+                    description="As atividades da faculdade com carga horária, certificado, relatório e outros anexos."
                 >
                     {summary.required_minutes !== null && (
                         <GoalDialog
@@ -188,7 +185,7 @@ export default function ComplementaryHoursIndex({
                     <EmptyState
                         icon={GraduationCap}
                         title="Nenhuma atividade ainda"
-                        description="Cadastre a primeira atividade com o título, as horas e o certificado. O relatório pode ser escrito depois."
+                        description="Cadastre a primeira atividade com o título, as horas e o certificado. O relatório pode ser anexado depois."
                     />
                 ) : (
                     <>
@@ -218,7 +215,7 @@ export default function ComplementaryHoursIndex({
                                 icon={GraduationCap}
                             />
                             <StatCard
-                                title="Sem relatório"
+                                title="Relatório pendente"
                                 value={summary.without_report}
                                 icon={FileWarning}
                             />

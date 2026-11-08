@@ -18,6 +18,7 @@ Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React
 - **Horas complementares** (`/complementary-hours`, privado de cada usuário): meta de horas exigida pelo curso, atividades com título, data, horas e vários anexos (certificado, relatório e outros), mais a marcação de relatório preenchido; progresso, horas que faltam e quais atividades ainda estão com o relatório pendente.
 - **Shows** (`/shows`, compartilhado pela casa): shows que vocês foram, com banda, nome da tour, local, data, setlist, shows de abertura (cada um com seu setlist) link do álbum do Google Fotos e link da playlist do Spotify; lista por ano com busca e totais de shows, bandas, locais e músicas.
 - **Jogo da Atenção** (`/attention`, compartilhado pela casa; jogo público em `/jogo/{código}`): quiz prático para o fim de uma apresentação sobre atenção. Os colegas entram pelo celular (link ou QR Code, só com apelido) e jogam 5 desafios — seletiva, sustentada, dividida, alternada e voluntária —, dizendo em cada um qual tipo de atenção usaram. Telão com QR Code e ranking ao vivo; relatório com acertos, erros, omissões, tempos, reação, reconhecimento de cada conceito, confusões entre conceitos, ranking e exportação em planilha.
+- **Roleta** (`/roulette`, compartilhada pela casa): sorteio animado para decidir onde comer, com as categorias Almoço, Sobremesa e Jantar. Qualquer pessoa da casa adiciona e remove lugares (só o nome) em cada categoria; ao escolher uma categoria, a roleta gira e para num lugar sorteado ao acaso.
 - **Assistidos** (`/watched`, compartilhado pela casa): filmes, episódios e vídeos terminados no Jellyfin por qualquer pessoa da casa, registrados automaticamente pelo plugin Webhook, com quem assistiu; "Continuar assistindo" (onde cada pessoa parou e o que está passando agora), séries em andamento, página de cada item com pôster, sinopse, gêneros e elenco do TMDB, e lista por ano e mês com busca e totais de filmes, episódios, séries e tempo assistido.
 
 ## Requisitos
@@ -271,6 +272,12 @@ Em **Settings › Secrets and variables › Actions**:
 - Pontos por desafio (máximo 1000, total 5000), calculados no servidor a partir das medidas enviadas pelo celular: **desempenho** = precisão × 5 (até 500); **rapidez** = até 300 só se o desafio foi feito certo, caindo linearmente até zero no limite do desafio (20 s na seletiva, 10 s para responder a sustentada, 15 s a dividida, 30 s a voluntária; na alternada vale o tempo médio de reação aos alvos, limite 800 ms); **conceito** = 200 por acertar qual tipo de atenção o desafio usou.
 - “Feito certo”: seletiva = achou os 5 Q sem tocar em O; sustentada = contagem exata; dividida = as duas contagens exatas; alternada = ao menos 90% de respostas certas (toques em alvos e não-toques nos demais); voluntária = seguiu as 6 instruções. Na alternada, tocar no círculo depois da troca de regra conta como erro e como **perseveração**.
 - Ranking: maior pontuação; empate → quem terminou, e quem terminou mais rápido. As medidas vêm do navegador, então o jogo é uma demonstração didática, não um teste psicológico validado nem à prova de trapaça.
+
+### Roleta
+
+- Os lugares (`roulette_places`) pertencem à **residência**: todos os membros veem, adicionam e removem qualquer lugar; lugares de outra residência respondem **404**. Fica registrado quem adicionou (`created_by_user_id`).
+- Categorias fixas (`RouletteCategory`): Almoço, Sobremesa e Jantar. O nome tem até 80 caracteres, espaços repetidos são normalizados e o mesmo nome (ignorando maiúsculas) não entra duas vezes na mesma categoria, embora possa estar em categorias diferentes.
+- O sorteio acontece no navegador (sorteio uniforme com `crypto.getRandomValues`): a roleta precisa de pelo menos 2 lugares na categoria para girar e a animação termina exatamente na fatia sorteada. O resultado não é guardado.
 
 ### Assistidos (Jellyfin)
 

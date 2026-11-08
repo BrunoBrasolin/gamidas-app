@@ -18,6 +18,7 @@ use App\Http\Controllers\Knowledge\KnowledgeBaseController;
 use App\Http\Controllers\Knowledge\KnowledgeCategoryController;
 use App\Http\Controllers\Knowledge\KnowledgePageController;
 use App\Http\Controllers\Knowledge\KnowledgeSubjectController;
+use App\Http\Controllers\Roulette\RoulettePlaceController;
 use App\Http\Controllers\Shows\ShowChecklistController;
 use App\Http\Controllers\Shows\ShowController;
 use App\Http\Controllers\Time\TimeCategoryController;
@@ -125,6 +126,17 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
         Route::put('shows/{show}', [ShowController::class, 'update'])->name('shows.update');
         Route::delete('shows/{show}', [ShowController::class, 'destroy'])->name('shows.destroy');
         Route::put('shows/{show}/checklist/{item}', [ShowChecklistController::class, 'check'])->name('shows.checklist.check');
+    });
+
+    // The household's food roulette: places to have lunch or dinner and
+    // desserts, added by any member. The draw happens in the browser.
+    Route::prefix('roulette')->name('roulette.')->group(function () {
+        Route::get('/', [RoulettePlaceController::class, 'index'])->name('index');
+
+        Route::middleware('throttle:finance-writes')->group(function () {
+            Route::post('places', [RoulettePlaceController::class, 'store'])->name('places.store');
+            Route::delete('places/{place}', [RoulettePlaceController::class, 'destroy'])->name('places.destroy');
+        });
     });
 
     // What the household watched on Jellyfin, recorded by its webhook

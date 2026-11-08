@@ -49,6 +49,14 @@ class Household extends Model
     }
 
     /**
+     * @return HasMany<RoulettePlace, $this>
+     */
+    public function roulettePlaces(): HasMany
+    {
+        return $this->hasMany(RoulettePlace::class)->orderBy('name')->orderBy('id');
+    }
+
+    /**
      * @return HasMany<WatchedItem, $this>
      */
     public function watchedItems(): HasMany

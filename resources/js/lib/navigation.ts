@@ -5,6 +5,7 @@ import {
     BarChart3,
     CalendarDays,
     Clapperboard,
+    Dices,
     GraduationCap,
     Home,
     LayoutGrid,
@@ -25,6 +26,7 @@ import household from '@/routes/household';
 import personal from '@/routes/personal';
 import recurringExpenses from '@/routes/recurring-expenses';
 import reports from '@/routes/reports';
+import roulette from '@/routes/roulette';
 import shows from '@/routes/shows';
 import knowledge from '@/routes/knowledge';
 import time from '@/routes/time';
@@ -105,7 +107,8 @@ export const timeNavItems: NavItem[] = [
 ];
 
 /**
- * Leisure: concerts of the household and what it watched on Jellyfin.
+ * Leisure: concerts of the household, what it watched on Jellyfin and the
+ * food roulette.
  */
 export const showNavItems: NavItem[] = [
     {
@@ -119,6 +122,12 @@ export const showNavItems: NavItem[] = [
         href: watched.index(),
         icon: Clapperboard,
         activePrefix: '/watched',
+    },
+    {
+        title: 'Roleta',
+        href: roulette.index(),
+        icon: Dices,
+        activePrefix: '/roulette',
     },
 ];
 

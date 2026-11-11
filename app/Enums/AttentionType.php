@@ -38,6 +38,21 @@ enum AttentionType: string
     }
 
     /**
+     * Accent color of the challenge (the 500 shade of the tailwind color the
+     * app uses for it), for places that can't use the app's stylesheet.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Selective => '#0ea5e9',
+            self::Sustained => '#f59e0b',
+            self::Divided => '#d946ef',
+            self::Alternating => '#10b981',
+            self::Voluntary => '#8b5cf6',
+        };
+    }
+
+    /**
      * Whether the speed bonus is measured on the mean reaction time to each
      * stimulus (go/no-go) instead of the time taken to answer.
      */

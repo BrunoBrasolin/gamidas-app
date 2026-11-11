@@ -191,6 +191,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
         Route::get('{game}', [AttentionGameController::class, 'show'])->name('show');
         Route::get('{game}/present', [AttentionGameController::class, 'present'])->name('present');
         Route::get('{game}/export', [AttentionGameController::class, 'export'])->name('export');
+        Route::get('{game}/pdf', [AttentionGameController::class, 'pdf'])->name('pdf');
 
         Route::middleware('throttle:finance-writes')->group(function () {
             Route::post('/', [AttentionGameController::class, 'store'])->name('store');

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Attention\AttentionGameRequest;
 use App\Models\AttentionGame;
 use App\Services\Attention\AttentionGameService;
+use App\Services\Attention\AttentionPdf;
 use App\Services\Attention\AttentionReport;
 use BaconQrCode\Renderer\Color\Rgb;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -147,6 +148,20 @@ class AttentionGameController extends Controller
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * The report page of the room as a PDF: numbers, performance by kind of
+     * attention, confusions and every player with each of their challenges.
+     */
+    public function pdf(AttentionGame $game, AttentionPdf $pdf): StreamedResponse
+    {
+        Gate::authorize('view', $game);
+        $filename = 'jogo-da-atencao-'.Str::slug($game->title).'-'.$game->code.'.pdf';
+
+        return response()->streamDownload(function () use ($pdf, $game) {
+            echo $pdf->render($game);
+        }, $filename, ['Content-Type' => 'application/pdf']);
     }
 
     public function close(AttentionGame $game): RedirectResponse

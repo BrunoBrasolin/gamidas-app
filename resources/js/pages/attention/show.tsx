@@ -6,6 +6,7 @@ import {
     Clock,
     Copy,
     Download,
+    FileText,
     Gauge,
     Lightbulb,
     Lock,
@@ -532,6 +533,12 @@ export default function AttentionReport({
                         <a href={attention.export.url(game.id)}>
                             <Download />
                             Planilha
+                        </a>
+                    </Button>
+                    <Button variant="outline" asChild>
+                        <a href={attention.pdf.url(game.id)}>
+                            <FileText />
+                            PDF
                         </a>
                     </Button>
                     {game.open ? (

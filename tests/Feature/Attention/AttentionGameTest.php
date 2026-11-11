@@ -214,8 +214,8 @@ class AttentionGameTest extends TestCase
             [$players[$number]] = $service->join($game, "Jogador {$number}");
         }
 
-        // On a tie the latest to join ranks first, so the first one is last.
-        $last = $players[1];
+        // On a full tie whoever joined first ranks first, so the last to join is last.
+        $last = $players[12];
 
         $this->getJson(route('game.ranking', $game->code))
             ->assertJsonCount(10, 'ranking')

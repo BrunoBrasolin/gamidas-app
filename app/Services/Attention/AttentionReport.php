@@ -144,7 +144,8 @@ class AttentionReport
     }
 
     /**
-     * Highest score first; on a tie, whoever finished, and faster, wins.
+     * Highest score first; on a tie, whoever finished, and faster, wins; then
+     * whoever joined first.
      *
      * @param  Collection<int, AttentionPlayer>  $players
      * @return Collection<int, AttentionPlayer>
@@ -152,8 +153,9 @@ class AttentionReport
     private function rank(Collection $players): Collection
     {
         return $players->sort(function (AttentionPlayer $a, AttentionPlayer $b) {
-            return [$b->score, $b->finished_at !== null, -($a->elapsedSeconds() ?? PHP_INT_MAX), -$a->id]
-                <=> [$a->score, $a->finished_at !== null, -($b->elapsedSeconds() ?? PHP_INT_MAX), -$b->id];
+            // Descending keys put $b on the left, ascending ones put $a there.
+            return [$b->score, $b->finished_at !== null, $a->elapsedSeconds() ?? PHP_INT_MAX, $a->id]
+                <=> [$a->score, $a->finished_at !== null, $b->elapsedSeconds() ?? PHP_INT_MAX, $b->id];
         })->values();
     }
 

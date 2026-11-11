@@ -10,8 +10,8 @@ use App\Http\Requests\Attention\JoinAttentionGameRequest;
 use App\Models\AttentionGame;
 use App\Models\AttentionPlayer;
 use App\Services\Attention\AttentionGameService;
-use App\Services\Attention\AttentionReport;
 use App\Services\Attention\AttentionScore;
+use App\Services\Attention\AttentionSnapshots;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,8 +25,13 @@ use Inertia\Response;
  */
 class PlayController extends Controller
 {
-    public function __construct(private readonly AttentionGameService $games)
-    {
+    /** Rows of the ranking every phone and the projector show. */
+    private const RANKING_SIZE = 10;
+
+    public function __construct(
+        private readonly AttentionGameService $games,
+        private readonly AttentionSnapshots $snapshots,
+    ) {
         //
     }
 
@@ -38,10 +43,10 @@ class PlayController extends Controller
         $code = strtoupper(trim((string) $request->query('code', '')));
 
         if ($code !== '') {
-            $game = AttentionGame::query()->where('code', $code)->first();
+            $room = $this->snapshots->room($code);
 
-            if ($game !== null) {
-                return to_route('game.show', $game->code);
+            if ($room !== null) {
+                return to_route('game.show', $room['code']);
             }
         }
 
@@ -51,14 +56,14 @@ class PlayController extends Controller
         ]);
     }
 
-    public function show(AttentionGame $game): Response
+    public function show(string $code): Response
     {
+        $room = $this->snapshots->room($code);
+
+        abort_if($room === null, 404);
+
         return Inertia::render('game/play', [
-            'game' => [
-                'title' => $game->title,
-                'code' => $game->code,
-                'open' => $game->isOpen(),
-            ],
+            'game' => $room,
             'types' => array_map(fn (AttentionType $type) => ['value' => $type->value, 'label' => $type->label()], AttentionType::cases()),
             'scoring' => [
                 'round_max' => AttentionScore::ROUND_MAX,
@@ -100,16 +105,34 @@ class PlayController extends Controller
         ], 201);
     }
 
-    public function ranking(AttentionGame $game): JsonResponse
+    /**
+     * Polled by every phone and by the projector, so it is answered from the
+     * cache. Phones get the top of the ranking plus their own row (`player`);
+     * the projector asks for the room's numbers too (`screen`).
+     */
+    public function ranking(Request $request, string $code): JsonResponse
     {
-        $report = new AttentionReport($game);
-        $summary = $report->summary();
+        $snapshot = $this->snapshots->live($code);
+
+        abort_if($snapshot === null, 404);
+
+        $ranking = array_slice($snapshot['ranking'], 0, self::RANKING_SIZE);
+        $playerId = $request->integer('player');
+
+        if ($playerId > 0) {
+            $own = collect($snapshot['ranking'])->firstWhere('id', $playerId);
+
+            if ($own !== null && $own['position'] > self::RANKING_SIZE) {
+                $ranking[] = $own;
+            }
+        }
 
         return response()->json([
-            'ranking' => $report->ranking(),
-            'players' => $summary['players'],
-            'finished' => $summary['finished'],
-            'open' => $game->isOpen(),
+            'ranking' => $ranking,
+            'players' => $snapshot['players'],
+            'finished' => $snapshot['finished'],
+            'open' => $snapshot['open'],
+            ...($request->boolean('screen') ? ['summary' => $snapshot['summary'], 'types' => $snapshot['types']] : []),
         ]);
     }
 

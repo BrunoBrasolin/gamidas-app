@@ -29,28 +29,41 @@ class AttentionGameService
     /** The page is public, so a room takes a bounded number of players. */
     public const MAX_PLAYERS = 300;
 
+    public function __construct(private readonly AttentionSnapshots $snapshots)
+    {
+        //
+    }
+
     public function create(Household $household, User $creator, string $title): AttentionGame
     {
-        return $household->attentionGames()->create([
+        $game = $household->attentionGames()->create([
             'created_by_user_id' => $creator->id,
             'title' => $title,
             'code' => $this->uniqueCode(),
         ]);
+
+        // A player may have tried the code before the room existed.
+        $this->snapshots->forget($game);
+
+        return $game;
     }
 
     public function close(AttentionGame $game): void
     {
         $game->update(['closed_at' => $game->closed_at ?? now()]);
+        $this->snapshots->forget($game);
     }
 
     public function reopen(AttentionGame $game): void
     {
         $game->update(['closed_at' => null]);
+        $this->snapshots->forget($game);
     }
 
     public function delete(AttentionGame $game): void
     {
         $game->delete();
+        $this->snapshots->forget($game);
     }
 
     /**

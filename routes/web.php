@@ -29,23 +29,32 @@ use App\Http\Controllers\Time\TimeTimerController;
 use App\Http\Controllers\Watched\JellyfinConnectionController;
 use App\Http\Controllers\Watched\WatchedItemController;
 use App\Http\Controllers\Watched\WatchProgressController;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::redirect('/', '/dashboard')->name('home');
 
 // The attention game, played on phones without an account by anyone with
-// the room code. Players are identified by the token they got on joining.
-Route::prefix('jogo')->name('game.')->group(function () {
-    Route::get('/', [PlayController::class, 'landing'])->name('landing');
-    Route::get('{game:code}', [PlayController::class, 'show'])->name('show');
-    Route::get('{game:code}/ranking', [PlayController::class, 'ranking'])->middleware('throttle:game-reads')->name('ranking');
+// the room code. Players are identified by the token they got on joining, so
+// these routes run without session and CSRF: that keeps them off the database
+// (hosting limits MySQL connections per hour) unless they really need it, and
+// a cookie-less request can't be forged into anything the code doesn't allow.
+// The pages and the ranking come from AttentionSnapshots (file cache).
+Route::prefix('jogo')->name('game.')
+    ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
+    ->group(function () {
+        Route::get('/', [PlayController::class, 'landing'])->name('landing');
+        Route::get('{code}', [PlayController::class, 'show'])->name('show');
+        Route::get('{code}/ranking', [PlayController::class, 'ranking'])->middleware('throttle:game-reads')->name('ranking');
 
-    Route::middleware('throttle:game-writes')->group(function () {
-        Route::post('{game:code}/players', [PlayController::class, 'join'])->name('join');
-        Route::post('{game:code}/resume', [PlayController::class, 'resume'])->name('resume');
-        Route::post('{game:code}/rounds', [PlayController::class, 'round'])->name('rounds.store');
+        Route::middleware('throttle:game-writes')->group(function () {
+            Route::post('{game:code}/players', [PlayController::class, 'join'])->name('join');
+            Route::post('{game:code}/resume', [PlayController::class, 'resume'])->name('resume');
+            Route::post('{game:code}/rounds', [PlayController::class, 'round'])->name('rounds.store');
+        });
     });
-});
 
 Route::middleware(['auth', 'verified', 'household'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

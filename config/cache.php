@@ -19,6 +19,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rate limiter store
+    |--------------------------------------------------------------------------
+    |
+    | Throttle counters live in a file store, not the default (database) one:
+    | with the database store every throttled request, even a rejected one,
+    | costs queries on a MySQL connection that the hosting plan limits per hour.
+    |
+    */
+
+    'limiter' => env('CACHE_LIMITER_STORE', 'file'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |

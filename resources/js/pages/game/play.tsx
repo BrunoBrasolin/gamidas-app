@@ -17,6 +17,7 @@ import {
     GameCard,
     GameShell,
 } from '@/components/attention/game-shell';
+import { useRoomSnapshot } from '@/hooks/use-room-snapshot';
 import { ATTENTION_INFO, ATTENTION_ORDER, formatPoints } from '@/lib/attention';
 import { HttpError, jsonRequest } from '@/lib/http';
 import { cn } from '@/lib/utils';
@@ -698,32 +699,20 @@ type RankingResponse = {
     open: boolean;
 };
 
-/** The room's ranking, refreshed every few seconds. */
-function useRanking(code: string): RankingResponse | null {
-    const [data, setData] = useState<RankingResponse | null>(null);
+/** Seconds between two ranking refreshes: it is cached on the server anyway. */
+const RANKING_REFRESH_MS = 20_000;
 
-    useEffect(() => {
-        const controller = new AbortController();
-        const load = () =>
-            jsonRequest<RankingResponse>(
-                'GET',
-                game.ranking.url(code),
-                undefined,
-                controller.signal,
-            )
-                .then(setData)
-                .catch(() => undefined);
-
-        void load();
-        const timer = window.setInterval(load, 4_000);
-
-        return () => {
-            controller.abort();
-            window.clearInterval(timer);
-        };
-    }, [code]);
-
-    return data;
+/** The room's ranking (top rows plus the player's own), refreshed now and then. */
+function useRanking(
+    code: string,
+    playerId: number | null,
+): RankingResponse | null {
+    return useRoomSnapshot<RankingResponse>(
+        game.ranking.url(code, {
+            query: playerId === null ? {} : { player: playerId },
+        }),
+        { intervalMs: RANKING_REFRESH_MS },
+    );
 }
 
 function Ranking({
@@ -815,7 +804,7 @@ function Finished({
     results: Partial<Record<AttentionType, RoundAnswer>>;
     gameMax: number;
 }) {
-    const ranking = useRanking(code);
+    const ranking = useRanking(code, player.id);
     const score = useCountUp(player.score, 1_200);
     const concepts = Object.values(results).filter(
         (round) => round.guess_correct,
@@ -888,7 +877,7 @@ function Finished({
 }
 
 function Closed({ code, playerId }: { code: string; playerId: number | null }) {
-    const ranking = useRanking(code);
+    const ranking = useRanking(code, playerId);
 
     return (
         <div className="flex flex-1 flex-col gap-4">

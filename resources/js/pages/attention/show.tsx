@@ -482,7 +482,7 @@ function PlayersCard({ players }: { players: AttentionPlayerReport[] }) {
 
 /** Follows the players live; rendered only while the room is open. */
 function LiveUpdates() {
-    usePoll(5_000, { only: ['game', 'summary', 'types', 'players'] });
+    usePoll(30_000, { only: ['game', 'summary', 'types', 'players'] });
 
     return null;
 }

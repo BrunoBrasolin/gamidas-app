@@ -7,6 +7,7 @@ use App\Models\AttentionGame;
 use App\Models\AttentionPlayer;
 use App\Services\Attention\AttentionGameService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesHousehold;
 use Tests\TestCase;
@@ -124,6 +125,111 @@ class AttentionGameTest extends TestCase
                 ->where('error', 'Não encontramos uma sala com esse código.'));
 
         $this->get('/jogo/NOPE1')->assertNotFound();
+    }
+
+    /**
+     * The hosting plan caps MySQL connections per hour and each request that
+     * queries opens one: polling must be answered from the cache.
+     */
+    public function test_polling_the_public_pages_does_not_touch_the_database(): void
+    {
+        $game = $this->createGame();
+        [$ana] = app(AttentionGameService::class)->join($game, 'Ana');
+
+        $this->getJson(route('game.ranking', $game->code))->assertOk();
+        $this->get(route('game.show', $game->code))->assertOk();
+        $this->get(route('game.landing', ['code' => $game->code]))->assertRedirect();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        foreach (range(1, 5) as $ignored) {
+            $this->getJson(route('game.ranking', $game->code))
+                ->assertOk()
+                ->assertJsonPath('ranking.0.id', $ana->id)
+                ->assertJsonPath('players', 1);
+            $this->get(route('game.show', $game->code))->assertOk();
+            $this->get(route('game.landing', ['code' => $game->code]))->assertRedirect();
+        }
+
+        $this->assertSame([], DB::getQueryLog());
+    }
+
+    public function test_unknown_codes_are_remembered_and_malformed_ones_never_reach_the_database(): void
+    {
+        $this->get('/jogo/NOPE1')->assertNotFound();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->get('/jogo/NOPE1')->assertNotFound();
+        $this->getJson('/jogo/NOPE1/ranking')->assertNotFound();
+        $this->get('/jogo/não-é-um-código')->assertNotFound();
+
+        $this->assertSame(1, count(DB::getQueryLog()), 'only the ranking lookup of an unseen code may query');
+    }
+
+    public function test_the_public_routes_do_not_start_a_session(): void
+    {
+        $game = $this->createGame();
+
+        foreach ([
+            $this->get(route('game.show', $game->code)),
+            $this->getJson(route('game.ranking', $game->code)),
+            $this->postJson(route('game.join', $game->code), ['nickname' => 'Ana']),
+        ] as $response) {
+            $this->assertSame([], $response->headers->getCookies(), 'no session or XSRF cookie, so nothing is written to the sessions table');
+        }
+    }
+
+    public function test_closing_reopening_or_creating_a_room_refreshes_what_the_public_pages_show(): void
+    {
+        $game = $this->createGame();
+        $service = app(AttentionGameService::class);
+
+        $this->getJson(route('game.ranking', $game->code))->assertJsonPath('open', true);
+        $this->get(route('game.show', $game->code))->assertInertia(fn (Assert $page) => $page->where('game.open', true));
+
+        $service->close($game);
+
+        $this->getJson(route('game.ranking', $game->code))->assertJsonPath('open', false);
+        $this->get(route('game.show', $game->code))->assertInertia(fn (Assert $page) => $page->where('game.open', false));
+
+        $service->reopen($game);
+
+        $this->getJson(route('game.ranking', $game->code))->assertJsonPath('open', true);
+
+        $service->delete($game);
+
+        $this->getJson(route('game.ranking', $game->code))->assertNotFound();
+    }
+
+    public function test_the_ranking_has_the_top_ten_plus_the_requesting_player(): void
+    {
+        $game = $this->createGame();
+        $service = app(AttentionGameService::class);
+        $players = [];
+
+        foreach (range(1, 12) as $number) {
+            [$players[$number]] = $service->join($game, "Jogador {$number}");
+        }
+
+        // On a tie the latest to join ranks first, so the first one is last.
+        $last = $players[1];
+
+        $this->getJson(route('game.ranking', $game->code))
+            ->assertJsonCount(10, 'ranking')
+            ->assertJsonPath('players', 12)
+            ->assertJsonMissingPath('summary');
+
+        $this->getJson(route('game.ranking', ['code' => $game->code, 'player' => $last->id]))
+            ->assertJsonCount(11, 'ranking')
+            ->assertJsonPath('ranking.10.id', $last->id)
+            ->assertJsonPath('ranking.10.position', 12);
+
+        $this->getJson(route('game.ranking', ['code' => $game->code, 'screen' => 1]))
+            ->assertJsonPath('summary.players', 12)
+            ->assertJsonCount(5, 'types');
     }
 
     public function test_the_public_pages_are_titled_without_the_app_name(): void

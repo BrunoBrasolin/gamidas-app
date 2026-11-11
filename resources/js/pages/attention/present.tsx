@@ -1,5 +1,6 @@
-import { Head, Link, usePoll } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Brain, Crown, Maximize, Medal } from 'lucide-react';
+import { useRoomSnapshot } from '@/hooks/use-room-snapshot';
 import {
     ATTENTION_INFO,
     ATTENTION_ORDER,
@@ -8,6 +9,7 @@ import {
 } from '@/lib/attention';
 import { cn } from '@/lib/utils';
 import attention from '@/routes/attention';
+import gameRoutes from '@/routes/game';
 import type {
     AttentionGame,
     AttentionRankingRow,
@@ -19,12 +21,19 @@ import type {
  * Projector screen: the QR code to join, live counters, the ranking and how
  * well each kind of attention is being recognized.
  */
+type Live = {
+    open: boolean;
+    ranking: AttentionRankingRow[];
+    summary: AttentionSummary;
+    types: AttentionTypeStats[];
+};
+
 export default function AttentionPresent({
     game,
     qr,
-    summary,
-    types,
-    ranking,
+    summary: initialSummary,
+    types: initialTypes,
+    ranking: initialRanking,
 }: {
     game: AttentionGame;
     qr: string;
@@ -32,7 +41,16 @@ export default function AttentionPresent({
     types: AttentionTypeStats[];
     ranking: AttentionRankingRow[];
 }) {
-    usePoll(3_000, { only: ['game', 'summary', 'types', 'ranking'] });
+    // The numbers come from the public, cached snapshot of the room instead of
+    // reloading this page: no session, no database connection per refresh.
+    const live = useRoomSnapshot<Live>(
+        gameRoutes.ranking.url(game.code, { query: { screen: 1 } }),
+        { intervalMs: 10_000, stopWhenClosed: false },
+    );
+    const summary = live?.summary ?? initialSummary;
+    const types = live?.types ?? initialTypes;
+    const ranking = live?.ranking ?? initialRanking;
+    const open = live?.open ?? game.open;
 
     function fullscreen() {
         void document.documentElement.requestFullscreen?.().catch(() => {
@@ -82,7 +100,7 @@ export default function AttentionPresent({
 
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
                     <section className="flex flex-col items-center gap-5 rounded-3xl bg-white/5 p-6 text-center">
-                        {game.open ? (
+                        {open ? (
                             <>
                                 <p className="text-xl font-semibold">
                                     Aponte a câmera do celular

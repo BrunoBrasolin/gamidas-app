@@ -1,16 +1,15 @@
 import {
-    Brain,
-    FolderOpen,
-    LibraryBig,
     BarChart3,
+    Brain,
     CalendarDays,
     Clapperboard,
     Dices,
+    FolderOpen,
     GraduationCap,
-    Home,
     Inbox,
     Landmark,
     LayoutGrid,
+    LibraryBig,
     Receipt,
     Repeat,
     Sheet,
@@ -26,181 +25,183 @@ import bank from '@/routes/bank';
 import calendar from '@/routes/calendar';
 import complementaryHours from '@/routes/complementary-hours';
 import expenses from '@/routes/expenses';
-import household from '@/routes/household';
+import knowledge from '@/routes/knowledge';
 import personal from '@/routes/personal';
 import recurringExpenses from '@/routes/recurring-expenses';
 import reports from '@/routes/reports';
 import roulette from '@/routes/roulette';
 import shows from '@/routes/shows';
-import knowledge from '@/routes/knowledge';
 import time from '@/routes/time';
 import watched from '@/routes/watched';
 import type { NavItem } from '@/types';
 
-export const mainNavItems: NavItem[] = [
+export type NavGroup = {
+    /** Shown above the group; the first group (home) has none. */
+    label?: string;
+    items: NavItem[];
+};
+
+/**
+ * The sidebar, one group per area of the app. Settings (the account and the
+ * household's salaries and members) live in the user menu, not here.
+ */
+export const navGroups: NavGroup[] = [
     {
-        title: 'Painel',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Agenda',
-        href: calendar.index(),
-        icon: CalendarDays,
-        activePrefix: '/dashboard/calendar',
-    },
-    {
-        title: 'Despesas da casa',
-        href: expenses.index(),
-        icon: Receipt,
-    },
-    {
-        title: 'Despesas recorrentes',
-        href: recurringExpenses.index(),
-        icon: Repeat,
-    },
-    {
-        title: 'Caixa de entrada',
-        href: bank.inbox(),
-        icon: Inbox,
-    },
-    {
-        title: 'Finanças pessoais',
-        href: personal.index(),
-        icon: Wallet,
         items: [
-            { title: 'Resumo', href: personal.index() },
-            { title: 'Receitas', href: personal.transactions.index('income') },
             {
-                title: 'Despesas',
-                href: personal.transactions.index('expenses'),
+                title: 'Painel',
+                href: dashboard(),
+                icon: LayoutGrid,
             },
             {
-                title: 'Investimentos',
-                href: personal.transactions.index('investments'),
+                title: 'Agenda',
+                href: calendar.index(),
+                icon: CalendarDays,
+                activePrefix: '/dashboard/calendar',
             },
         ],
     },
     {
-        title: 'Relatórios',
-        href: reports.index(),
-        icon: BarChart3,
+        label: 'Finanças',
+        items: [
+            {
+                title: 'Despesas da casa',
+                href: expenses.index(),
+                icon: Receipt,
+            },
+            {
+                title: 'Despesas recorrentes',
+                href: recurringExpenses.index(),
+                icon: Repeat,
+            },
+            {
+                title: 'Finanças pessoais',
+                href: personal.index(),
+                icon: Wallet,
+                activePrefix: '/personal',
+                items: [
+                    { title: 'Resumo', href: personal.index() },
+                    {
+                        title: 'Receitas',
+                        href: personal.transactions.index('income'),
+                    },
+                    {
+                        title: 'Despesas',
+                        href: personal.transactions.index('expenses'),
+                    },
+                    {
+                        title: 'Investimentos',
+                        href: personal.transactions.index('investments'),
+                    },
+                ],
+            },
+            {
+                title: 'Relatórios',
+                href: reports.index(),
+                icon: BarChart3,
+            },
+        ],
     },
     {
-        title: 'Configurações da casa',
-        href: household.salaries.edit(),
-        icon: Home,
-        activePrefix: '/household',
+        // Open Finance: banks connected through Pluggy, the inbox of their
+        // transactions and the rules that catalogue them (private to each user).
+        label: 'Bancos',
+        items: [
+            {
+                title: 'Caixa de entrada',
+                href: bank.inbox(),
+                icon: Inbox,
+            },
+            {
+                title: 'Contas e cartões',
+                href: bank.index(),
+                icon: Landmark,
+            },
+            {
+                title: 'Regras de catalogação',
+                href: bank.rules.index(),
+                icon: SlidersHorizontal,
+                activePrefix: '/bank/rules',
+            },
+        ],
+    },
+    {
+        // Personal time tracking (private to each user).
+        label: 'Tempo',
+        items: [
+            {
+                title: 'Planilha de horas',
+                href: time.index(),
+                icon: Sheet,
+            },
+            {
+                title: 'Categorias',
+                href: time.categories.index(),
+                icon: Tags,
+            },
+            {
+                title: 'Relatórios de tempo',
+                href: time.reports.index(),
+                icon: TrendingUp,
+            },
+        ],
+    },
+    {
+        // The knowledge base and complementary hours (private to each user)
+        // and the attention game (shared by the household).
+        label: 'Estudos',
+        items: [
+            {
+                title: 'Base de conhecimento',
+                href: knowledge.index(),
+                icon: LibraryBig,
+                activePrefix: '/knowledge',
+                inactivePrefix: '/knowledge/files',
+            },
+            {
+                title: 'Arquivos',
+                href: knowledge.files(),
+                icon: FolderOpen,
+                activePrefix: '/knowledge/files',
+            },
+            {
+                title: 'Horas complementares',
+                href: complementaryHours.index(),
+                icon: GraduationCap,
+                activePrefix: '/complementary-hours',
+            },
+            {
+                title: 'Jogo da Atenção',
+                href: attention.index(),
+                icon: Brain,
+                activePrefix: '/attention',
+            },
+        ],
+    },
+    {
+        // Shared by the household.
+        label: 'Lazer',
+        items: [
+            {
+                title: 'Shows',
+                href: shows.index(),
+                icon: Ticket,
+                activePrefix: '/shows',
+            },
+            {
+                title: 'Assistidos',
+                href: watched.index(),
+                icon: Clapperboard,
+                activePrefix: '/watched',
+            },
+            {
+                title: 'Roleta',
+                href: roulette.index(),
+                icon: Dices,
+                activePrefix: '/roulette',
+            },
+        ],
     },
 ];
 
-/**
- * Open Finance: the member's banks connected through Pluggy and the rules
- * that catalogue imported transactions (private to each user).
- */
-export const bankNavItems: NavItem[] = [
-    {
-        title: 'Contas e cartões',
-        href: bank.index(),
-        icon: Landmark,
-    },
-    {
-        title: 'Regras de catalogação',
-        href: bank.rules.index(),
-        icon: SlidersHorizontal,
-        activePrefix: '/bank/rules',
-    },
-];
-
-/**
- * The personal time tracking module (private to each user).
- */
-export const timeNavItems: NavItem[] = [
-    {
-        title: 'Planilha de horas',
-        href: time.index(),
-        icon: Sheet,
-    },
-    {
-        title: 'Categorias',
-        href: time.categories.index(),
-        icon: Tags,
-    },
-    {
-        title: 'Relatórios de tempo',
-        href: time.reports.index(),
-        icon: TrendingUp,
-    },
-];
-
-/**
- * Leisure: concerts of the household, what it watched on Jellyfin and the
- * food roulette.
- */
-export const showNavItems: NavItem[] = [
-    {
-        title: 'Shows',
-        href: shows.index(),
-        icon: Ticket,
-        activePrefix: '/shows',
-    },
-    {
-        title: 'Assistidos',
-        href: watched.index(),
-        icon: Clapperboard,
-        activePrefix: '/watched',
-    },
-    {
-        title: 'Roleta',
-        href: roulette.index(),
-        icon: Dices,
-        activePrefix: '/roulette',
-    },
-];
-
-/**
- * The knowledge base (private to each user).
- */
-export const knowledgeNavItems: NavItem[] = [
-    {
-        title: 'Matérias',
-        href: knowledge.index(),
-        icon: LibraryBig,
-        activePrefix: '/knowledge',
-        inactivePrefix: '/knowledge/files',
-    },
-    {
-        title: 'Arquivos',
-        href: knowledge.files(),
-        icon: FolderOpen,
-        activePrefix: '/knowledge/files',
-    },
-];
-
-/**
- * College: complementary hours (private to each user) and the attention
- * game (shared by the household).
- */
-export const collegeNavItems: NavItem[] = [
-    {
-        title: 'Horas complementares',
-        href: complementaryHours.index(),
-        icon: GraduationCap,
-        activePrefix: '/complementary-hours',
-    },
-    {
-        title: 'Jogo da Atenção',
-        href: attention.index(),
-        icon: Brain,
-        activePrefix: '/attention',
-    },
-];
-
-export const allNavItems: NavItem[] = [
-    ...mainNavItems,
-    ...bankNavItems,
-    ...timeNavItems,
-    ...knowledgeNavItems,
-    ...collegeNavItems,
-    ...showNavItems,
-];
+export const allNavItems: NavItem[] = navGroups.flatMap((group) => group.items);

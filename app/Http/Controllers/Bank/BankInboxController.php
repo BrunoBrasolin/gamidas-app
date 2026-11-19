@@ -34,7 +34,15 @@ class BankInboxController extends Controller
         $user = $this->user($request);
         $filters = $this->filters($request);
 
-        $transactions = $this->filteredQuery($user->id, $filters)
+        $query = $this->filteredQuery($user->id, $filters);
+
+        // Suggestions are worked out in PHP, so the filter narrows the query
+        // down to the transactions that have (or lack) one.
+        if ($filters['suggestion'] !== null) {
+            $query->whereIntegerInRaw('id', $catalog->idsBySuggestion($query, $user, $filters['suggestion'] === 'with'));
+        }
+
+        $transactions = $query
             ->with(['account', 'bill', 'expenseOccurrence', 'personalTransaction', 'offsetTransaction'])
             ->orderByDesc('date')
             ->orderByDesc('id')
@@ -144,24 +152,30 @@ class BankInboxController extends Controller
     }
 
     /**
-     * @return array{status: string, account: ?int, channel: ?string, month: ?string}
+     * Suggestions exist only for pending transactions, so the suggestion
+     * filter applies to that tab alone.
+     *
+     * @return array{status: string, account: ?int, channel: ?string, month: ?string, suggestion: ?string}
      */
     private function filters(Request $request): array
     {
         $status = $request->query('status');
+        $status = in_array($status, ['pending', 'catalogued', 'ignored', 'removed', 'all'], true) ? $status : 'pending';
         $channel = $request->query('channel');
         $month = $request->query('month');
+        $suggestion = $request->query('suggestion');
 
         return [
-            'status' => in_array($status, ['pending', 'catalogued', 'ignored', 'removed', 'all'], true) ? $status : 'pending',
+            'status' => $status,
             'account' => $request->integer('account') ?: null,
             'channel' => in_array($channel, ['pix', 'card', 'transfer', 'other'], true) ? $channel : null,
             'month' => is_string($month) && preg_match(Month::PATTERN, $month) === 1 ? $month : null,
+            'suggestion' => $status === 'pending' && in_array($suggestion, ['with', 'without'], true) ? $suggestion : null,
         ];
     }
 
     /**
-     * @param  array{status: string, account: ?int, channel: ?string, month: ?string}  $filters
+     * @param  array{status: string, account: ?int, channel: ?string, month: ?string, suggestion: ?string}  $filters
      * @return Builder<BankTransaction>
      */
     private function filteredQuery(int $userId, array $filters): Builder

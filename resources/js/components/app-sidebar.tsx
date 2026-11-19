@@ -13,14 +13,7 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from '@/components/ui/sidebar';
-import {
-    bankNavItems,
-    collegeNavItems,
-    mainNavItems,
-    showNavItems,
-    knowledgeNavItems,
-    timeNavItems,
-} from '@/lib/navigation';
+import { navGroups } from '@/lib/navigation';
 import { dashboard } from '@/routes';
 
 export function AppSidebar() {
@@ -47,15 +40,13 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
-                <NavMain items={bankNavItems} label="Open Finance" />
-                <NavMain items={timeNavItems} label="Tempo" />
-                <NavMain
-                    items={knowledgeNavItems}
-                    label="Base de Conhecimento"
-                />
-                <NavMain items={collegeNavItems} label="Faculdade" />
-                <NavMain items={showNavItems} label="Lazer" />
+                {navGroups.map((group, index) => (
+                    <NavMain
+                        key={group.label ?? index}
+                        items={group.items}
+                        label={group.label}
+                    />
+                ))}
             </SidebarContent>
 
             <SidebarFooter>

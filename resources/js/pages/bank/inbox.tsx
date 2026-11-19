@@ -43,6 +43,7 @@ type Filters = {
     account: number | null;
     channel: 'pix' | 'card' | 'transfer' | 'other' | null;
     month: string | null;
+    suggestion: 'with' | 'without' | null;
 };
 
 type Props = {
@@ -64,6 +65,11 @@ export default function BankInbox({
     const suggested = transactions.data.filter(
         (transaction) => transaction.suggestion !== null,
     ).length;
+    const hasFilters =
+        filters.account !== null ||
+        filters.channel !== null ||
+        filters.month !== null ||
+        filters.suggestion !== null;
 
     return (
         <>
@@ -121,7 +127,15 @@ export default function BankInbox({
                                 <button
                                     key={status}
                                     type="button"
-                                    onClick={() => apply({ status })}
+                                    onClick={() =>
+                                        apply({
+                                            status,
+                                            suggestion:
+                                                status === 'pending'
+                                                    ? filters.suggestion
+                                                    : null,
+                                        })
+                                    }
                                     aria-current={
                                         filters.status === status
                                             ? 'page'
@@ -165,7 +179,7 @@ export default function BankInbox({
                             </Alert>
                         )}
 
-                        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                             <FilterSelect
                                 id="filter-account"
                                 label="Conta"
@@ -217,9 +231,25 @@ export default function BankInbox({
                                     }
                                 />
                             </div>
-                            {(filters.account !== null ||
-                                filters.channel !== null ||
-                                filters.month !== null) && (
+                            {filters.status === 'pending' && (
+                                <FilterSelect
+                                    id="filter-suggestion"
+                                    label="Sugestão"
+                                    value={filters.suggestion ?? ''}
+                                    onChange={(value) =>
+                                        apply({
+                                            suggestion: (value ||
+                                                null) as Filters['suggestion'],
+                                        })
+                                    }
+                                    options={[
+                                        ['', 'Todas'],
+                                        ['with', 'Com sugestão'],
+                                        ['without', 'Sem sugestão'],
+                                    ]}
+                                />
+                            )}
+                            {hasFilters && (
                                 <div className="flex items-end">
                                     <Button
                                         variant="ghost"
@@ -228,6 +258,7 @@ export default function BankInbox({
                                                 account: null,
                                                 channel: null,
                                                 month: null,
+                                                suggestion: null,
                                             })
                                         }
                                     >
@@ -241,12 +272,12 @@ export default function BankInbox({
                             <EmptyState
                                 icon={Inbox}
                                 title={
-                                    filters.status === 'pending'
+                                    filters.status === 'pending' && !hasFilters
                                         ? 'Tudo catalogado'
                                         : 'Nenhuma transação'
                                 }
                                 description={
-                                    filters.status === 'pending'
+                                    filters.status === 'pending' && !hasFilters
                                         ? 'As próximas transações dos seus bancos aparecem aqui assim que chegarem.'
                                         : 'Nenhuma transação corresponde aos filtros.'
                                 }

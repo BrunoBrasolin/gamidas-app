@@ -373,6 +373,52 @@ class BankInboxTest extends TestCase
         $this->assertTrue($other->fresh()->isPending());
     }
 
+    public function test_the_inbox_filters_pending_transactions_by_suggestion(): void
+    {
+        BankRule::create(['user_id' => $this->bruno->id, 'pattern' => 'fulano de tal', 'label' => 'Fulano de Tal', 'action' => BankRuleAction::Personal]);
+        $older = $this->pix(date: '2026-11-04');
+        $newer = $this->pix(date: '2026-11-06');
+        $without = $this->createBankTransaction($this->card, ['description' => 'Sem regra', 'date' => '2026-11-05T00:00:00.000Z']);
+        $catalogued = $this->createBankTransaction($this->card, ['description' => 'Já catalogada']);
+        $this->actingAs($this->bruno)->post(route('bank.transactions.catalog', $catalogued), ['action' => 'personal', 'remember' => '0']);
+
+        $this->actingAs($this->bruno)
+            ->get(route('bank.inbox', ['suggestion' => 'with']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.suggestion', 'with')
+                ->has('transactions.data', 2)
+                ->where('transactions.data.0.id', $newer->id)
+                ->where('transactions.data.1.id', $older->id)
+                ->where('counts.pending', 3));
+
+        $this->actingAs($this->bruno)
+            ->get(route('bank.inbox', ['suggestion' => 'without']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.suggestion', 'without')
+                ->has('transactions.data', 1)
+                ->where('transactions.data.0.id', $without->id)
+                ->where('transactions.data.0.suggestion', null));
+
+        // Combines with the other filters.
+        $this->actingAs($this->bruno)
+            ->get(route('bank.inbox', ['suggestion' => 'with', 'account' => $this->card->id]))
+            ->assertInertia(fn (Assert $page) => $page->has('transactions.data', 0));
+
+        // Only pending transactions have suggestions: other tabs ignore it.
+        $this->actingAs($this->bruno)
+            ->get(route('bank.inbox', ['status' => 'catalogued', 'suggestion' => 'without']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.suggestion', null)
+                ->has('transactions.data', 1)
+                ->where('transactions.data.0.id', $catalogued->id));
+
+        $this->actingAs($this->bruno)
+            ->get(route('bank.inbox', ['suggestion' => 'maybe']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.suggestion', null)
+                ->has('transactions.data', 3));
+    }
+
     public function test_undo_removes_the_created_expense_and_brings_the_transaction_back(): void
     {
         $transaction = $this->createBankTransaction($this->card);

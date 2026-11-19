@@ -51,6 +51,12 @@ final class BankCatalogService
     private const MAX_CANDIDATES = 6;
 
     /**
+     * Pending transactions looked at when filtering the inbox by suggestion
+     * (the newest ones), since each suggestion is worked out one by one.
+     */
+    private const SUGGESTION_FILTER_LIMIT = 500;
+
+    /**
      * Closed bills per card account, loaded once per request.
      *
      * @var array<int, Collection<int, BankBill>>
@@ -390,6 +396,35 @@ final class BankCatalogService
             null,
             $best['occurrence'],
         );
+    }
+
+    /**
+     * The pending transactions of the query the inbox has a suggestion for
+     * (or, with $suggested false, has none for), to filter the inbox by it.
+     * Only the newest SUGGESTION_FILTER_LIMIT are looked at.
+     *
+     * @param  Builder<BankTransaction>  $query  The owner's transactions, already filtered.
+     * @return array<int, int>
+     */
+    public function idsBySuggestion(Builder $query, User $user, bool $suggested): array
+    {
+        $transactions = (clone $query)
+            ->where('review_status', BankReviewStatus::Pending)
+            ->whereNull('removed_at')
+            ->with(['account', 'bill'])
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->limit(self::SUGGESTION_FILTER_LIMIT)
+            ->get();
+        $transactions->each(fn (BankTransaction $transaction) => $transaction->setRelation('user', $user));
+
+        $rules = $this->rules->rulesOf($user->id);
+        $candidates = $this->candidates($transactions, $user);
+
+        return $transactions
+            ->filter(fn (BankTransaction $transaction) => $suggested === ($this->suggest($transaction, $rules, $candidates[$transaction->id] ?? []) !== null))
+            ->map(fn (BankTransaction $transaction) => $transaction->id)
+            ->all();
     }
 
     public function suggestionFromRule(BankTransaction $transaction, BankRule $rule): ?BankSuggestion

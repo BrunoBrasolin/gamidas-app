@@ -133,7 +133,7 @@ class BankSettlementTest extends TestCase
                 ->where('transactions.data.0.settlement_ids', $this->ids($bills))
                 ->where('transactions.data.0.suggestion.action', 'settlement')
                 ->where('transactions.data.0.suggestion.occurrence_ids', $this->ids($bills))
-                ->where('transactions.data.0.suggestion.label', 'Acerto da casa: outubro/2026 (3 despesas)'));
+                ->where('transactions.data.0.suggestion.label', 'Acerto da casa: 10/2026 (3 despesas)'));
     }
 
     public function test_settling_pays_each_expense_in_the_name_of_who_owed_the_share(): void

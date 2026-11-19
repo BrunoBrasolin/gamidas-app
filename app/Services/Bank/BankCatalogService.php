@@ -947,9 +947,7 @@ final class BankCatalogService
 
     private function monthLabel(CarbonImmutable $month): string
     {
-        $names = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-
-        return $names[$month->month - 1].'/'.$month->year;
+        return $month->format('m/Y');
     }
 
     private function installmentLabel(ExpenseOccurrence $occurrence): string

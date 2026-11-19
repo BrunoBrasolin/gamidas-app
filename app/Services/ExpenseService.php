@@ -143,7 +143,8 @@ final class ExpenseService
      * removed (soft deleted, so it is not generated again, as when a month
      * is removed by hand) and becomes a one-off personal bill with the same
      * title, notes, amount and due date. Bank transactions catalogued as (or
-     * linked to) the expense follow it. Returns the personal expense.
+     * linked to) the expense follow it, as do the parts of split ones.
+     * Returns the personal expense.
      */
     public function moveToPersonal(ExpenseOccurrence $occurrence, User $actor): ExpenseOccurrence
     {
@@ -175,6 +176,7 @@ final class ExpenseService
                 ]);
 
                 $occurrence->bankTransactions()->update(['expense_occurrence_id' => $personal->id]);
+                $occurrence->bankSplitItems()->update(['expense_occurrence_id' => $personal->id]);
                 $occurrence->update(['updated_by_user_id' => $actor->id]);
                 $occurrence->delete();
             } else {

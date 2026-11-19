@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\BankSplitItem;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
 use App\Models\User;
@@ -59,11 +60,16 @@ class ExpenseOccurrencePolicy
         $transactions = $occurrence->relationLoaded('bankTransactions')
             ? $occurrence->bankTransactions
             : $occurrence->bankTransactions()->get(['id', 'expense_occurrence_id', 'user_id']);
+        $parts = $occurrence->relationLoaded('bankSplitItems')
+            ? $occurrence->bankSplitItems
+            : $occurrence->bankSplitItems()->get(['id', 'expense_occurrence_id', 'user_id']);
 
-        $foreign = $transactions->first(fn (BankTransaction $transaction) => $transaction->user_id !== $user->id);
+        // As a whole or as a part of a split transaction.
+        $foreign = $transactions->first(fn (BankTransaction $transaction) => $transaction->user_id !== $user->id)->user_id
+            ?? $parts->first(fn (BankSplitItem $part) => $part->user_id !== $user->id)?->user_id;
 
         if ($foreign !== null) {
-            $owner = User::query()->find($foreign->user_id)?->firstName() ?? 'outro membro';
+            $owner = User::query()->find($foreign)?->firstName() ?? 'outro membro';
 
             return Response::deny("Esta despesa está vinculada ao extrato de {$owner}; só {$owner} pode movê-la para as próprias finanças pessoais.");
         }

@@ -61,7 +61,41 @@ export type BankCatalogAction =
     | 'link'
     | 'ignore'
     | 'offset'
-    | 'settlement';
+    | 'settlement'
+    | 'split';
+
+/** The expense a transaction (or one part of it) became. */
+export type BankDestinationExpense =
+    | { missing: true }
+    | {
+          missing: false;
+          id: number;
+          title: string;
+          scope: 'household' | 'personal';
+          billing_month: string;
+          status: 'pending' | 'paid';
+      };
+
+/** The personal entry a transaction (or one part of it) became. */
+export type BankDestinationEntry =
+    | { missing: true }
+    | {
+          missing: false;
+          id: number;
+          type: 'income' | 'expense' | 'investment';
+          slug: 'income' | 'expenses' | 'investments';
+          title: string;
+          month: string;
+      };
+
+/** One part of a transaction whose value was split. */
+export type BankSplitPart = {
+    type: 'household' | 'linked' | 'personal' | 'investment';
+    label: string;
+    amount_cents: number;
+    expense: BankDestinationExpense | null;
+    entry: BankDestinationEntry | null;
+};
 
 /** The other side of a refund and its charge, which cancel each other out. */
 export type BankOffsetSide = {
@@ -133,32 +167,15 @@ export type BankTransaction = {
         | 'income'
         | 'investment'
         | 'settlement'
+        | 'split'
         | null;
     catalog_label: string | null;
     ignore_reason: 'bill_payment' | 'user' | 'offset' | null;
     removed: boolean;
-    expense:
-        | { missing: true }
-        | {
-              missing: false;
-              id: number;
-              title: string;
-              scope: 'household' | 'personal';
-              billing_month: string;
-              status: 'pending' | 'paid';
-          }
-        | null;
-    entry:
-        | { missing: true }
-        | {
-              missing: false;
-              id: number;
-              type: 'income' | 'expense' | 'investment';
-              slug: 'income' | 'expenses' | 'investments';
-              title: string;
-              month: string;
-          }
-        | null;
+    expense: BankDestinationExpense | null;
+    entry: BankDestinationEntry | null;
+    /** The parts of a transaction whose value was split. */
+    split: BankSplitPart[] | null;
     /** What a house settlement paid. */
     settlement: { count: number; months: string[] } | null;
     /** The household expenses whose shares add up to the transfer. */

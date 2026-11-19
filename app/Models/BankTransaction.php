@@ -56,6 +56,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read BankBill|null $bill
  * @property-read BankTransaction|null $offsetTransaction
  * @property-read Collection<int, BankSettlementItem> $settlementItems
+ * @property-read Collection<int, BankSplitItem> $splitItems
  */
 #[Fillable([
     'bank_account_id', 'user_id', 'pluggy_id', 'date', 'description', 'amount_cents', 'direction', 'channel',
@@ -203,6 +204,16 @@ class BankTransaction extends Model
     public function settlementItems(): HasMany
     {
         return $this->hasMany(BankSettlementItem::class);
+    }
+
+    /**
+     * The parts of a transaction whose value was split.
+     *
+     * @return HasMany<BankSplitItem, $this>
+     */
+    public function splitItems(): HasMany
+    {
+        return $this->hasMany(BankSplitItem::class)->orderBy('id');
     }
 
     /**

@@ -54,6 +54,7 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $payer
  * @property-read Collection<int, BankTransaction> $bankTransactions
  * @property-read Collection<int, BankSettlementItem> $settlementItems
+ * @property-read Collection<int, BankSplitItem> $bankSplitItems
  */
 #[Fillable([
     'household_id', 'scope', 'owner_user_id', 'source', 'recurring_expense_id',
@@ -139,6 +140,23 @@ class ExpenseOccurrence extends Model
     public function scopeHousehold(Builder $query, int $householdId): void
     {
         $query->where($query->qualifyColumn('household_id'), $householdId)->where($query->qualifyColumn('scope'), ExpenseScope::Household);
+    }
+
+    /**
+     * Not linked yet to a bank transaction still at the bank, as a whole or
+     * through a part of a split one. The links of $exceptTransactionId are
+     * not counted.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeWithoutBankLink(Builder $query, ?int $exceptTransactionId = null): void
+    {
+        $current = fn (Builder $query) => $query
+            ->whereNull('removed_at')
+            ->when($exceptTransactionId !== null, fn (Builder $query) => $query->whereKeyNot($exceptTransactionId));
+
+        $query->whereDoesntHave('bankTransactions', $current)
+            ->whereDoesntHave('bankSplitItems', fn (Builder $query) => $query->whereHas('bankTransaction', $current));
     }
 
     /**
@@ -260,6 +278,17 @@ class ExpenseOccurrence extends Model
     public function bankTransactions(): HasMany
     {
         return $this->hasMany(BankTransaction::class);
+    }
+
+    /**
+     * Parts of split bank transactions that created or were linked to this
+     * expense: the proof of payment of part of a transaction.
+     *
+     * @return HasMany<BankSplitItem, $this>
+     */
+    public function bankSplitItems(): HasMany
+    {
+        return $this->hasMany(BankSplitItem::class);
     }
 
     /**

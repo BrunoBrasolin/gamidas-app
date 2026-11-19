@@ -11,8 +11,10 @@ use App\Models\BankConnection;
 use App\Models\BankInvestment;
 use App\Models\BankRule;
 use App\Models\BankSettlementItem;
+use App\Models\BankSplitItem;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
+use App\Models\PersonalTransaction;
 use App\Services\Bank\BankConnectionService;
 use App\Services\Bank\BankSuggestion;
 use App\Services\Bank\SettlementCandidate;
@@ -115,9 +117,6 @@ final class BankPresenter
     {
         $offset = $transaction->offsetTransaction;
 
-        $occurrence = $transaction->expenseOccurrence;
-        $entry = $transaction->personalTransaction;
-
         return [
             'id' => $transaction->id,
             'date' => $transaction->date->toDateString(),
@@ -140,35 +139,26 @@ final class BankPresenter
             ],
             'review_status' => $transaction->review_status->value,
             'catalog_type' => $transaction->catalog_type?->value,
-            // A household expense created here may have been moved to the
-            // owner's personal finances later.
-            'catalog_label' => $transaction->catalog_type === BankCatalogType::Household && $occurrence?->scope === ExpenseScope::Personal
-                ? 'Conta pessoal'
-                : $transaction->catalog_type?->label(),
+            'catalog_label' => $this->catalogLabel($transaction->catalog_type, $transaction->expenseOccurrence),
             'ignore_reason' => $transaction->ignore_reason,
             'removed' => $transaction->removed_at !== null,
-            'expense' => $transaction->expense_occurrence_id === null ? null : ($occurrence === null
-                ? ['missing' => true]
-                : [
-                    'missing' => false,
-                    'id' => $occurrence->id,
-                    'title' => $occurrence->title,
-                    'scope' => $occurrence->scope->value,
-                    'billing_month' => $occurrence->billing_month->format('Y-m'),
-                    'status' => $occurrence->status->value,
-                ]),
+            'expense' => $transaction->expense_occurrence_id === null ? null : $this->destinationExpense($transaction->expenseOccurrence),
             'entry' => $transaction->personal_transaction_id === null && ! in_array($transaction->catalog_type?->value, ['personal', 'income', 'investment'], true)
                 ? null
-                : ($entry === null
-                    ? ['missing' => true]
-                    : [
-                        'missing' => false,
-                        'id' => $entry->id,
-                        'type' => $entry->type->value,
-                        'slug' => $entry->type->slug(),
-                        'title' => $entry->title,
-                        'month' => $entry->transaction_date->format('Y-m'),
-                    ]),
+                : $this->destinationEntry($transaction->personalTransaction),
+            'split' => $transaction->catalog_type === BankCatalogType::Split && $transaction->relationLoaded('splitItems')
+                ? $transaction->splitItems->map(fn (BankSplitItem $item) => [
+                    'type' => $item->type->value,
+                    'label' => $this->catalogLabel($item->type, $item->occurrence),
+                    'amount_cents' => $item->amount_cents,
+                    'expense' => $item->type === BankCatalogType::Household || $item->type === BankCatalogType::Linked
+                        ? $this->destinationExpense($item->occurrence)
+                        : null,
+                    'entry' => $item->type === BankCatalogType::Personal || $item->type === BankCatalogType::Investment
+                        ? $this->destinationEntry($item->personalTransaction)
+                        : null,
+                ])->values()->all()
+                : null,
             'settlement' => $transaction->catalog_type === BankCatalogType::Settlement && $transaction->relationLoaded('settlementItems')
                 ? $this->settlement($transaction)
                 : null,
@@ -215,6 +205,54 @@ final class BankPresenter
             'auto_apply' => $rule->auto_apply,
             'hits' => $rule->hits,
             'last_used_at' => $rule->last_used_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * What a transaction (or a part of it) became. A household expense
+     * created here may have been moved to the owner's personal finances
+     * later.
+     */
+    private function catalogLabel(?BankCatalogType $type, ?ExpenseOccurrence $occurrence): ?string
+    {
+        return $type === BankCatalogType::Household && $occurrence?->scope === ExpenseScope::Personal
+            ? 'Conta pessoal'
+            : $type?->label();
+    }
+
+    /**
+     * The expense a transaction (or a part of it) became, or a note that it
+     * was removed since.
+     *
+     * @return array<string, mixed>
+     */
+    private function destinationExpense(?ExpenseOccurrence $occurrence): array
+    {
+        return $occurrence === null ? ['missing' => true] : [
+            'missing' => false,
+            'id' => $occurrence->id,
+            'title' => $occurrence->title,
+            'scope' => $occurrence->scope->value,
+            'billing_month' => $occurrence->billing_month->format('Y-m'),
+            'status' => $occurrence->status->value,
+        ];
+    }
+
+    /**
+     * The personal entry a transaction (or a part of it) became, or a note
+     * that it was removed since.
+     *
+     * @return array<string, mixed>
+     */
+    private function destinationEntry(?PersonalTransaction $entry): array
+    {
+        return $entry === null ? ['missing' => true] : [
+            'missing' => false,
+            'id' => $entry->id,
+            'type' => $entry->type->value,
+            'slug' => $entry->type->slug(),
+            'title' => $entry->title,
+            'month' => $entry->transaction_date->format('Y-m'),
         ];
     }
 

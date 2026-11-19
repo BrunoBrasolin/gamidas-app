@@ -46,7 +46,7 @@ class BankInboxController extends Controller
         }
 
         $transactions = $query
-            ->with(['account', 'bill', 'expenseOccurrence', 'personalTransaction', 'offsetTransaction', 'settlementItems.occurrence:id,title,billing_month,status'])
+            ->with(['account', 'bill', 'expenseOccurrence', 'personalTransaction', 'offsetTransaction', 'settlementItems.occurrence:id,title,billing_month,status', 'splitItems.occurrence', 'splitItems.personalTransaction'])
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->paginate(50)

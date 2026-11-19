@@ -13,6 +13,7 @@ use App\Enums\OccurrenceStatus;
 use App\Enums\TransactionType;
 use App\Models\BankRule;
 use App\Models\BankSettlementItem;
+use App\Models\BankSplitItem;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
 use App\Models\PersonalTransaction;
@@ -20,6 +21,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ExpenseService;
 use App\Services\PaymentService;
+use App\Support\Money;
 use App\Support\Month;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -34,8 +36,10 @@ use Illuminate\Validation\ValidationException;
  * The inbox of imported transactions: catalogues each one as a household or
  * personal expense, links it to an expense that already exists (this
  * month's rent, an installment typed by hand), records it as income or an
- * investment, or ignores it, and undoes any of that. Every decision can be
- * remembered as a rule that suggests the same for the next ones.
+ * investment, splits its value into parts catalogued on their own (part an
+ * existing expense, part a personal one), or ignores it, and undoes any of
+ * that. Every decision but a split can be remembered as a rule that
+ * suggests the same for the next ones.
  *
  * Payment confirmation keeps its rule: linking marks the expense as paid
  * only when the policy lets the owner confirm it; a household expense the
@@ -159,20 +163,13 @@ final class BankCatalogService
             $ruleAction = null;
             $recurringExpenseId = null;
             $settled = null;
+            $parts = null;
 
             $attributes = ['review_status' => BankReviewStatus::Catalogued, 'ignore_reason' => null, 'reviewed_at' => $now];
 
             switch ($choice->action) {
                 case 'household':
-                    $occurrence = $this->expenses->create($actor->household(), $actor, [
-                        'scope' => ExpenseScope::Household,
-                        'title' => $title,
-                        'notes' => $choice->notes,
-                        'amount_cents' => $transaction->amount_cents,
-                        'due_date' => $date,
-                        'installment_number' => $transaction->installment_number,
-                        'installment_count' => $transaction->installment_count,
-                    ]);
+                    $occurrence = $this->createHouseholdExpense($transaction, $actor, $title, $choice->notes, $transaction->amount_cents, $date);
                     $attributes += ['catalog_type' => BankCatalogType::Household, 'expense_occurrence_id' => $occurrence->id];
                     $ruleAction = BankRuleAction::Household;
                     break;
@@ -180,20 +177,7 @@ final class BankCatalogService
                 case 'personal':
                 case 'income':
                 case 'investment':
-                    $type = match ($choice->action) {
-                        'personal' => TransactionType::Expense,
-                        'income' => TransactionType::Income,
-                        default => TransactionType::Investment,
-                    };
-
-                    $entry = PersonalTransaction::create([
-                        'user_id' => $actor->id,
-                        'type' => $type,
-                        'title' => $title,
-                        'amount_cents' => $transaction->amount_cents,
-                        'transaction_date' => $date,
-                        'notes' => $choice->notes,
-                    ]);
+                    $entry = $this->createEntry($actor, $choice->action, $title, $transaction->amount_cents, $date, $choice->notes);
 
                     $attributes += [
                         'catalog_type' => BankCatalogType::from($choice->action),
@@ -218,6 +202,11 @@ final class BankCatalogService
                     $ruleAction = BankRuleAction::Settlement;
                     break;
 
+                case 'split':
+                    $parts = $this->split($transaction, $actor, $choice, $date);
+                    $attributes += ['catalog_type' => BankCatalogType::Split];
+                    break;
+
                 default:
                     $attributes = [
                         'review_status' => BankReviewStatus::Ignored,
@@ -234,7 +223,8 @@ final class BankCatalogService
                 'amount_cents' => $transaction->amount_cents,
                 'expense_occurrence_id' => $transaction->expense_occurrence_id,
                 'personal_transaction_id' => $transaction->personal_transaction_id,
-            ] + ($settled !== null ? ['settlement' => $settled + ['occurrence_ids' => $choice->occurrenceIds]] : []));
+            ] + ($settled !== null ? ['settlement' => $settled + ['occurrence_ids' => $choice->occurrenceIds]] : [])
+              + ($parts !== null ? ['parts' => $parts] : []));
 
             if ($choice->remember && $ruleAction !== null) {
                 $this->rules->learn($actor, $transaction, $ruleAction, $title, $recurringExpenseId, $choice->autoApply, $choice->rememberAmount);
@@ -307,8 +297,9 @@ final class BankCatalogService
 
     /**
      * Put a catalogued or ignored transaction back in the inbox, removing the
-     * expense or personal entry it created. A linked expense is only
-     * unlinked: its amount and payment stay as they are.
+     * expense or personal entry it created (each part's, for a split one). A
+     * linked expense is only unlinked: its amount and payment stay as they
+     * are.
      */
     public function reopen(BankTransaction $transaction, User $actor): void
     {
@@ -344,6 +335,10 @@ final class BankCatalogService
             // A settlement's expenses become pending again.
             if ($transaction->catalog_type === BankCatalogType::Settlement) {
                 $this->settlements->undo($transaction, $actor);
+            }
+
+            if ($transaction->catalog_type === BankCatalogType::Split) {
+                $old['parts'] = $this->undoSplit($transaction, $actor);
             }
 
             if ($transaction->catalog_type === BankCatalogType::Household && $transaction->expense_occurrence_id !== null) {
@@ -491,7 +486,8 @@ final class BankCatalogService
      * usually carries the purchase date), same installment, similar title.
      * Expenses already paid count too — history imported after the bills were
      * typed and paid by hand — and, on a tie, come after the pending ones.
-     * Expenses already linked to another transaction are left out.
+     * Expenses already linked to another transaction (or to a part of a split
+     * one) are left out.
      *
      * @param  Collection<int, BankTransaction>  $transactions
      * @return array<int, list<array{occurrence: ExpenseOccurrence, score: int, strong: bool}>>
@@ -520,7 +516,7 @@ final class BankCatalogService
         $occurrences = ExpenseOccurrence::query()
             ->visibleTo($user)
             ->whereBetween('due_date', [$this->dateOf($from - self::LINK_WINDOW_DAYS), $this->dateOf($to + self::LINK_WINDOW_DAYS)])
-            ->whereDoesntHave('bankTransactions', fn (Builder $query) => $query->whereNull('removed_at'))
+            ->withoutBankLink()
             ->orderBy('due_date')
             ->limit(self::MAX_LOADED_OCCURRENCES)
             ->get()
@@ -616,7 +612,7 @@ final class BankCatalogService
                         ->whereBetween('due_date', [$from->subMonths(self::PAID_LINK_MONTHS)->toDateString(), $to->addMonths(self::PAID_LINK_MONTHS)->toDateString()]));
                 }
             })
-            ->whereDoesntHave('bankTransactions', fn (Builder $query) => $query->whereNull('removed_at'))
+            ->withoutBankLink()
             ->orderBy('due_date')
             ->orderBy('id')
             ->limit(1000)
@@ -698,38 +694,38 @@ final class BankCatalogService
 
     /**
      * Link to an expense the actor can see, setting its amount to what the
-     * bank shows (variable bills get their real value) and confirming the
-     * payment when the actor is allowed to. An expense already paid (history
+     * bank shows (variable bills get their real value) — or, for a part of
+     * a split transaction, to the part's value — and confirming the payment
+     * when the actor is allowed to. An expense already paid (history
      * imported after it was paid by hand) cannot change: it only gets the
      * bank proof, its amount and payment stay as they are.
+     *
+     * @param  string  $field  Where a validation error is reported.
      */
-    private function link(BankTransaction $transaction, User $actor, ?int $occurrenceId): ExpenseOccurrence
+    private function link(BankTransaction $transaction, User $actor, ?int $occurrenceId, ?int $amountCents = null, string $field = 'occurrence_id'): ExpenseOccurrence
     {
+        $amountCents ??= $transaction->amount_cents;
         $occurrence = $occurrenceId === null ? null : ExpenseOccurrence::query()->visibleTo($actor)->find($occurrenceId);
 
         if ($occurrence === null) {
-            throw ValidationException::withMessages(['occurrence_id' => 'Escolha uma despesa da casa ou sua.']);
+            throw ValidationException::withMessages([$field => 'Escolha uma despesa da casa ou sua.']);
         }
 
-        $taken = BankTransaction::query()
-            ->where('expense_occurrence_id', $occurrence->id)
-            ->whereKeyNot($transaction->id)
-            ->whereNull('removed_at')
-            ->exists();
+        $taken = ExpenseOccurrence::query()->whereKey($occurrence->id)->withoutBankLink($transaction->id)->doesntExist();
 
         if ($taken) {
-            throw ValidationException::withMessages(['occurrence_id' => 'Esta despesa já está vinculada a outra transação do banco.']);
+            throw ValidationException::withMessages([$field => "“{$occurrence->title}” já está vinculada a outra transação do banco."]);
         }
 
         if ($occurrence->isPaid()) {
             return $occurrence;
         }
 
-        if ($occurrence->amount_cents !== $transaction->amount_cents) {
+        if ($occurrence->amount_cents !== $amountCents) {
             $occurrence = $this->expenses->update($occurrence, $actor, [
                 'title' => $occurrence->title,
                 'notes' => $occurrence->notes,
-                'amount_cents' => $transaction->amount_cents,
+                'amount_cents' => $amountCents,
                 'due_date' => $occurrence->due_date,
             ]);
         }
@@ -759,7 +755,7 @@ final class BankCatalogService
             ->visibleTo($transaction->user)
             ->where('recurring_expense_id', $rule->recurring_expense_id)
             ->whereBetween('due_date', [$reference->subDays(self::LINK_WINDOW_DAYS)->toDateString(), $reference->addDays(self::LINK_WINDOW_DAYS)->toDateString()])
-            ->whereDoesntHave('bankTransactions', fn (Builder $query) => $query->whereNull('removed_at')->whereKeyNot($transaction->id))
+            ->withoutBankLink($transaction->id)
             ->get()
             ->sortBy(fn (ExpenseOccurrence $occurrence) => [abs($this->dayNumber($occurrence->due_date) - $this->dayNumber($reference)), $occurrence->isPaid()])
             ->first();
@@ -801,6 +797,10 @@ final class BankCatalogService
             ]);
 
             BankSettlementItem::query()
+                ->where('bank_transaction_id', $replaced->id)
+                ->update(['bank_transaction_id' => $transaction->id]);
+
+            BankSplitItem::query()
                 ->where('bank_transaction_id', $replaced->id)
                 ->update(['bank_transaction_id' => $transaction->id]);
 
@@ -846,6 +846,168 @@ final class BankCatalogService
 
             return $transaction->fresh() ?? $transaction;
         });
+    }
+
+    /**
+     * Split the transaction's value into parts, each catalogued on its own:
+     * a new household expense, a link to an expense that already exists, or
+     * a personal expense or investment. The parts must add up to the
+     * transaction, and an expense goes into one part only.
+     *
+     * @return list<array{type: string, amount_cents: int, expense_occurrence_id: int|null, personal_transaction_id: int|null}>
+     */
+    private function split(BankTransaction $transaction, User $actor, CatalogChoice $choice, CarbonImmutable $date): array
+    {
+        $parts = $choice->parts;
+
+        if (count($parts) < 2 || count($parts) > CatalogChoice::MAX_PARTS) {
+            throw ValidationException::withMessages(['parts' => 'Divida o valor em 2 a '.CatalogChoice::MAX_PARTS.' partes.']);
+        }
+
+        foreach ($parts as $index => $part) {
+            if (! in_array($part->action, SplitPart::ACTIONS, true)) {
+                throw ValidationException::withMessages(["parts.{$index}.action" => 'Escolha o que é esta parte.']);
+            }
+
+            if ($part->amountCents <= 0) {
+                throw ValidationException::withMessages(["parts.{$index}.amount" => 'Informe o valor desta parte.']);
+            }
+        }
+
+        $total = array_sum(array_map(fn (SplitPart $part) => $part->amountCents, $parts));
+
+        if ($total !== $transaction->amount_cents) {
+            throw ValidationException::withMessages([
+                'parts' => 'As partes somam '.Money::format($total).', mas a transação é de '.Money::format($transaction->amount_cents).'.',
+            ]);
+        }
+
+        $linked = array_values(array_filter(array_map(fn (SplitPart $part) => $part->action === 'link' ? $part->occurrenceId : null, $parts)));
+
+        if (count($linked) !== count(array_unique($linked))) {
+            throw ValidationException::withMessages(['parts' => 'Cada despesa existente só pode entrar em uma parte.']);
+        }
+
+        $result = [];
+
+        foreach ($parts as $index => $part) {
+            $title = $this->title($part->title, $transaction);
+            $occurrence = null;
+            $entry = null;
+
+            if ($part->action === 'household') {
+                $occurrence = $this->createHouseholdExpense($transaction, $actor, $title, $choice->notes, $part->amountCents, $date);
+            } elseif ($part->action === 'link') {
+                $occurrence = $this->link($transaction, $actor, $part->occurrenceId, $part->amountCents, "parts.{$index}.occurrence_id");
+            } else {
+                $entry = $this->createEntry($actor, $part->action, $title, $part->amountCents, $date, $choice->notes);
+            }
+
+            $item = BankSplitItem::create([
+                'bank_transaction_id' => $transaction->id,
+                'user_id' => $actor->id,
+                'type' => $part->action === 'link' ? BankCatalogType::Linked : BankCatalogType::from($part->action),
+                'amount_cents' => $part->amountCents,
+                'expense_occurrence_id' => $occurrence?->id,
+                'personal_transaction_id' => $entry?->id,
+            ]);
+
+            $result[] = $this->splitAudit($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Undo a split: the household expenses its parts created are removed
+     * (refused once one of them was paid), the personal entries deleted and
+     * the links only undone, without touching the expense.
+     *
+     * @return list<array{type: string, amount_cents: int, expense_occurrence_id: int|null, personal_transaction_id: int|null}> What the parts were.
+     */
+    private function undoSplit(BankTransaction $transaction, User $actor): array
+    {
+        $items = BankSplitItem::query()
+            ->where('bank_transaction_id', $transaction->id)
+            ->with('occurrence')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($items as $item) {
+            if ($item->type === BankCatalogType::Household && $item->occurrence?->isPaid()) {
+                throw ValidationException::withMessages([
+                    'transaction' => "A despesa “{$item->occurrence->title}” criada nesta divisão já foi paga. Reabra o pagamento em Despesas antes de desfazer.",
+                ]);
+            }
+        }
+
+        $parts = [];
+
+        foreach ($items as $item) {
+            if ($item->type === BankCatalogType::Household && $item->occurrence !== null) {
+                $this->expenses->delete($item->occurrence, $actor);
+            }
+
+            if ($item->personal_transaction_id !== null) {
+                PersonalTransaction::query()->where('user_id', $actor->id)->whereKey($item->personal_transaction_id)->delete();
+            }
+
+            $parts[] = $this->splitAudit($item);
+            $item->delete();
+        }
+
+        return $parts;
+    }
+
+    /**
+     * @return array{type: string, amount_cents: int, expense_occurrence_id: int|null, personal_transaction_id: int|null}
+     */
+    private function splitAudit(BankSplitItem $item): array
+    {
+        return [
+            'type' => $item->type->value,
+            'amount_cents' => $item->amount_cents,
+            'expense_occurrence_id' => $item->expense_occurrence_id,
+            'personal_transaction_id' => $item->personal_transaction_id,
+        ];
+    }
+
+    /**
+     * A new household expense, pending, with the transaction's installment.
+     */
+    private function createHouseholdExpense(BankTransaction $transaction, User $actor, string $title, ?string $notes, int $amountCents, CarbonImmutable $date): ExpenseOccurrence
+    {
+        return $this->expenses->create($actor->household(), $actor, [
+            'scope' => ExpenseScope::Household,
+            'title' => $title,
+            'notes' => $notes,
+            'amount_cents' => $amountCents,
+            'due_date' => $date,
+            'installment_number' => $transaction->installment_number,
+            'installment_count' => $transaction->installment_count,
+        ]);
+    }
+
+    /**
+     * An entry in the actor's personal ledger.
+     *
+     * @param  string  $action  personal, income or investment.
+     */
+    private function createEntry(User $actor, string $action, string $title, int $amountCents, CarbonImmutable $date, ?string $notes): PersonalTransaction
+    {
+        return PersonalTransaction::create([
+            'user_id' => $actor->id,
+            'type' => match ($action) {
+                'personal' => TransactionType::Expense,
+                'income' => TransactionType::Income,
+                default => TransactionType::Investment,
+            },
+            'title' => $title,
+            'amount_cents' => $amountCents,
+            'transaction_date' => $date,
+            'notes' => $notes,
+        ]);
     }
 
     private function ensureOwner(BankTransaction $transaction, User $actor): void

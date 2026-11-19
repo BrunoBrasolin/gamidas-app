@@ -5,6 +5,7 @@ namespace App\Http\Presenters;
 use App\Enums\OccurrenceSource;
 use App\Enums\RecurringKind;
 use App\Models\BankSettlementItem;
+use App\Models\BankSplitItem;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
 use App\Models\ExpenseShare;
@@ -32,6 +33,7 @@ final class ExpensePresenter
         'recurringExpense:id,kind',
         'bankTransactions:id,expense_occurrence_id,user_id,date,removed_at',
         'settlementItems.bankTransaction:id,user_id,date,amount_cents,channel',
+        'bankSplitItems.bankTransaction:id,user_id,date,removed_at',
     ];
 
     /**
@@ -135,8 +137,9 @@ final class ExpensePresenter
 
     /**
      * The bank transaction that proves the expense was paid (catalogued or
-     * linked by a member in the bank inbox): when, and from whose bank. The
-     * other member relies on it to confirm the payment.
+     * linked by a member in the bank inbox, as a whole or as a part of a
+     * split one): when, and from whose bank. The other member relies on it
+     * to confirm the payment.
      *
      * @return array{date: string, member: string}|null
      */
@@ -146,7 +149,12 @@ final class ExpensePresenter
             return null;
         }
 
-        $transaction = $occurrence->bankTransactions->first(fn (BankTransaction $transaction) => $transaction->removed_at === null);
+        $transaction = $occurrence->bankTransactions->first(fn (BankTransaction $transaction) => $transaction->removed_at === null)
+            ?? ($occurrence->relationLoaded('bankSplitItems')
+                ? $occurrence->bankSplitItems
+                    ->map(fn (BankSplitItem $item) => $item->bankTransaction)
+                    ->first(fn (?BankTransaction $transaction) => $transaction !== null && $transaction->removed_at === null)
+                : null);
 
         if ($transaction === null) {
             return null;

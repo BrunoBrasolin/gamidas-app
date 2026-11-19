@@ -25,6 +25,9 @@ enum BankCatalogType: string
     /** A transfer between the members that pays their shares of several household expenses. */
     case Settlement = 'settlement';
 
+    /** Split into parts, each catalogued on its own (see BankSplitItem). */
+    case Split = 'split';
+
     public function label(): string
     {
         return match ($this) {
@@ -34,6 +37,7 @@ enum BankCatalogType: string
             self::Income => 'Receita',
             self::Investment => 'Investimento',
             self::Settlement => 'Acerto da casa',
+            self::Split => 'Valor dividido',
         };
     }
 }

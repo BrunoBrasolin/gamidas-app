@@ -36,7 +36,12 @@ import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
 import personal from '@/routes/personal';
-import type { BankTransaction, Paginated } from '@/types';
+import type {
+    BankDestinationEntry,
+    BankDestinationExpense,
+    BankTransaction,
+    Paginated,
+} from '@/types';
 
 type Filters = {
     status: 'pending' | 'catalogued' | 'ignored' | 'removed' | 'all';
@@ -557,7 +562,25 @@ function ReviewedRow({ transaction }: { transaction: BankTransaction }) {
 }
 
 function Destination({ transaction }: { transaction: BankTransaction }) {
-    const { expense, entry, settlement } = transaction;
+    const { expense, entry, settlement, split } = transaction;
+
+    if (split) {
+        return (
+            <span className="mt-0.5 block space-y-0.5">
+                {split.map((part, index) => (
+                    <span key={index} className="block">
+                        <Money cents={part.amount_cents} />
+                        {' · '}
+                        {part.label}
+                        {part.expense && (
+                            <ExpenseDestination expense={part.expense} />
+                        )}
+                        {part.entry && <EntryDestination entry={part.entry} />}
+                    </span>
+                ))}
+            </span>
+        );
+    }
 
     if (settlement) {
         return (
@@ -585,66 +608,74 @@ function Destination({ transaction }: { transaction: BankTransaction }) {
     }
 
     if (expense) {
-        if (expense.missing) {
-            return (
-                <span className="text-amber-700 dark:text-amber-400">
-                    {' '}
-                    — a despesa foi removida
-                </span>
-            );
-        }
-
-        return (
-            <>
-                {' · '}
-                <Link
-                    href={expenses.index({
-                        query: {
-                            month: expense.billing_month,
-                            scope: expense.scope,
-                        },
-                    })}
-                    className="font-medium underline underline-offset-4"
-                >
-                    {expense.title}
-                </Link>{' '}
-                <span className="text-muted-foreground">
-                    ({formatMonth(expense.billing_month)}
-                    {expense.status === 'paid' ? ', paga' : ', pendente'})
-                </span>
-            </>
-        );
+        return <ExpenseDestination expense={expense} />;
     }
 
     if (entry) {
-        if (entry.missing) {
-            return (
-                <span className="text-amber-700 dark:text-amber-400">
-                    {' '}
-                    — o lançamento foi removido
-                </span>
-            );
-        }
-
-        return (
-            <>
-                {' · '}
-                <Link
-                    href={personal.transactions.index(entry.slug, {
-                        query: { month: entry.month },
-                    })}
-                    className="font-medium underline underline-offset-4"
-                >
-                    {entry.title}
-                </Link>{' '}
-                <span className="text-muted-foreground">
-                    ({formatMonth(entry.month)})
-                </span>
-            </>
-        );
+        return <EntryDestination entry={entry} />;
     }
 
     return null;
+}
+
+function ExpenseDestination({ expense }: { expense: BankDestinationExpense }) {
+    if (expense.missing) {
+        return (
+            <span className="text-amber-700 dark:text-amber-400">
+                {' '}
+                — a despesa foi removida
+            </span>
+        );
+    }
+
+    return (
+        <>
+            {' · '}
+            <Link
+                href={expenses.index({
+                    query: {
+                        month: expense.billing_month,
+                        scope: expense.scope,
+                    },
+                })}
+                className="font-medium underline underline-offset-4"
+            >
+                {expense.title}
+            </Link>{' '}
+            <span className="text-muted-foreground">
+                ({formatMonth(expense.billing_month)}
+                {expense.status === 'paid' ? ', paga' : ', pendente'})
+            </span>
+        </>
+    );
+}
+
+function EntryDestination({ entry }: { entry: BankDestinationEntry }) {
+    if (entry.missing) {
+        return (
+            <span className="text-amber-700 dark:text-amber-400">
+                {' '}
+                — o lançamento foi removido
+            </span>
+        );
+    }
+
+    return (
+        <>
+            {' · '}
+            <Link
+                href={personal.transactions.index(entry.slug, {
+                    query: { month: entry.month },
+                })}
+                className="font-medium underline underline-offset-4"
+            >
+                {entry.title}
+            </Link>{' '}
+            <span className="text-muted-foreground">
+                ({formatMonth(entry.month)})
+            </span>
+        </>
+    );
 }
 
 function undoDescription(transaction: BankTransaction): string {
@@ -661,6 +692,8 @@ function undoDescription(transaction: BankTransaction): string {
             return 'O lançamento pessoal criado a partir desta transação é excluído e a transação volta para a caixa de entrada.';
         case 'linked':
             return 'A transação é desvinculada da despesa e volta para a caixa de entrada. O valor e o pagamento da despesa não mudam.';
+        case 'split':
+            return 'Cada parte é desfeita: as despesas da casa criadas são removidas (se ainda pendentes), os lançamentos pessoais são excluídos e as despesas existentes só são desvinculadas, sem mudar valor nem pagamento. A transação volta para a caixa de entrada.';
         case 'settlement':
             return 'As despesas pagas por este acerto voltam a ficar pendentes (as que o outro membro também acertou pelo banco dele continuam pagas) e a transação volta para a caixa de entrada.';
         default:

@@ -6,16 +6,22 @@ import {
     Home,
     Link2,
     PiggyBank,
+    Split,
     TrendingUp,
     User,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { FormField } from '@/components/finance/form-field';
+import { LinkCandidates, useLinkable } from '@/components/bank/link-candidates';
 import { SettlementCandidates } from '@/components/bank/settlement-candidates';
+import {
+    initialSplit,
+    SplitParts,
+    splitReady,
+} from '@/components/bank/split-parts';
+import type { SplitPartDraft } from '@/components/bank/split-parts';
+import { FormField } from '@/components/finance/form-field';
 import { Money } from '@/components/finance/money';
-import { StatusBadge } from '@/components/finance/status-badge';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -31,7 +37,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDate, formatMoney, formatMonth } from '@/lib/format';
+import { formatDate, formatMoney } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import type {
@@ -99,6 +105,13 @@ const SETTLEMENT_ACTION: (typeof OUT_ACTIONS)[number] = {
     icon: HandCoins,
 };
 
+const SPLIT_ACTION: (typeof OUT_ACTIONS)[number] = {
+    value: 'split',
+    label: 'Dividir valor',
+    hint: 'Parte numa despesa existente, parte em outra categoria',
+    icon: Split,
+};
+
 const IN_ACTIONS: typeof OUT_ACTIONS = [
     {
         value: 'income',
@@ -117,9 +130,10 @@ const IN_ACTIONS: typeof OUT_ACTIONS = [
 /**
  * Catalogues an imported transaction: a new household or personal expense,
  * a link to an expense that already exists, income, an investment, a house
- * settlement between the two members, or ignored. The choice can be
+ * settlement between the two members, its value split into parts (part an
+ * existing expense, part a personal one), or ignored. The choice can be
  * remembered as a rule for the counterparty, so the next transactions come
- * with it suggested (or applied).
+ * with it suggested (or applied); a split never is.
  */
 export function CatalogDialog({
     transaction,
@@ -141,8 +155,10 @@ export function CatalogDialog({
         ...base.slice(0, outgoing ? 2 : 1),
         ...(partner ? [SETTLEMENT_ACTION] : []),
         ...base.slice(outgoing ? 2 : 1),
+        ...(outgoing ? [SPLIT_ACTION] : []),
         ...(canOffset ? [OFFSET_ACTION] : []),
     ];
+    const linkable = useLinkable(transaction);
     const initialAction =
         transaction.suggestion?.action ??
         (outgoing
@@ -180,6 +196,9 @@ export function CatalogDialog({
     );
     const [settlementIds, setSettlementIds] =
         useState<number[]>(initialSettlement);
+    const [parts, setParts] = useState<SplitPartDraft[]>(() =>
+        initialSplit(transaction),
+    );
     const [remember, setRemember] = useState(true);
     const [autoApply, setAutoApply] = useState(false);
     const [amountChoice, setAmountChoice] = useState<boolean | null>(null);
@@ -207,6 +226,16 @@ export function CatalogDialog({
         'income',
         'investment',
     ].includes(action);
+    const splitCreates =
+        action === 'split' && parts.some((part) => part.action !== 'link');
+    const splitHousehold =
+        action === 'split' && parts.some((part) => part.action === 'household');
+
+    // Split starting from the expense chosen to link, when there is one.
+    const startSplit = (linked: BankCandidate | null) => {
+        setParts(initialSplit(transaction, linked));
+        setAction('split');
+    };
 
     return (
         <Dialog
@@ -216,6 +245,7 @@ export function CatalogDialog({
                     setAction(initialAction);
                     setOccurrenceId(initialOccurrence);
                     setSettlementIds(initialSettlement);
+                    setParts(initialSplit(transaction));
                     setOffsetId(initialOffset);
                     setRemember(true);
                     setAutoApply(false);
@@ -265,7 +295,19 @@ export function CatalogDialog({
                                                     action === option.value
                                                 }
                                                 onChange={() =>
-                                                    setAction(option.value)
+                                                    option.value === 'split' &&
+                                                    action === 'link' &&
+                                                    occurrenceId !== null
+                                                        ? startSplit(
+                                                              linkable.find(
+                                                                  (candidate) =>
+                                                                      candidate.id ===
+                                                                      occurrenceId,
+                                                              ) ?? null,
+                                                          )
+                                                        : setAction(
+                                                              option.value,
+                                                          )
                                                 }
                                                 className="sr-only"
                                             />
@@ -291,32 +333,46 @@ export function CatalogDialog({
                                 )}
                             </fieldset>
 
-                            {createsRecord && (
+                            {action === 'split' && (
+                                <SplitParts
+                                    transaction={transaction}
+                                    parts={parts}
+                                    onChange={setParts}
+                                    errors={errors}
+                                />
+                            )}
+
+                            {(createsRecord || splitCreates) && (
                                 <>
-                                    <FormField
-                                        id={`catalog-title-${transaction.id}`}
-                                        label="Título"
-                                        error={errors.title}
-                                    >
-                                        <Input
+                                    {createsRecord && (
+                                        <FormField
                                             id={`catalog-title-${transaction.id}`}
-                                            name="title"
-                                            maxLength={120}
-                                            defaultValue={
-                                                transaction.suggestion?.title ??
-                                                transaction.display_name.slice(
-                                                    0,
-                                                    120,
-                                                )
-                                            }
-                                        />
-                                    </FormField>
+                                            label="Título"
+                                            error={errors.title}
+                                        >
+                                            <Input
+                                                id={`catalog-title-${transaction.id}`}
+                                                name="title"
+                                                maxLength={120}
+                                                defaultValue={
+                                                    transaction.suggestion
+                                                        ?.title ??
+                                                    transaction.display_name.slice(
+                                                        0,
+                                                        120,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    )}
                                     <FormField
                                         id={`catalog-date-${transaction.id}`}
                                         label={
                                             action === 'household'
                                                 ? 'Vencimento'
-                                                : 'Data'
+                                                : splitHousehold
+                                                  ? 'Data (e vencimento da despesa da casa)'
+                                                  : 'Data'
                                         }
                                         error={errors.date}
                                         hint={
@@ -338,7 +394,8 @@ export function CatalogDialog({
                                             }
                                         />
                                     </FormField>
-                                    {action === 'household' && (
+                                    {(action === 'household' ||
+                                        splitHousehold) && (
                                         <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                                             A despesa entra em Despesas da casa
                                             como pendente, com o comprovante do
@@ -386,7 +443,10 @@ export function CatalogDialog({
                                 <LinkCandidates
                                     transaction={transaction}
                                     value={occurrenceId}
-                                    onChange={setOccurrenceId}
+                                    onChange={(candidate) =>
+                                        setOccurrenceId(candidate.id)
+                                    }
+                                    onSplit={startSplit}
                                     error={errors.occurrence_id}
                                 />
                             )}
@@ -394,13 +454,19 @@ export function CatalogDialog({
                             <div
                                 className={cn(
                                     'space-y-2 rounded-md border p-3',
-                                    action === 'offset' && 'hidden',
+                                    (action === 'offset' ||
+                                        action === 'split') &&
+                                        'hidden',
                                 )}
                             >
                                 <input
                                     type="hidden"
                                     name="remember"
-                                    value={remember ? '1' : '0'}
+                                    value={
+                                        remember && action !== 'split'
+                                            ? '1'
+                                            : '0'
+                                    }
                                 />
                                 <input
                                     type="hidden"
@@ -516,7 +582,12 @@ export function CatalogDialog({
                                         (action === 'offset' &&
                                             offsetId === null) ||
                                         (action === 'settlement' &&
-                                            settlementIds.length === 0)
+                                            settlementIds.length === 0) ||
+                                        (action === 'split' &&
+                                            !splitReady(
+                                                parts,
+                                                transaction.amount_cents,
+                                            ))
                                     }
                                 >
                                     {processing && <Spinner />}
@@ -528,7 +599,9 @@ export function CatalogDialog({
                                             ? 'Vincular'
                                             : action === 'settlement'
                                               ? 'Registrar acerto'
-                                              : 'Catalogar'}
+                                              : action === 'split'
+                                                ? 'Dividir'
+                                                : 'Catalogar'}
                                 </Button>
                             </DialogFooter>
                         </>
@@ -614,224 +687,5 @@ function OffsetCandidates({
                 </p>
             )}
         </fieldset>
-    );
-}
-
-/**
- * Lowercase without accents, to search titles as typed.
- */
-function normalize(text: string): string {
-    return text
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase();
-}
-
-/**
- * The expense to link to: the suggestions first, then any other expense the
- * member can see (household ones and their own) not linked yet — pending, or
- * already paid by hand around the transaction's date — nearest to it,
- * searchable by title, month or "paga".
- */
-function LinkCandidates({
-    transaction,
-    value,
-    onChange,
-    error,
-}: {
-    transaction: BankTransaction;
-    value: number | null;
-    onChange: (id: number) => void;
-    error?: string;
-}) {
-    const { linkable = [] } = usePage<{ linkable?: BankCandidate[] }>().props;
-    const [search, setSearch] = useState('');
-
-    const suggested = new Set(transaction.candidates.map((c) => c.id));
-    const reference = Date.parse(transaction.reference_date);
-    const term = normalize(search.trim());
-    const pool = linkable.filter((candidate) => !suggested.has(candidate.id));
-    const others = pool
-        .filter(
-            (candidate) =>
-                term === '' ||
-                normalize(
-                    `${candidate.title} ${formatMonth(candidate.billing_month)} ${candidate.paid ? 'paga' : 'pendente'}`,
-                ).includes(term),
-        )
-        .sort(
-            (a, b) =>
-                Math.abs(Date.parse(a.due_date) - reference) -
-                Math.abs(Date.parse(b.due_date) - reference),
-        )
-        .slice(0, term === '' ? 8 : 30);
-
-    // Keep the chosen expense in view while searching for another.
-    const chosen = pool.find(
-        (candidate) =>
-            candidate.id === value &&
-            !others.some((other) => other.id === value),
-    );
-    const selected =
-        transaction.candidates.find((candidate) => candidate.id === value) ??
-        pool.find((candidate) => candidate.id === value);
-
-    if (transaction.candidates.length === 0 && pool.length === 0) {
-        return (
-            <p className="rounded-md border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-                Nenhuma despesa para vincular. Cadastre como despesa da casa ou
-                pessoal.
-            </p>
-        );
-    }
-
-    return (
-        <fieldset className="grid gap-1.5">
-            <legend className="mb-1.5 text-sm font-medium">
-                Qual despesa?
-            </legend>
-
-            {transaction.candidates.length > 0 && (
-                <div className="grid gap-2">
-                    <p className="text-xs font-medium text-muted-foreground">
-                        Sugestões
-                    </p>
-                    {transaction.candidates.map((candidate) => (
-                        <CandidateOption
-                            key={candidate.id}
-                            candidate={candidate}
-                            checked={value === candidate.id}
-                            onChange={onChange}
-                        />
-                    ))}
-                </div>
-            )}
-
-            {pool.length > 0 && (
-                <div className="mt-2 grid gap-2">
-                    <Label
-                        htmlFor={`link-search-${transaction.id}`}
-                        className="text-xs font-medium text-muted-foreground"
-                    >
-                        {transaction.candidates.length > 0
-                            ? 'Outra despesa'
-                            : 'Despesas cadastradas'}
-                    </Label>
-                    <Input
-                        id={`link-search-${transaction.id}`}
-                        type="search"
-                        placeholder="Buscar por nome, mês ou “paga” (ex.: aluguel, dezembro)"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        autoComplete="off"
-                    />
-                    {chosen && (
-                        <CandidateOption
-                            candidate={chosen}
-                            checked
-                            onChange={onChange}
-                        />
-                    )}
-                    {others.map((candidate) => (
-                        <CandidateOption
-                            key={candidate.id}
-                            candidate={candidate}
-                            checked={value === candidate.id}
-                            onChange={onChange}
-                        />
-                    ))}
-                    {others.length === 0 && (
-                        <p className="text-xs text-muted-foreground">
-                            Nenhuma despesa com esse nome.
-                        </p>
-                    )}
-                </div>
-            )}
-
-            {selected?.paid ? (
-                <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    Esta despesa já foi paga
-                    {selected.paid_at
-                        ? ` em ${formatDate(selected.paid_at)}`
-                        : ''}
-                    : o vínculo só anexa o comprovante do banco. Valor e
-                    pagamento continuam como estão
-                    {selected.amount_cents !== transaction.amount_cents &&
-                        ` — ela tem ${formatMoney(selected.amount_cents)} e o banco mostra ${formatMoney(transaction.amount_cents)}`}
-                    .
-                </p>
-            ) : (
-                <p className="text-xs text-muted-foreground">
-                    O valor da despesa passa a ser o do banco e, se você puder
-                    confirmar o pagamento, ela é marcada como paga.
-                </p>
-            )}
-            {error && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                    {error}
-                </p>
-            )}
-        </fieldset>
-    );
-}
-
-function CandidateOption({
-    candidate,
-    checked,
-    onChange,
-}: {
-    candidate: BankCandidate;
-    checked: boolean;
-    onChange: (id: number) => void;
-}) {
-    return (
-        <label
-            className={cn(
-                'flex cursor-pointer items-start justify-between gap-3 rounded-md border p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-muted',
-                'has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
-            )}
-        >
-            <input
-                type="radio"
-                name="occurrence_id"
-                value={candidate.id}
-                checked={checked}
-                onChange={() => onChange(candidate.id)}
-                className="sr-only"
-            />
-            <span className="min-w-0">
-                <span className="block font-medium">{candidate.title}</span>
-                <span className="mt-0.5 flex flex-wrap gap-1">
-                    <Badge variant="outline">
-                        {candidate.scope === 'household' ? 'Casa' : 'Pessoal'}
-                    </Badge>
-                    <Badge variant="outline">
-                        {formatMonth(candidate.billing_month)}
-                    </Badge>
-                    {candidate.installment_number && (
-                        <Badge variant="outline">
-                            Parcela {candidate.installment_number}/
-                            {candidate.installment_count}
-                        </Badge>
-                    )}
-                    {candidate.is_recurring && (
-                        <Badge variant="secondary">Recorrente</Badge>
-                    )}
-                    {candidate.paid && <StatusBadge status="paid" />}
-                </span>
-            </span>
-            <span className="text-right">
-                {candidate.awaits_amount ? (
-                    <span className="text-xs text-amber-700 dark:text-amber-400">
-                        Valor a definir
-                    </span>
-                ) : (
-                    <Money cents={candidate.amount_cents} />
-                )}
-                <span className="block text-xs text-muted-foreground">
-                    vence {formatDate(candidate.due_date)}
-                </span>
-            </span>
-        </label>
     );
 }

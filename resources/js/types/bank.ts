@@ -83,6 +83,9 @@ export type BankCandidate = {
     installment_count: number | null;
     awaits_amount: boolean;
     is_recurring: boolean;
+    /** Already paid (by hand): linking only attaches the bank proof. */
+    paid: boolean;
+    paid_at: string | null;
     /** Only on suggestions: same amount and clearly the same expense. */
     strong?: boolean;
 };

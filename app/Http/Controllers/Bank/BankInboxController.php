@@ -59,7 +59,7 @@ class BankInboxController extends Controller
         // Only needed to catalogue, i.e. when money going out is pending.
         // (Checked before through(), which turns the items into arrays.)
         $linkable = $items->contains(fn (BankTransaction $transaction) => $transaction->isPending() && $transaction->isOutgoing())
-            ? $catalog->linkable($user)->map(fn ($occurrence) => $presenter->candidate($occurrence))->values()->all()
+            ? $catalog->linkable($user, $items)->map(fn ($occurrence) => $presenter->candidate($occurrence))->values()->all()
             : [];
 
         return Inertia::render('bank/inbox', [

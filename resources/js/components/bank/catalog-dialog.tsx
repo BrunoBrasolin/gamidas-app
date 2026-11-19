@@ -12,6 +12,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { FormField } from '@/components/finance/form-field';
 import { Money } from '@/components/finance/money';
+import { StatusBadge } from '@/components/finance/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -59,7 +60,7 @@ const OUT_ACTIONS: {
     {
         value: 'link',
         label: 'Despesa existente',
-        hint: 'Recorrente (aluguel, luz), parcela já cadastrada…',
+        hint: 'Já cadastrada, pendente ou paga: aluguel, parcela…',
         icon: Link2,
     },
     {
@@ -579,9 +580,10 @@ function normalize(text: string): string {
 }
 
 /**
- * The expense to link to: the suggestions first, then any other pending
- * expense the member can see (household ones and their own), nearest to the
- * transaction's date, searchable by title or month.
+ * The expense to link to: the suggestions first, then any other expense the
+ * member can see (household ones and their own) not linked yet — pending, or
+ * already paid by hand around the transaction's date — nearest to it,
+ * searchable by title, month or "paga".
  */
 function LinkCandidates({
     transaction,
@@ -606,7 +608,7 @@ function LinkCandidates({
             (candidate) =>
                 term === '' ||
                 normalize(
-                    `${candidate.title} ${formatMonth(candidate.billing_month)}`,
+                    `${candidate.title} ${formatMonth(candidate.billing_month)} ${candidate.paid ? 'paga' : 'pendente'}`,
                 ).includes(term),
         )
         .sort(
@@ -622,12 +624,15 @@ function LinkCandidates({
             candidate.id === value &&
             !others.some((other) => other.id === value),
     );
+    const selected =
+        transaction.candidates.find((candidate) => candidate.id === value) ??
+        pool.find((candidate) => candidate.id === value);
 
     if (transaction.candidates.length === 0 && pool.length === 0) {
         return (
             <p className="rounded-md border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-                Nenhuma despesa pendente para vincular. Cadastre como despesa da
-                casa ou pessoal.
+                Nenhuma despesa para vincular. Cadastre como despesa da casa ou
+                pessoal.
             </p>
         );
     }
@@ -661,13 +666,13 @@ function LinkCandidates({
                         className="text-xs font-medium text-muted-foreground"
                     >
                         {transaction.candidates.length > 0
-                            ? 'Outra despesa pendente'
-                            : 'Despesas pendentes'}
+                            ? 'Outra despesa'
+                            : 'Despesas cadastradas'}
                     </Label>
                     <Input
                         id={`link-search-${transaction.id}`}
                         type="search"
-                        placeholder="Buscar por nome ou mês (ex.: aluguel, dezembro)"
+                        placeholder="Buscar por nome, mês ou “paga” (ex.: aluguel, dezembro)"
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         autoComplete="off"
@@ -689,16 +694,30 @@ function LinkCandidates({
                     ))}
                     {others.length === 0 && (
                         <p className="text-xs text-muted-foreground">
-                            Nenhuma despesa pendente com esse nome.
+                            Nenhuma despesa com esse nome.
                         </p>
                     )}
                 </div>
             )}
 
-            <p className="text-xs text-muted-foreground">
-                O valor da despesa passa a ser o do banco e, se você puder
-                confirmar o pagamento, ela é marcada como paga.
-            </p>
+            {selected?.paid ? (
+                <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    Esta despesa já foi paga
+                    {selected.paid_at
+                        ? ` em ${formatDate(selected.paid_at)}`
+                        : ''}
+                    : o vínculo só anexa o comprovante do banco. Valor e
+                    pagamento continuam como estão
+                    {selected.amount_cents !== transaction.amount_cents &&
+                        ` — ela tem ${formatMoney(selected.amount_cents)} e o banco mostra ${formatMoney(transaction.amount_cents)}`}
+                    .
+                </p>
+            ) : (
+                <p className="text-xs text-muted-foreground">
+                    O valor da despesa passa a ser o do banco e, se você puder
+                    confirmar o pagamento, ela é marcada como paga.
+                </p>
+            )}
             {error && (
                 <p className="text-sm text-red-600 dark:text-red-400">
                     {error}
@@ -750,6 +769,7 @@ function CandidateOption({
                     {candidate.is_recurring && (
                         <Badge variant="secondary">Recorrente</Badge>
                     )}
+                    {candidate.paid && <StatusBadge status="paid" />}
                 </span>
             </span>
             <span className="text-right">

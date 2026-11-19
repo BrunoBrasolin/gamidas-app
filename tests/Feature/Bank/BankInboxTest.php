@@ -15,12 +15,14 @@ use App\Models\BankConnection;
 use App\Models\BankRule;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
+use App\Models\PaymentEvent;
 use App\Models\PersonalTransaction;
 use App\Services\Bank\BankCatalogService;
 use App\Services\Bank\BankSyncService;
 use App\Services\Bank\CatalogChoice;
 use App\Services\ExpenseService;
 use App\Services\OccurrenceGenerator;
+use App\Services\PaymentService;
 use App\Services\RecurringExpenseService;
 use App\Support\Month;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -566,6 +568,120 @@ class BankInboxTest extends TestCase
         $this->assertSame($rent->id, $transaction->fresh()->expense_occurrence_id);
         $this->assertSame(150_000, $rent->fresh()->amount_cents);
         $this->assertNotSame($leticiaPrivate->id, $transaction->fresh()->expense_occurrence_id);
+    }
+
+    public function test_an_old_purchase_is_suggested_for_the_expense_paid_by_hand_and_keeps_its_payment(): void
+    {
+        // Typed by hand with the purchase date and paid months ago.
+        $groceries = $this->createPaidExpense('Compras do mês', 25_000, '2026-08-12');
+        $events = PaymentEvent::query()->count();
+
+        // Imported now, in a bill due weeks after the purchase.
+        $this->card->bills()->create(['pluggy_id' => 'bill-sep', 'closing_date' => '2026-08-28', 'due_date' => '2026-09-25', 'total_cents' => 25_000]);
+        $purchase = $this->createBankTransaction($this->card, ['description' => 'Supermercado Exemplo', 'amount' => 250, 'date' => '2026-08-12T00:00:00.000Z']);
+
+        $suggestion = app(BankCatalogService::class)->suggest($purchase);
+        $this->assertSame('link', $suggestion?->choice->action);
+        $this->assertSame($groceries->id, $suggestion->occurrence?->id);
+        $this->assertStringContainsString('já paga', $suggestion->label);
+
+        $this->actingAs($this->bruno)->post(route('bank.transactions.confirm', $purchase))->assertSessionHasNoErrors();
+
+        $this->assertSame(BankCatalogType::Linked, $purchase->fresh()->catalog_type);
+        $this->assertSame($groceries->id, $purchase->fresh()->expense_occurrence_id);
+
+        // Only the bank proof is attached: the payment stays as it was.
+        $groceries->refresh();
+        $this->assertTrue($groceries->isPaid());
+        $this->assertSame(25_000, $groceries->amount_cents);
+        $this->assertSame($this->bruno->id, $groceries->paid_by_user_id);
+        $this->assertSame('2026-08-12', $groceries->paid_at->toDateString());
+        $this->assertSame($events, PaymentEvent::query()->count());
+    }
+
+    public function test_expenses_paid_without_a_bank_link_can_be_picked_by_hand(): void
+    {
+        $pharmacy = $this->createPaidExpense('Farmácia', 8_000, '2026-08-20');
+        $tooOld = $this->createPaidExpense('Farmácia', 8_000, '2026-01-20');
+        $linked = $this->createPaidExpense('Farmácia', 8_000, '2026-08-21');
+        $this->actingAs($this->bruno)
+            ->post(route('bank.transactions.catalog', $this->pix('ALGUEM EXEMPLO', -80, '2026-08-21')), ['action' => 'link', 'occurrence_id' => $linked->id])
+            ->assertSessionHasNoErrors();
+
+        $transaction = $this->createBankTransaction($this->checking, ['description' => 'Drogaria Exemplo', 'amount' => -80.4, 'date' => '2026-08-19T00:00:00.000Z']);
+
+        $this->actingAs($this->bruno)
+            ->get(route('bank.inbox'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('transactions.data', 1)
+                ->where('transactions.data.0.suggestion', null)
+                ->where('transactions.data.0.candidates.0.id', $pharmacy->id)
+                ->where('transactions.data.0.candidates.0.paid', true)
+                ->where('transactions.data.0.candidates.0.strong', false)
+                ->where('linkable', function ($linkable) use ($pharmacy, $tooOld, $linked) {
+                    $ids = collect($linkable)->pluck('id');
+
+                    return $ids->contains($pharmacy->id)
+                        && ! $ids->contains($tooOld->id)
+                        && ! $ids->contains($linked->id)
+                        && collect($linkable)->firstWhere('id', $pharmacy->id)['paid'] === true;
+                }));
+
+        $this->actingAs($this->bruno)
+            ->post(route('bank.transactions.catalog', $transaction), ['action' => 'link', 'occurrence_id' => $pharmacy->id])
+            ->assertSessionHasNoErrors();
+
+        // A paid expense cannot change: the bank's R$ 80,40 is not copied.
+        $this->assertSame($pharmacy->id, $transaction->fresh()->expense_occurrence_id);
+        $this->assertSame(8_000, $pharmacy->fresh()->amount_cents);
+        $this->assertTrue($pharmacy->fresh()->isPaid());
+    }
+
+    public function test_a_recurring_rule_links_an_old_payment_to_its_month_paid_by_hand(): void
+    {
+        $rent = app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
+            'scope' => ExpenseScope::Household,
+            'kind' => RecurringKind::Fixed,
+            'title' => 'Aluguel',
+            'notes' => null,
+            'amount_cents' => 180_000,
+            'due_day' => 5,
+            'start_month' => Month::parse('2026-09'),
+            'end_month' => null,
+            'total_months' => null,
+        ]);
+        $october = $rent->occurrences()->forMonth(Month::parse('2026-10'))->sole();
+        app(PaymentService::class)->confirm($october, $this->bruno, $this->day('2026-10-05')->setTime(12, 0));
+        BankRule::create(['user_id' => $this->bruno->id, 'pattern' => 'fulano de tal', 'label' => 'Fulano de Tal', 'action' => BankRuleAction::Recurring, 'recurring_expense_id' => $rent->id]);
+
+        $catalog = app(BankCatalogService::class);
+
+        // October's PIX, imported now, is October's rent — not September's
+        // or November's, still pending.
+        $old = $catalog->suggest($this->pix(date: '2026-10-04'));
+        $this->assertSame($october->id, $old?->occurrence?->id);
+        $this->assertStringContainsString('já paga', $old->label);
+
+        $current = $catalog->suggest($this->pix(date: '2026-11-04'));
+        $this->assertSame('2026-11', Month::key($current?->occurrence?->billing_month));
+        $this->assertFalse($current->occurrence->isPaid());
+    }
+
+    /**
+     * A household expense Letícia typed and Bruno confirmed on its due date,
+     * as done by hand before the bank was connected.
+     */
+    private function createPaidExpense(string $title, int $amountCents, string $dueDate): ExpenseOccurrence
+    {
+        $occurrence = app(ExpenseService::class)->create($this->household, $this->leticia, [
+            'scope' => ExpenseScope::Household,
+            'title' => $title,
+            'notes' => null,
+            'amount_cents' => $amountCents,
+            'due_date' => $this->day($dueDate),
+        ]);
+
+        return app(PaymentService::class)->confirm($occurrence, $this->bruno, $this->day($dueDate)->setTime(12, 0));
     }
 
     public function test_rules_learned_from_the_description_keep_matching_once_the_name_is_known(): void

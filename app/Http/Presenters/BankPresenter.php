@@ -239,6 +239,9 @@ final class BankPresenter
             'installment_count' => $occurrence->installment_count,
             'awaits_amount' => $occurrence->awaitsAmount(),
             'is_recurring' => $occurrence->recurring_expense_id !== null,
+            // Linking a paid expense only attaches the bank proof.
+            'paid' => $occurrence->isPaid(),
+            'paid_at' => $occurrence->paid_at?->toDateString(),
         ];
     }
 }

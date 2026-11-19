@@ -19,6 +19,7 @@ use App\Services\AuditLogger;
 use App\Services\ExpenseService;
 use App\Services\PaymentService;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
@@ -49,6 +50,18 @@ final class BankCatalogService
      * Expenses offered for linking per transaction.
      */
     private const MAX_CANDIDATES = 6;
+
+    /**
+     * Months around the inbox page's transactions where expenses already
+     * paid are listed for linking by hand.
+     */
+    private const PAID_LINK_MONTHS = 3;
+
+    /**
+     * Expenses loaded at most to work out the suggestions of a batch of
+     * transactions (paid ones count too, so a year of history fits).
+     */
+    private const MAX_LOADED_OCCURRENCES = 2000;
 
     /**
      * Pending transactions looked at when filtering the inbox by suggestion
@@ -392,7 +405,7 @@ final class BankCatalogService
 
         return new BankSuggestion(
             new CatalogChoice('link', occurrenceId: $best['occurrence']->id),
-            'Vincular a “'.$best['occurrence']->title.'”'.$this->installmentLabel($best['occurrence']),
+            'Vincular a “'.$best['occurrence']->title.'”'.$this->installmentLabel($best['occurrence']).$this->paidLabel($best['occurrence']),
             null,
             $best['occurrence'],
         );
@@ -438,7 +451,7 @@ final class BankCatalogService
 
             return new BankSuggestion(
                 new CatalogChoice('link', occurrenceId: $occurrence->id, remember: false),
-                '“'.$occurrence->title.'” de '.$this->monthLabel($occurrence->billing_month),
+                '“'.$occurrence->title.'” de '.$this->monthLabel($occurrence->billing_month).$this->paidLabel($occurrence),
                 $rule,
                 $occurrence,
             );
@@ -452,10 +465,13 @@ final class BankCatalogService
     }
 
     /**
-     * Pending expenses the actor may link to each pending outgoing
-     * transaction, best first: same amount (or a month still without amount),
-     * close to the reference date, same installment, similar title. Expenses
-     * already linked to another transaction are left out.
+     * Expenses the actor may link to each pending outgoing transaction, best
+     * first: same amount (or a month still without amount), due close to the
+     * reference date or to the day it happened (a card purchase typed by hand
+     * usually carries the purchase date), same installment, similar title.
+     * Expenses already paid count too — history imported after the bills were
+     * typed and paid by hand — and, on a tie, come after the pending ones.
+     * Expenses already linked to another transaction are left out.
      *
      * @param  Collection<int, BankTransaction>  $transactions
      * @return array<int, list<array{occurrence: ExpenseOccurrence, score: int, strong: bool}>>
@@ -468,32 +484,42 @@ final class BankCatalogService
             return [];
         }
 
-        $references = $pending->mapWithKeys(fn (BankTransaction $transaction) => [$transaction->id => $this->referenceDate($transaction)]);
+        // Day numbers (days since the epoch), so the inner loop only compares integers.
+        $days = [];
+        $from = PHP_INT_MAX;
+        $to = PHP_INT_MIN;
 
-        /** @var CarbonImmutable $from */
-        $from = $references->min();
-        /** @var CarbonImmutable $to */
-        $to = $references->max();
+        foreach ($pending as $transaction) {
+            $reference = $this->dayNumber($this->referenceDate($transaction));
+            $happened = $this->dayNumber($transaction->date);
+            $days[$transaction->id] = [$reference, $happened];
+            $from = min($from, $reference, $happened);
+            $to = max($to, $reference, $happened);
+        }
 
         $occurrences = ExpenseOccurrence::query()
             ->visibleTo($user)
-            ->where('status', OccurrenceStatus::Pending)
-            ->whereBetween('due_date', [$from->subDays(self::LINK_WINDOW_DAYS)->toDateString(), $to->addDays(self::LINK_WINDOW_DAYS)->toDateString()])
+            ->whereBetween('due_date', [$this->dateOf($from - self::LINK_WINDOW_DAYS), $this->dateOf($to + self::LINK_WINDOW_DAYS)])
             ->whereDoesntHave('bankTransactions', fn (Builder $query) => $query->whereNull('removed_at'))
             ->orderBy('due_date')
-            ->limit(500)
-            ->get();
+            ->limit(self::MAX_LOADED_OCCURRENCES)
+            ->get()
+            ->map(fn (ExpenseOccurrence $occurrence) => [
+                'occurrence' => $occurrence,
+                'due' => $this->dayNumber($occurrence->due_date),
+                'title' => TransactionClassifier::normalize($occurrence->title),
+            ]);
 
         $result = [];
 
         foreach ($pending as $transaction) {
-            $reference = $references[$transaction->id];
+            [$reference, $happened] = $days[$transaction->id];
             $scored = [];
 
-            foreach ($occurrences as $occurrence) {
-                $days = abs((int) $occurrence->due_date->diffInDays($reference));
+            foreach ($occurrences as ['occurrence' => $occurrence, 'due' => $due, 'title' => $title]) {
+                $distance = min(abs($due - $reference), abs($due - $happened));
 
-                if ($days > self::LINK_WINDOW_DAYS) {
+                if ($distance > self::LINK_WINDOW_DAYS) {
                     continue;
                 }
 
@@ -502,32 +528,32 @@ final class BankCatalogService
                 // close to its due date, never a card installment.
                 $amountScore = match (true) {
                     $sameAmount => 50,
-                    $occurrence->amount_cents === 0 => $days <= 20 && $transaction->installment_count === null ? 30 : 0,
+                    $occurrence->awaitsAmount() => $distance <= 20 && $transaction->installment_count === null ? 30 : 0,
                     abs($occurrence->amount_cents - $transaction->amount_cents) * 10 <= $transaction->amount_cents => 10,
                     default => 0,
                 };
                 $sameInstallment = $transaction->installment_count !== null
                     && $occurrence->installment_count === $transaction->installment_count
                     && $occurrence->installment_number === $transaction->installment_number;
-                $similarTitle = $this->similar($occurrence->title, $transaction->match_key);
+                $similarTitle = $this->similar($title, $transaction->match_key);
 
                 if ($amountScore === 0 && ! $similarTitle) {
                     continue;
                 }
 
                 $score = $amountScore
-                    + max(0, 20 - intdiv($days, 2))
+                    + max(0, 20 - intdiv($distance, 2))
                     + ($sameInstallment ? 30 : 0)
                     + ($similarTitle ? 20 : 0);
 
                 $scored[] = [
                     'occurrence' => $occurrence,
                     'score' => $score,
-                    'strong' => $sameAmount && ($sameInstallment || $similarTitle || $days <= 5),
+                    'strong' => $sameAmount && ($sameInstallment || $similarTitle || $distance <= 5),
                 ];
             }
 
-            usort($scored, fn (array $a, array $b) => $b['score'] <=> $a['score']);
+            usort($scored, fn (array $a, array $b) => [$b['score'], $a['occurrence']->isPaid()] <=> [$a['score'], $b['occurrence']->isPaid()]);
             $result[$transaction->id] = array_slice($scored, 0, self::MAX_CANDIDATES);
         }
 
@@ -535,25 +561,45 @@ final class BankCatalogService
     }
 
     /**
-     * Every pending expense the user may link a transaction to — household
-     * ones and their own personal ones, not linked to another transaction —
-     * from a year back to three months ahead, for picking by hand when the
-     * suggestions miss (a PIX to a person that pays a household bill).
+     * Every expense the user may pick by hand when the suggestions miss (a
+     * PIX to a person that pays a household bill) — household ones and their
+     * own personal ones, not linked to another transaction: pending ones from
+     * a year back to three months ahead, and ones already paid due within
+     * PAID_LINK_MONTHS of the given transactions (history imported after the
+     * bills were paid by hand).
      *
+     * @param  Collection<int, BankTransaction>  $transactions  The inbox page.
      * @return Collection<int, ExpenseOccurrence>
      */
-    public function linkable(User $user): Collection
+    public function linkable(User $user, Collection $transactions): Collection
     {
         $today = Date::today();
+        $dates = $transactions
+            ->filter(fn (BankTransaction $transaction) => $transaction->isPending() && $transaction->isOutgoing())
+            ->flatMap(fn (BankTransaction $transaction) => [$transaction->date, $this->referenceDate($transaction)]);
+
+        /** @var CarbonImmutable|null $from */
+        $from = $dates->min();
+        /** @var CarbonImmutable|null $to */
+        $to = $dates->max();
 
         return ExpenseOccurrence::query()
             ->visibleTo($user)
-            ->where('status', OccurrenceStatus::Pending)
-            ->whereBetween('due_date', [$today->subYear()->toDateString(), $today->addMonths(3)->toDateString()])
+            ->where(function (Builder $query) use ($today, $from, $to) {
+                $query->where(fn (Builder $query) => $query
+                    ->where('status', OccurrenceStatus::Pending)
+                    ->whereBetween('due_date', [$today->subYear()->toDateString(), $today->addMonths(3)->toDateString()]));
+
+                if ($from !== null && $to !== null) {
+                    $query->orWhere(fn (Builder $query) => $query
+                        ->where('status', OccurrenceStatus::Paid)
+                        ->whereBetween('due_date', [$from->subMonths(self::PAID_LINK_MONTHS)->toDateString(), $to->addMonths(self::PAID_LINK_MONTHS)->toDateString()]));
+                }
+            })
             ->whereDoesntHave('bankTransactions', fn (Builder $query) => $query->whereNull('removed_at'))
             ->orderBy('due_date')
             ->orderBy('id')
-            ->limit(500)
+            ->limit(1000)
             ->get();
     }
 
@@ -617,7 +663,9 @@ final class BankCatalogService
     /**
      * Link to an expense the actor can see, setting its amount to what the
      * bank shows (variable bills get their real value) and confirming the
-     * payment when the actor is allowed to.
+     * payment when the actor is allowed to. An expense already paid (history
+     * imported after it was paid by hand) cannot change: it only gets the
+     * bank proof, its amount and payment stay as they are.
      */
     private function link(BankTransaction $transaction, User $actor, ?int $occurrenceId): ExpenseOccurrence
     {
@@ -658,8 +706,10 @@ final class BankCatalogService
     }
 
     /**
-     * The month of the rule's recurring expense closest to the transaction,
-     * still pending and not linked to another transaction.
+     * The month of the rule's recurring expense closest to the transaction
+     * and not linked to another transaction. A month already paid by hand
+     * counts too (on a tie, after a pending one): its payment arriving now
+     * from the bank must not take next month's place.
      */
     private function recurringOccurrence(BankTransaction $transaction, BankRule $rule): ?ExpenseOccurrence
     {
@@ -672,11 +722,10 @@ final class BankCatalogService
         return ExpenseOccurrence::query()
             ->visibleTo($transaction->user)
             ->where('recurring_expense_id', $rule->recurring_expense_id)
-            ->where('status', OccurrenceStatus::Pending)
             ->whereBetween('due_date', [$reference->subDays(self::LINK_WINDOW_DAYS)->toDateString(), $reference->addDays(self::LINK_WINDOW_DAYS)->toDateString()])
             ->whereDoesntHave('bankTransactions', fn (Builder $query) => $query->whereNull('removed_at')->whereKeyNot($transaction->id))
             ->get()
-            ->sortBy(fn (ExpenseOccurrence $occurrence) => abs((int) $occurrence->due_date->diffInDays($reference)))
+            ->sortBy(fn (ExpenseOccurrence $occurrence) => [abs($this->dayNumber($occurrence->due_date) - $this->dayNumber($reference)), $occurrence->isPaid()])
             ->first();
     }
 
@@ -799,14 +848,28 @@ final class BankCatalogService
     }
 
     /**
-     * Whether an expense title and a transaction key name the same thing
-     * ("Aluguel" and "pix aluguel fulano").
+     * Whether an expense title (normalized) and a transaction key name the
+     * same thing ("aluguel" and "pix aluguel fulano").
      */
     private function similar(string $title, string $key): bool
     {
-        $title = TransactionClassifier::normalize($title);
-
         return strlen($title) >= 4 && strlen($key) >= 4 && (str_contains($key, $title) || str_contains($title, $key));
+    }
+
+    /**
+     * Days since the epoch of a calendar date, to compare dates cheaply.
+     */
+    private function dayNumber(CarbonInterface $date): int
+    {
+        return intdiv((int) gmmktime(0, 0, 0, $date->month, $date->day, $date->year), 86400);
+    }
+
+    /**
+     * The calendar date ("2026-11-19") of a day number.
+     */
+    private function dateOf(int $day): string
+    {
+        return gmdate('Y-m-d', $day * 86400);
     }
 
     /**
@@ -822,5 +885,14 @@ final class BankCatalogService
     private function installmentLabel(ExpenseOccurrence $occurrence): string
     {
         return $occurrence->installment_number !== null ? " (parcela {$occurrence->installment_number}/{$occurrence->installment_count})" : '';
+    }
+
+    /**
+     * Linking an expense already paid only attaches the bank proof, so the
+     * suggestion says so.
+     */
+    private function paidLabel(ExpenseOccurrence $occurrence): string
+    {
+        return $occurrence->isPaid() ? ', já paga' : '';
     }
 }

@@ -2,14 +2,15 @@
 
 namespace App\Services\Bank;
 
+use App\Enums\BankAccountType;
 use App\Enums\BankCatalogType;
 use App\Enums\BankChannel;
 use App\Enums\BankReviewStatus;
 use App\Enums\BankRuleAction;
 use App\Enums\ExpenseScope;
+use App\Enums\OccurrenceSource;
 use App\Enums\OccurrenceStatus;
 use App\Enums\TransactionType;
-use App\Models\BankBill;
 use App\Models\BankRule;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
@@ -18,6 +19,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ExpenseService;
 use App\Services\PaymentService;
+use App\Support\Month;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -69,18 +71,12 @@ final class BankCatalogService
      */
     private const SUGGESTION_FILTER_LIMIT = 500;
 
-    /**
-     * Closed bills per card account, loaded once per request.
-     *
-     * @var array<int, Collection<int, BankBill>>
-     */
-    private array $bills = [];
-
     public function __construct(
         private readonly ExpenseService $expenses,
         private readonly PaymentService $payments,
         private readonly BankRuleBook $rules,
         private readonly BankOffsetService $offsets,
+        private readonly CardBillCalendar $bills,
         private readonly AuditLogger $audit,
     ) {
         //
@@ -605,48 +601,64 @@ final class BankCatalogService
 
     /**
      * The date the transaction counts on: for a card purchase the due date
-     * of its bill (the month the money actually leaves), for anything else
-     * the day it happened. The bill comes from the transaction itself or, for
-     * purchases of the open bill, from the closing dates of the last bills.
+     * of the bill that pays it (the month the money actually leaves; see
+     * CardBillCalendar), for anything else the day it happened.
      */
     public function referenceDate(BankTransaction $transaction): CarbonImmutable
     {
-        $account = $transaction->account;
-
-        if (! $account->isCreditCard()) {
+        if (! $transaction->account->isCreditCard()) {
             return $transaction->date;
         }
 
-        if ($transaction->bill !== null) {
-            return $transaction->bill->due_date;
-        }
+        return $this->bills->dueDate($transaction) ?? $transaction->date;
+    }
 
-        $bills = $this->bills[$account->id] ??= $account->bills()->whereNotNull('closing_date')->orderBy('closing_date')->get();
-        $date = $transaction->date;
+    /**
+     * Move household expenses created from card purchases, still pending,
+     * to the due date of the bill that pays them when they were left in an
+     * earlier month (the bill used to be worked out from the purchase date
+     * alone), so nothing shows as unpaid before the bill is even due. Only
+     * moves them forward: a date set later by hand stays.
+     *
+     * @return int How many were moved.
+     */
+    public function moveCardExpensesToTheirBill(): int
+    {
+        $moved = 0;
 
-        $closedIn = $bills->first(fn (BankBill $bill) => $bill->closing_date !== null && $bill->closing_date->gte($date));
+        BankTransaction::query()
+            ->where('catalog_type', BankCatalogType::Household)
+            ->whereNotNull('expense_occurrence_id')
+            ->whereHas('account', fn (Builder $query) => $query->where('type', BankAccountType::Credit))
+            ->with(['account', 'bill', 'expenseOccurrence'])
+            ->chunkById(200, function (Collection $transactions) use (&$moved) {
+                foreach ($transactions as $transaction) {
+                    $occurrence = $transaction->expenseOccurrence;
 
-        if ($closedIn !== null) {
-            return $closedIn->due_date;
-        }
+                    if ($occurrence === null || $occurrence->isPaid() || $occurrence->source !== OccurrenceSource::OneOff) {
+                        continue;
+                    }
 
-        $last = $bills->last();
+                    $due = $this->referenceDate($transaction);
 
-        if ($last !== null && $last->closing_date !== null) {
-            $closing = $last->closing_date;
-            $due = $last->due_date;
+                    if (! $due->startOfMonth()->gt($occurrence->billing_month)) {
+                        continue;
+                    }
 
-            for ($month = 0; $month < 24 && $date->gt($closing); $month++) {
-                $closing = $closing->addMonthsNoOverflow(1);
-                $due = $due->addMonthsNoOverflow(1);
-            }
+                    $old = ['billing_month' => Month::key($occurrence->billing_month), 'due_date' => $occurrence->due_date->toDateString()];
+                    $occurrence->update(['due_date' => $due, 'billing_month' => $due->startOfMonth()]);
 
-            return $due;
-        }
+                    $this->audit->record('bank.moved_to_bill', $occurrence, null, $occurrence->household_id, $old, [
+                        'billing_month' => Month::key($occurrence->billing_month),
+                        'due_date' => $occurrence->due_date->toDateString(),
+                        'bank_transaction_id' => $transaction->id,
+                    ]);
 
-        $due = $account->balance_due_date;
+                    $moved++;
+                }
+            });
 
-        return $due !== null && $due->gte($date) && $due->lte($date->addDays(60)) ? $due : $date;
+        return $moved;
     }
 
     /**

@@ -120,6 +120,34 @@ class BankRuleTest extends TestCase
             ->assertSessionHasNoErrors();
     }
 
+    public function test_a_rule_can_hold_an_amount(): void
+    {
+        $this->actingAs($this->bruno)
+            ->post(route('bank.rules.store'), ['label' => 'Letícia', 'match_mode' => 'equals', 'amount' => '1500.00', 'action' => 'household', 'title' => 'Parcela da casa'])
+            ->assertSessionHasNoErrors();
+
+        // Another value, or any value, for the same person is another rule.
+        $this->actingAs($this->bruno)
+            ->post(route('bank.rules.store'), ['label' => 'Leticia', 'match_mode' => 'equals', 'amount' => '120.00', 'action' => 'personal', 'title' => 'Academia'])
+            ->assertSessionHasNoErrors();
+        $this->actingAs($this->bruno)
+            ->post(route('bank.rules.store'), ['label' => 'Leticia', 'match_mode' => 'equals', 'amount' => '', 'action' => 'personal'])
+            ->assertSessionHasNoErrors();
+
+        // The same value twice is not.
+        $this->actingAs($this->bruno)
+            ->post(route('bank.rules.store'), ['label' => 'LETICIA', 'match_mode' => 'equals', 'amount' => '1500', 'action' => 'ignore'])
+            ->assertSessionHasErrors('label');
+
+        $this->assertSame([null, 12_000, 150_000], BankRule::query()->orderBy('amount_cents')->pluck('amount_cents')->all());
+
+        $this->actingAs($this->bruno)
+            ->get(route('bank.rules.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('rules', 3)
+                ->where('rules', fn ($rules) => collect($rules)->pluck('amount_cents')->sort()->values()->all() === [null, 12_000, 150_000]));
+    }
+
     public function test_rules_are_edited_and_removed_only_by_their_owner(): void
     {
         $rule = BankRule::create(['user_id' => $this->bruno->id, 'pattern' => 'fulano', 'label' => 'Fulano', 'action' => BankRuleAction::Ignore]);

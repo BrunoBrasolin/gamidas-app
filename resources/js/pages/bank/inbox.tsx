@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useQueryFilters } from '@/hooks/use-query-filters';
-import { formatDate, formatMonth } from '@/lib/format';
+import { formatDate, formatMoney, formatMonth } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
@@ -406,6 +406,9 @@ function PendingActions({ transaction }: { transaction: BankTransaction }) {
                         {transaction.suggestion.rule && (
                             <span className="block text-xs text-muted-foreground">
                                 pela regra “{transaction.suggestion.rule.label}”
+                                {transaction.suggestion.rule.amount_cents !==
+                                    null &&
+                                    ` de ${formatMoney(transaction.suggestion.rule.amount_cents)}`}
                             </span>
                         )}
                     </span>

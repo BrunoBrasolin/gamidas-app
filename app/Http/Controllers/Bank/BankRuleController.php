@@ -54,7 +54,7 @@ class BankRuleController extends Controller
         $data = $request->toData();
         $user = $this->user($request);
 
-        $this->ensureUnique($user->id, $data['pattern'], $data['match_mode']);
+        $this->ensureUnique($user->id, $data['pattern'], $data['match_mode'], $data['amount_cents']);
 
         BankRule::create([...$data, 'user_id' => $user->id]);
 
@@ -67,7 +67,7 @@ class BankRuleController extends Controller
     {
         $data = $request->toData();
 
-        $this->ensureUnique($rule->user_id, $data['pattern'], $data['match_mode'], $rule->id);
+        $this->ensureUnique($rule->user_id, $data['pattern'], $data['match_mode'], $data['amount_cents'], $rule->id);
 
         $rule->update($data);
 
@@ -87,17 +87,18 @@ class BankRuleController extends Controller
         return back();
     }
 
-    private function ensureUnique(int $userId, string $pattern, BankRuleMatch $mode, ?int $ignoreId = null): void
+    private function ensureUnique(int $userId, string $pattern, BankRuleMatch $mode, ?int $amountCents, ?int $ignoreId = null): void
     {
         $exists = BankRule::query()
             ->where('user_id', $userId)
             ->where('pattern', $pattern)
             ->where('match_mode', $mode)
+            ->where('amount_cents', $amountCents)
             ->when($ignoreId, fn (Builder $query, int $id) => $query->whereKeyNot($id))
             ->exists();
 
         if ($exists) {
-            throw ValidationException::withMessages(['label' => 'Já existe uma regra com este texto e esta comparação.']);
+            throw ValidationException::withMessages(['label' => 'Já existe uma regra com este texto, esta comparação e este valor.']);
         }
     }
 }

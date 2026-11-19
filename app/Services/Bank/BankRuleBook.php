@@ -27,10 +27,10 @@ final class BankRuleBook
     }
 
     /**
-     * The rule for a transaction: an exact match on its key wins over
-     * "contains" rules, and among those the longest pattern wins. Rules whose
-     * action does not fit the direction (income for money going out) are
-     * skipped.
+     * The rule for a transaction: a rule for its exact value wins over rules
+     * for any value; then an exact match on its key wins over "contains"
+     * rules, and among those the longest pattern wins. Rules whose action
+     * does not fit the direction (income for money going out) are skipped.
      *
      * @param  Collection<int, BankRule>|null  $rules  The owner's rules, when already loaded.
      */
@@ -41,22 +41,25 @@ final class BankRuleBook
         return $rules
             ->filter(fn (BankRule $rule) => $rule->user_id === $transaction->user_id
                 && $rule->action->fits($transaction->direction)
-                && $rule->matches($transaction->match_key))
-            ->sortByDesc(fn (BankRule $rule) => ($rule->match_mode === BankRuleMatch::Equals ? 1000 : 0) + strlen($rule->pattern))
+                && $rule->matches($transaction->ruleKeys(), $transaction->amount_cents))
+            ->sortByDesc(fn (BankRule $rule) => ($rule->amount_cents !== null ? 2000 : 0)
+                + ($rule->match_mode === BankRuleMatch::Equals ? 1000 : 0)
+                + strlen($rule->pattern))
             ->first();
     }
 
     /**
      * Remember the owner's choice for transactions like this one: creates
-     * the exact rule for its key or updates it (adjusting a suggestion
-     * corrects the rule).
+     * the exact rule for its key (for any value, or only for this value) or
+     * updates it (adjusting a suggestion corrects the rule).
      */
-    public function learn(User $owner, BankTransaction $transaction, BankRuleAction $action, ?string $title, ?int $recurringExpenseId, ?bool $autoApply): BankRule
+    public function learn(User $owner, BankTransaction $transaction, BankRuleAction $action, ?string $title, ?int $recurringExpenseId, ?bool $autoApply, bool $onlyThisAmount = false): BankRule
     {
         $rule = BankRule::query()->firstOrNew([
             'user_id' => $owner->id,
             'pattern' => $transaction->match_key,
             'match_mode' => BankRuleMatch::Equals->value,
+            'amount_cents' => $onlyThisAmount ? $transaction->amount_cents : null,
         ]);
 
         $rule->fill([

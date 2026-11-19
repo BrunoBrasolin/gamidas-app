@@ -162,7 +162,11 @@ final class BankPresenter
                 'label' => $suggestion->label,
                 'title' => $suggestion->choice->title,
                 'occurrence_id' => $suggestion->choice->occurrenceId,
-                'rule' => $suggestion->rule === null ? null : ['id' => $suggestion->rule->id, 'label' => $suggestion->rule->label],
+                'rule' => $suggestion->rule === null ? null : [
+                    'id' => $suggestion->rule->id,
+                    'label' => $suggestion->rule->label,
+                    'amount_cents' => $suggestion->rule->amount_cents,
+                ],
             ],
             'candidates' => array_map(fn (array $candidate) => $this->candidate($candidate['occurrence']) + [
                 'strong' => $candidate['strong'],
@@ -181,6 +185,7 @@ final class BankPresenter
             'pattern' => $rule->pattern,
             'match_mode' => $rule->match_mode->value,
             'match_label' => $rule->match_mode->label(),
+            'amount_cents' => $rule->amount_cents,
             'action' => $rule->action->value,
             'action_label' => $rule->action->label(),
             'title' => $rule->title,
@@ -194,9 +199,11 @@ final class BankPresenter
     }
 
     /**
+     * An expense the owner may link a transaction to.
+     *
      * @return array<string, mixed>
      */
-    private function candidate(ExpenseOccurrence $occurrence): array
+    public function candidate(ExpenseOccurrence $occurrence): array
     {
         return [
             'id' => $occurrence->id,

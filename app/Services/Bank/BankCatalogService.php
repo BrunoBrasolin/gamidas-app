@@ -200,7 +200,7 @@ final class BankCatalogService
             ]);
 
             if ($choice->remember && $ruleAction !== null) {
-                $this->rules->learn($actor, $transaction, $ruleAction, $title, $recurringExpenseId, $choice->autoApply);
+                $this->rules->learn($actor, $transaction, $ruleAction, $title, $recurringExpenseId, $choice->autoApply, $choice->rememberAmount);
             }
 
             return $transaction;
@@ -458,6 +458,29 @@ final class BankCatalogService
         }
 
         return $result;
+    }
+
+    /**
+     * Every pending expense the user may link a transaction to — household
+     * ones and their own personal ones, not linked to another transaction —
+     * from a year back to three months ahead, for picking by hand when the
+     * suggestions miss (a PIX to a person that pays a household bill).
+     *
+     * @return Collection<int, ExpenseOccurrence>
+     */
+    public function linkable(User $user): Collection
+    {
+        $today = Date::today();
+
+        return ExpenseOccurrence::query()
+            ->visibleTo($user)
+            ->where('status', OccurrenceStatus::Pending)
+            ->whereBetween('due_date', [$today->subYear()->toDateString(), $today->addMonths(3)->toDateString()])
+            ->whereDoesntHave('bankTransactions', fn (Builder $query) => $query->whereNull('removed_at'))
+            ->orderBy('due_date')
+            ->orderBy('id')
+            ->limit(500)
+            ->get();
     }
 
     /**

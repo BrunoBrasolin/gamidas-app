@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property string $pattern Normalized (see {@see TransactionClassifier::normalize()}).
  * @property BankRuleMatch $match_mode
+ * @property int|null $amount_cents Only transactions of exactly this value match; null matches any value.
  * @property string $label The counterparty or description as shown to the owner.
  * @property BankRuleAction $action
  * @property int|null $recurring_expense_id
@@ -31,7 +32,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read User $user
  * @property-read RecurringExpense|null $recurringExpense
  */
-#[Fillable(['user_id', 'pattern', 'match_mode', 'label', 'action', 'recurring_expense_id', 'title', 'auto_apply', 'hits', 'last_used_at'])]
+#[Fillable(['user_id', 'pattern', 'match_mode', 'amount_cents', 'label', 'action', 'recurring_expense_id', 'title', 'auto_apply', 'hits', 'last_used_at'])]
 class BankRule extends Model
 {
     /**
@@ -50,6 +51,7 @@ class BankRule extends Model
     {
         return [
             'match_mode' => BankRuleMatch::class,
+            'amount_cents' => 'integer',
             'action' => BankRuleAction::class,
             'auto_apply' => 'boolean',
             'hits' => 'integer',
@@ -57,12 +59,31 @@ class BankRule extends Model
         ];
     }
 
-    public function matches(string $key): bool
+    /**
+     * Whether a transaction fits the rule: one of its keys (counterparty,
+     * description) matches the pattern and, when the rule holds an amount,
+     * the value is exactly that.
+     *
+     * @param  list<string>  $keys
+     */
+    public function matches(array $keys, int $amountCents): bool
     {
-        return match ($this->match_mode) {
-            BankRuleMatch::Equals => $key === $this->pattern,
-            BankRuleMatch::Contains => $this->pattern !== '' && str_contains($key, $this->pattern),
-        };
+        if ($this->amount_cents !== null && $this->amount_cents !== $amountCents) {
+            return false;
+        }
+
+        foreach ($keys as $key) {
+            $matched = match ($this->match_mode) {
+                BankRuleMatch::Equals => $key === $this->pattern,
+                BankRuleMatch::Contains => $this->pattern !== '' && str_contains($key, $this->pattern),
+            };
+
+            if ($matched) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

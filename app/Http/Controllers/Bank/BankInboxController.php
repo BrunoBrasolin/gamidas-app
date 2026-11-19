@@ -46,6 +46,12 @@ class BankInboxController extends Controller
         $userRules = $rules->rulesOf($user->id);
         $candidates = $catalog->candidates($items, $user);
 
+        // Only needed to catalogue, i.e. when money going out is pending.
+        // (Checked before through(), which turns the items into arrays.)
+        $linkable = $items->contains(fn (BankTransaction $transaction) => $transaction->isPending() && $transaction->isOutgoing())
+            ? $catalog->linkable($user)->map(fn ($occurrence) => $presenter->candidate($occurrence))->values()->all()
+            : [];
+
         return Inertia::render('bank/inbox', [
             'filters' => $filters,
             'accounts' => BankAccount::query()
@@ -70,6 +76,7 @@ class BankInboxController extends Controller
                     ->count(),
             ],
             'hasConnections' => BankAccount::query()->where('user_id', $user->id)->exists(),
+            'linkable' => $linkable,
         ]);
     }
 

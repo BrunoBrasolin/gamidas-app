@@ -105,6 +105,16 @@ class TransactionClassifierTest extends TestCase
         $this->assertSame('•••.456.789-••', $pix['counterparty_document']);
     }
 
+    public function test_pix_counterparty_is_read_from_descriptions_split_by_pipes(): void
+    {
+        $pix = $this->classify(['description' => 'Transferência enviada pelo Pix|FULANO DE TAL|•••.456.789-••']);
+
+        $this->assertSame(BankChannel::Pix, $pix['channel']);
+        $this->assertSame('Fulano De Tal', $pix['counterparty_name']);
+        $this->assertSame('fulano de tal', $pix['match_key']);
+        $this->assertSame('•••.456.789-••', $pix['counterparty_document']);
+    }
+
     public function test_channels_from_the_description_when_open_finance_fields_are_missing(): void
     {
         $this->assertSame(BankChannel::BillPayment, $this->classify(['description' => 'Pagamento de fatura'])['channel']);

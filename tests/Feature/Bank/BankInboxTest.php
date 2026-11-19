@@ -449,6 +449,99 @@ class BankInboxTest extends TestCase
         $this->assertSame('2026-11-05', $catalog->referenceDate($this->pix())->toDateString());
     }
 
+    public function test_rules_by_value_tell_apart_payments_to_the_same_person(): void
+    {
+        $house = app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
+            'scope' => ExpenseScope::Household,
+            'kind' => RecurringKind::Fixed,
+            'title' => 'Parcela da casa',
+            'notes' => null,
+            'amount_cents' => 150_000,
+            'due_day' => 5,
+            'start_month' => Month::current(),
+            'end_month' => null,
+            'total_months' => null,
+        ]);
+        $november = $house->occurrences()->forMonth(Month::current())->sole();
+
+        // R$ 1.500,00 to Letícia is the house: remembered for any value.
+        $this->actingAs($this->bruno)
+            ->post(route('bank.transactions.catalog', $this->pix('LETICIA EXEMPLO', -1500, '2026-11-05')), [
+                'action' => 'link', 'occurrence_id' => $november->id, 'remember' => '1',
+            ])
+            ->assertSessionHasNoErrors();
+
+        // R$ 120,00 to her comes suggested as the house too; adjusted to the
+        // gym, remembered only for this value.
+        $gym = $this->pix('LETICIA EXEMPLO', -120, '2026-11-06');
+        $this->assertSame('link', app(BankCatalogService::class)->suggest($gym)?->choice->action);
+
+        $this->actingAs($this->bruno)
+            ->post(route('bank.transactions.catalog', $gym), [
+                'action' => 'personal', 'title' => 'Academia', 'remember' => '1', 'remember_amount' => '1',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(2, BankRule::query()->count());
+        $this->assertSame(12_000, BankRule::query()->where('action', BankRuleAction::Personal)->sole()->amount_cents);
+        $this->assertNull(BankRule::query()->where('action', BankRuleAction::Recurring)->sole()->amount_cents);
+
+        // Next month each value gets its own suggestion.
+        $catalog = app(BankCatalogService::class);
+        $nextHouse = $catalog->suggest($this->pix('LETICIA EXEMPLO', -1500, '2026-12-05'));
+        $nextGym = $catalog->suggest($this->pix('LETICIA EXEMPLO', -120, '2026-12-06'));
+
+        $this->assertSame('link', $nextHouse?->choice->action);
+        $this->assertSame('2026-12', Month::key($nextHouse->occurrence->billing_month));
+        $this->assertSame('personal', $nextGym?->choice->action);
+        $this->assertSame('Academia', $nextGym->choice->title);
+
+        // Other values to her still fall back to the rule for any value.
+        $this->assertSame('link', $catalog->suggest($this->pix('LETICIA EXEMPLO', -99, '2026-12-07'))?->choice->action);
+    }
+
+    public function test_any_pending_expense_can_be_picked_even_without_suggestions(): void
+    {
+        $rent = $this->createExpense($this->leticia, 180_000);
+        $leticiaPrivate = $this->createExpense($this->leticia, 5_000, null, ExpenseScope::Personal);
+        $mine = $this->createExpense($this->bruno, 7_000, null, ExpenseScope::Personal);
+        $transaction = $this->pix('MARIA EXEMPLO', -1500);
+
+        $this->actingAs($this->bruno)
+            ->get(route('bank.inbox'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('transactions.data.0.candidates', [])
+                ->where('linkable', fn ($linkable) => collect($linkable)->pluck('id')->sort()->values()->all() === collect([$rent->id, $mine->id])->sort()->values()->all()));
+
+        $this->actingAs($this->bruno)
+            ->post(route('bank.transactions.catalog', $transaction), ['action' => 'link', 'occurrence_id' => $rent->id])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($rent->id, $transaction->fresh()->expense_occurrence_id);
+        $this->assertSame(150_000, $rent->fresh()->amount_cents);
+        $this->assertNotSame($leticiaPrivate->id, $transaction->fresh()->expense_occurrence_id);
+    }
+
+    public function test_rules_learned_from_the_description_keep_matching_once_the_name_is_known(): void
+    {
+        // Learned before the counterparty was read from "Pix|NAME".
+        BankRule::create([
+            'user_id' => $this->bruno->id,
+            'pattern' => 'transferencia enviada pelo pix fulano de tal',
+            'label' => 'Transferência enviada pelo Pix|FULANO DE TAL',
+            'action' => BankRuleAction::Personal,
+            'title' => 'Aluguel da vaga',
+        ]);
+
+        $transaction = $this->createBankTransaction($this->checking, [
+            'description' => 'Transferência enviada pelo Pix|FULANO DE TAL',
+            'amount' => -300,
+        ]);
+
+        $this->assertSame('Fulano De Tal', $transaction->counterparty_name);
+        $this->assertSame('Aluguel da vaga', app(BankCatalogService::class)->suggest($transaction)?->choice->title);
+    }
+
     public function test_the_expenses_page_points_to_the_inbox(): void
     {
         $this->pix();

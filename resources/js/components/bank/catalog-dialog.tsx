@@ -20,10 +20,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDate, formatMonth } from '@/lib/format';
+import { formatDate, formatMoney, formatMonth } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
-import type { BankCatalogAction, BankTransaction } from '@/types';
+import type {
+    BankCandidate,
+    BankCatalogAction,
+    BankTransaction,
+} from '@/types';
 
 type SharedHousehold = {
     household: {
@@ -122,6 +126,23 @@ export function CatalogDialog({
     );
     const [remember, setRemember] = useState(true);
     const [autoApply, setAutoApply] = useState(false);
+    const [amountChoice, setAmountChoice] = useState<boolean | null>(null);
+
+    // Choosing something else than a rule suggested means this counterparty
+    // is told apart by value (a PIX of R$ 1.500,00 to someone is the house,
+    // other values are the gym): the new rule then defaults to this value
+    // only, and the existing one keeps covering the other values.
+    const ruleSuggestion = transaction.suggestion?.rule
+        ? transaction.suggestion
+        : null;
+    const adjustsRule =
+        ruleSuggestion !== null &&
+        (action !== ruleSuggestion.action ||
+            (action === 'link' &&
+                occurrenceId !== ruleSuggestion.occurrence_id));
+    const rememberAmount =
+        amountChoice ??
+        (adjustsRule || (ruleSuggestion?.rule?.amount_cents ?? null) !== null);
 
     const others = (household?.members ?? []).filter(
         (member) => member.user_id !== auth.user.id,
@@ -144,6 +165,7 @@ export function CatalogDialog({
                     setOccurrenceId(initialOccurrence);
                     setRemember(true);
                     setAutoApply(false);
+                    setAmountChoice(null);
                 }
 
                 setOpen(next);
@@ -306,6 +328,13 @@ export function CatalogDialog({
                                     name="auto_apply"
                                     value={autoApply ? '1' : '0'}
                                 />
+                                <input
+                                    type="hidden"
+                                    name="remember_amount"
+                                    value={
+                                        remember && rememberAmount ? '1' : '0'
+                                    }
+                                />
                                 <div className="flex items-start gap-2">
                                     <Checkbox
                                         id={`catalog-remember-${transaction.id}`}
@@ -323,6 +352,54 @@ export function CatalogDialog({
                                             ' (só para despesas recorrentes)'}
                                     </Label>
                                 </div>
+                                {remember && (
+                                    <div
+                                        role="radiogroup"
+                                        aria-label="Valor da regra"
+                                        className="space-y-1 pl-6 text-sm"
+                                    >
+                                        {(
+                                            [
+                                                [false, 'Para qualquer valor'],
+                                                [
+                                                    true,
+                                                    `Só quando o valor for ${formatMoney(transaction.amount_cents)}`,
+                                                ],
+                                            ] as const
+                                        ).map(([onlyThis, label]) => (
+                                            <label
+                                                key={label}
+                                                className="flex cursor-pointer items-center gap-2"
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    checked={
+                                                        rememberAmount ===
+                                                        onlyThis
+                                                    }
+                                                    onChange={() =>
+                                                        setAmountChoice(
+                                                            onlyThis,
+                                                        )
+                                                    }
+                                                    className="accent-primary"
+                                                />
+                                                {label}
+                                            </label>
+                                        ))}
+                                        {adjustsRule &&
+                                            rememberAmount &&
+                                            ruleSuggestion?.rule && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    A regra “
+                                                    {ruleSuggestion.rule.label}”
+                                                    continua sugerindo “
+                                                    {ruleSuggestion.label}” para
+                                                    os outros valores.
+                                                </p>
+                                            )}
+                                    </div>
+                                )}
                                 {remember && (
                                     <div className="flex items-start gap-2 pl-6">
                                         <Checkbox
@@ -368,6 +445,21 @@ export function CatalogDialog({
     );
 }
 
+/**
+ * Lowercase without accents, to search titles as typed.
+ */
+function normalize(text: string): string {
+    return text
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+}
+
+/**
+ * The expense to link to: the suggestions first, then any other pending
+ * expense the member can see (household ones and their own), nearest to the
+ * transaction's date, searchable by title or month.
+ */
 function LinkCandidates({
     transaction,
     value,
@@ -379,11 +471,40 @@ function LinkCandidates({
     onChange: (id: number) => void;
     error?: string;
 }) {
-    if (transaction.candidates.length === 0) {
+    const { linkable = [] } = usePage<{ linkable?: BankCandidate[] }>().props;
+    const [search, setSearch] = useState('');
+
+    const suggested = new Set(transaction.candidates.map((c) => c.id));
+    const reference = Date.parse(transaction.reference_date);
+    const term = normalize(search.trim());
+    const pool = linkable.filter((candidate) => !suggested.has(candidate.id));
+    const others = pool
+        .filter(
+            (candidate) =>
+                term === '' ||
+                normalize(
+                    `${candidate.title} ${formatMonth(candidate.billing_month)}`,
+                ).includes(term),
+        )
+        .sort(
+            (a, b) =>
+                Math.abs(Date.parse(a.due_date) - reference) -
+                Math.abs(Date.parse(b.due_date) - reference),
+        )
+        .slice(0, term === '' ? 8 : 30);
+
+    // Keep the chosen expense in view while searching for another.
+    const chosen = pool.find(
+        (candidate) =>
+            candidate.id === value &&
+            !others.some((other) => other.id === value),
+    );
+
+    if (transaction.candidates.length === 0 && pool.length === 0) {
         return (
             <p className="rounded-md border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-                Nenhuma despesa pendente com valor ou nome parecido perto desta
-                data. Cadastre como despesa da casa ou pessoal.
+                Nenhuma despesa pendente para vincular. Cadastre como despesa da
+                casa ou pessoal.
             </p>
         );
     }
@@ -393,64 +514,64 @@ function LinkCandidates({
             <legend className="mb-1.5 text-sm font-medium">
                 Qual despesa?
             </legend>
-            <div className="grid gap-2">
-                {transaction.candidates.map((candidate) => (
-                    <label
-                        key={candidate.id}
-                        className={cn(
-                            'flex cursor-pointer items-start justify-between gap-3 rounded-md border p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-muted',
-                            'has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
-                        )}
-                    >
-                        <input
-                            type="radio"
-                            name="occurrence_id"
-                            value={candidate.id}
+
+            {transaction.candidates.length > 0 && (
+                <div className="grid gap-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                        Sugestões
+                    </p>
+                    {transaction.candidates.map((candidate) => (
+                        <CandidateOption
+                            key={candidate.id}
+                            candidate={candidate}
                             checked={value === candidate.id}
-                            onChange={() => onChange(candidate.id)}
-                            className="sr-only"
+                            onChange={onChange}
                         />
-                        <span className="min-w-0">
-                            <span className="block font-medium">
-                                {candidate.title}
-                            </span>
-                            <span className="mt-0.5 flex flex-wrap gap-1">
-                                <Badge variant="outline">
-                                    {candidate.scope === 'household'
-                                        ? 'Casa'
-                                        : 'Pessoal'}
-                                </Badge>
-                                <Badge variant="outline">
-                                    {formatMonth(candidate.billing_month)}
-                                </Badge>
-                                {candidate.installment_number && (
-                                    <Badge variant="outline">
-                                        Parcela {candidate.installment_number}/
-                                        {candidate.installment_count}
-                                    </Badge>
-                                )}
-                                {candidate.is_recurring && (
-                                    <Badge variant="secondary">
-                                        Recorrente
-                                    </Badge>
-                                )}
-                            </span>
-                        </span>
-                        <span className="text-right">
-                            {candidate.awaits_amount ? (
-                                <span className="text-xs text-amber-700 dark:text-amber-400">
-                                    Valor a definir
-                                </span>
-                            ) : (
-                                <Money cents={candidate.amount_cents} />
-                            )}
-                            <span className="block text-xs text-muted-foreground">
-                                vence {formatDate(candidate.due_date)}
-                            </span>
-                        </span>
-                    </label>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
+
+            {pool.length > 0 && (
+                <div className="mt-2 grid gap-2">
+                    <Label
+                        htmlFor={`link-search-${transaction.id}`}
+                        className="text-xs font-medium text-muted-foreground"
+                    >
+                        {transaction.candidates.length > 0
+                            ? 'Outra despesa pendente'
+                            : 'Despesas pendentes'}
+                    </Label>
+                    <Input
+                        id={`link-search-${transaction.id}`}
+                        type="search"
+                        placeholder="Buscar por nome ou mês (ex.: aluguel, dezembro)"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        autoComplete="off"
+                    />
+                    {chosen && (
+                        <CandidateOption
+                            candidate={chosen}
+                            checked
+                            onChange={onChange}
+                        />
+                    )}
+                    {others.map((candidate) => (
+                        <CandidateOption
+                            key={candidate.id}
+                            candidate={candidate}
+                            checked={value === candidate.id}
+                            onChange={onChange}
+                        />
+                    ))}
+                    {others.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            Nenhuma despesa pendente com esse nome.
+                        </p>
+                    )}
+                </div>
+            )}
+
             <p className="text-xs text-muted-foreground">
                 O valor da despesa passa a ser o do banco e, se você puder
                 confirmar o pagamento, ela é marcada como paga.
@@ -461,5 +582,65 @@ function LinkCandidates({
                 </p>
             )}
         </fieldset>
+    );
+}
+
+function CandidateOption({
+    candidate,
+    checked,
+    onChange,
+}: {
+    candidate: BankCandidate;
+    checked: boolean;
+    onChange: (id: number) => void;
+}) {
+    return (
+        <label
+            className={cn(
+                'flex cursor-pointer items-start justify-between gap-3 rounded-md border p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-muted',
+                'has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
+            )}
+        >
+            <input
+                type="radio"
+                name="occurrence_id"
+                value={candidate.id}
+                checked={checked}
+                onChange={() => onChange(candidate.id)}
+                className="sr-only"
+            />
+            <span className="min-w-0">
+                <span className="block font-medium">{candidate.title}</span>
+                <span className="mt-0.5 flex flex-wrap gap-1">
+                    <Badge variant="outline">
+                        {candidate.scope === 'household' ? 'Casa' : 'Pessoal'}
+                    </Badge>
+                    <Badge variant="outline">
+                        {formatMonth(candidate.billing_month)}
+                    </Badge>
+                    {candidate.installment_number && (
+                        <Badge variant="outline">
+                            Parcela {candidate.installment_number}/
+                            {candidate.installment_count}
+                        </Badge>
+                    )}
+                    {candidate.is_recurring && (
+                        <Badge variant="secondary">Recorrente</Badge>
+                    )}
+                </span>
+            </span>
+            <span className="text-right">
+                {candidate.awaits_amount ? (
+                    <span className="text-xs text-amber-700 dark:text-amber-400">
+                        Valor a definir
+                    </span>
+                ) : (
+                    <Money cents={candidate.amount_cents} />
+                )}
+                <span className="block text-xs text-muted-foreground">
+                    vence {formatDate(candidate.due_date)}
+                </span>
+            </span>
+        </label>
     );
 }

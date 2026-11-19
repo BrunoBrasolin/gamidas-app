@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
 import { FormField } from '@/components/finance/form-field';
+import { MoneyInput } from '@/components/finance/money-input';
 import { PageHeader } from '@/components/finance/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatMoney } from '@/lib/format';
 import bank from '@/routes/bank';
 import type { BankRule, BankRuleAction } from '@/types';
 
@@ -94,7 +95,16 @@ export default function BankRules({
                                             <div className="font-medium break-words">
                                                 {rule.match_mode === 'contains'
                                                     ? `Contém “${rule.label}”`
-                                                    : rule.label}{' '}
+                                                    : rule.label}
+                                                {rule.amount_cents !== null && (
+                                                    <span className="text-muted-foreground">
+                                                        {' '}
+                                                        de{' '}
+                                                        {formatMoney(
+                                                            rule.amount_cents,
+                                                        )}
+                                                    </span>
+                                                )}{' '}
                                                 <span className="text-muted-foreground">
                                                     →
                                                 </span>{' '}
@@ -270,6 +280,19 @@ function RuleDialog({
                                     />
                                 </FormField>
                             </div>
+                            <FormField
+                                id="rule-amount"
+                                label="Valor (opcional)"
+                                error={errors.amount}
+                                hint="Preenchido, a regra só vale para transações de exatamente esse valor — útil quando a mesma pessoa recebe PIX de coisas diferentes. Vazio, vale para qualquer valor."
+                            >
+                                <MoneyInput
+                                    id="rule-amount"
+                                    name="amount"
+                                    defaultCents={rule?.amount_cents ?? null}
+                                    placeholder="Qualquer valor"
+                                />
+                            </FormField>
                             <FormField
                                 id="rule-action"
                                 label="Sugerir"

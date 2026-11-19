@@ -9,7 +9,8 @@ use Carbon\CarbonImmutable;
  *
  * Actions: household, personal, income, investment (a new record), link (an
  * expense that already exists, e.g. this month's rent) or ignore. Title and
- * date default to the transaction's name and reference date.
+ * date default to the transaction's name and reference date. Remembering
+ * creates a rule for the counterparty, for any value or only for this one.
  */
 final readonly class CatalogChoice
 {
@@ -23,6 +24,7 @@ final readonly class CatalogChoice
         public ?int $occurrenceId = null,
         public bool $remember = true,
         public ?bool $autoApply = null,
+        public bool $rememberAmount = false,
     ) {
         //
     }

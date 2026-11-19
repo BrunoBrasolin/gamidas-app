@@ -7,6 +7,7 @@ use App\Enums\BankCatalogType;
 use App\Enums\BankChannel;
 use App\Enums\BankDirection;
 use App\Enums\BankReviewStatus;
+use App\Services\Bank\TransactionClassifier;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -111,6 +112,21 @@ class BankTransaction extends Model
     public function isOutgoing(): bool
     {
         return $this->direction === BankDirection::Out;
+    }
+
+    /**
+     * What rules are compared with: the main key (the counterparty, when
+     * known) and the description without numbers, so a rule written from
+     * either one matches.
+     *
+     * @return list<string>
+     */
+    public function ruleKeys(): array
+    {
+        return array_values(array_unique(array_filter([
+            $this->match_key,
+            TransactionClassifier::matchKey(null, $this->description),
+        ], fn (string $key) => $key !== '')));
     }
 
     /**

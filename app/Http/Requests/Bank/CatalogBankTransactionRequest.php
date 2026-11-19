@@ -24,6 +24,7 @@ class CatalogBankTransactionRequest extends FinanceRequest
             'notes' => ['nullable', 'string', 'max:2000'],
             'occurrence_id' => ['nullable', 'required_if:action,link', 'integer'],
             'remember' => ['boolean'],
+            'remember_amount' => ['boolean'],
             'auto_apply' => ['boolean'],
         ];
     }
@@ -54,6 +55,7 @@ class CatalogBankTransactionRequest extends FinanceRequest
             occurrenceId: $this->nullableInt('occurrence_id'),
             remember: $this->boolean('remember'),
             autoApply: $this->has('auto_apply') ? $this->boolean('auto_apply') : null,
+            rememberAmount: $this->boolean('remember_amount'),
         );
     }
 }

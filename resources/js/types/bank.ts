@@ -72,7 +72,8 @@ export type BankCandidate = {
     installment_count: number | null;
     awaits_amount: boolean;
     is_recurring: boolean;
-    strong: boolean;
+    /** Only on suggestions: same amount and clearly the same expense. */
+    strong?: boolean;
 };
 
 export type BankTransaction = {
@@ -129,7 +130,11 @@ export type BankTransaction = {
         label: string;
         title: string | null;
         occurrence_id: number | null;
-        rule: { id: number; label: string } | null;
+        rule: {
+            id: number;
+            label: string;
+            amount_cents: number | null;
+        } | null;
     } | null;
     candidates: BankCandidate[];
 };
@@ -148,6 +153,7 @@ export type BankRule = {
     pattern: string;
     match_mode: 'equals' | 'contains';
     match_label: string;
+    amount_cents: number | null;
     action: BankRuleAction;
     action_label: string;
     title: string | null;

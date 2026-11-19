@@ -183,7 +183,8 @@ final class TransactionClassifier
     /**
      * Who received the money (when it went out) or sent it (when it came in),
      * from the payment data or, for PIX and transfers, the description
-     * ("Transferência enviada pelo Pix - FULANO DE TAL - •••.123.456-••").
+     * ("Transferência enviada pelo Pix - FULANO DE TAL - •••.123.456-••" or
+     * "Transferência enviada pelo Pix|FULANO DE TAL").
      * CPFs are masked; CNPJs identify companies and stay whole.
      *
      * @param  array<array-key, mixed>  $payment
@@ -200,7 +201,8 @@ final class TransactionClassifier
         }
 
         if ($name === null && preg_match('/(pix|transfer[eê]ncia|ted|doc)/iu', $description) === 1) {
-            $parts = array_map('trim', explode(' - ', $description));
+            // "Transferência enviada pelo Pix - FULANO - ..." or "...Pix|FULANO|...".
+            $parts = array_map('trim', preg_split('/\s+-\s+|\s*\|\s*/u', $description) ?: [$description]);
 
             if (count($parts) >= 2 && preg_match('/\p{L}/u', $parts[1]) === 1 && preg_match('/^[•*.\d\-\/\s]+$/u', $parts[1]) !== 1) {
                 $name = $this->text($parts[1], 160);

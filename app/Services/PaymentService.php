@@ -7,6 +7,7 @@ use App\Enums\PaymentEventType;
 use App\Models\ExpenseOccurrence;
 use App\Models\PaymentEvent;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -28,11 +29,12 @@ final class PaymentService
 
     /**
      * Mark an occurrence as paid. Its shares are brought up to date one last
-     * time and then frozen as history.
+     * time and then frozen as history. The payment date defaults to now; a
+     * payment proven by a bank transaction carries the transaction's date.
      */
-    public function confirm(ExpenseOccurrence $occurrence, User $actor): ExpenseOccurrence
+    public function confirm(ExpenseOccurrence $occurrence, User $actor, ?CarbonInterface $paidAt = null): ExpenseOccurrence
     {
-        return DB::transaction(function () use ($occurrence, $actor) {
+        return DB::transaction(function () use ($occurrence, $actor, $paidAt) {
             $occurrence = ExpenseOccurrence::query()->lockForUpdate()->findOrFail($occurrence->id);
 
             if ($occurrence->isPaid()) {
@@ -47,7 +49,7 @@ final class PaymentService
 
             $occurrence->update([
                 'status' => OccurrenceStatus::Paid,
-                'paid_at' => $now,
+                'paid_at' => $paidAt ?? $now,
                 'paid_by_user_id' => $actor->id,
             ]);
 

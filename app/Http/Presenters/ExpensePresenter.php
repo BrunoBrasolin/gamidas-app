@@ -4,6 +4,7 @@ namespace App\Http\Presenters;
 
 use App\Enums\OccurrenceSource;
 use App\Enums\RecurringKind;
+use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
 use App\Models\ExpenseShare;
 use App\Models\Household;
@@ -28,6 +29,7 @@ final class ExpensePresenter
         'payer:id,name',
         'shares',
         'recurringExpense:id,kind',
+        'bankTransactions:id,expense_occurrence_id,user_id,date,removed_at',
     ];
 
     /**
@@ -80,6 +82,7 @@ final class ExpensePresenter
             'updated_at' => $occurrence->updated_at?->toIso8601String(),
             'paid_at' => $occurrence->paid_at?->toIso8601String(),
             'paid_by' => $occurrence->payer ? ['id' => $occurrence->payer->id, 'name' => $occurrence->payer->name] : null,
+            'bank_proof' => $this->bankProof($occurrence),
             'payment' => [
                 'confirm_label' => $this->confirmLabel($occurrence),
                 'paid_label' => $this->paidLabel($occurrence),
@@ -124,6 +127,31 @@ final class ExpensePresenter
                 'payment_label' => $member->paymentLabel(),
             ])
             ->all());
+    }
+
+    /**
+     * The bank transaction that proves the expense was paid (catalogued or
+     * linked by a member in the bank inbox): when, and from whose bank. The
+     * other member relies on it to confirm the payment.
+     *
+     * @return array{date: string, member: string}|null
+     */
+    private function bankProof(ExpenseOccurrence $occurrence): ?array
+    {
+        if (! $occurrence->relationLoaded('bankTransactions')) {
+            return null;
+        }
+
+        $transaction = $occurrence->bankTransactions->first(fn (BankTransaction $transaction) => $transaction->removed_at === null);
+
+        if ($transaction === null) {
+            return null;
+        }
+
+        return [
+            'date' => $transaction->date->toDateString(),
+            'member' => $this->members->get($transaction->user_id)?->user->firstName() ?? 'membro',
+        ];
     }
 
     private function sourceLabel(ExpenseOccurrence $occurrence): string

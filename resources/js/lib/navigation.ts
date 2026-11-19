@@ -8,10 +8,13 @@ import {
     Dices,
     GraduationCap,
     Home,
+    Inbox,
+    Landmark,
     LayoutGrid,
     Receipt,
     Repeat,
     Sheet,
+    SlidersHorizontal,
     Tags,
     Ticket,
     TrendingUp,
@@ -19,6 +22,7 @@ import {
 } from 'lucide-react';
 import { dashboard } from '@/routes';
 import attention from '@/routes/attention';
+import bank from '@/routes/bank';
 import calendar from '@/routes/calendar';
 import complementaryHours from '@/routes/complementary-hours';
 import expenses from '@/routes/expenses';
@@ -56,6 +60,11 @@ export const mainNavItems: NavItem[] = [
         icon: Repeat,
     },
     {
+        title: 'Caixa de entrada',
+        href: bank.inbox(),
+        icon: Inbox,
+    },
+    {
         title: 'Finanças pessoais',
         href: personal.index(),
         icon: Wallet,
@@ -82,6 +91,24 @@ export const mainNavItems: NavItem[] = [
         href: household.salaries.edit(),
         icon: Home,
         activePrefix: '/household',
+    },
+];
+
+/**
+ * Open Finance: the member's banks connected through Pluggy and the rules
+ * that catalogue imported transactions (private to each user).
+ */
+export const bankNavItems: NavItem[] = [
+    {
+        title: 'Contas e cartões',
+        href: bank.index(),
+        icon: Landmark,
+    },
+    {
+        title: 'Regras de catalogação',
+        href: bank.rules.index(),
+        icon: SlidersHorizontal,
+        activePrefix: '/bank/rules',
     },
 ];
 
@@ -171,6 +198,7 @@ export const collegeNavItems: NavItem[] = [
 
 export const allNavItems: NavItem[] = [
     ...mainNavItems,
+    ...bankNavItems,
     ...timeNavItems,
     ...knowledgeNavItems,
     ...collegeNavItems,

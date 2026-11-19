@@ -36,6 +36,20 @@ return [
         'language' => env('TMDB_LANGUAGE', 'pt-BR'),
     ],
 
+    // Open Finance through Pluggy (https://pluggy.ai). The client id and
+    // secret come from the Pluggy dashboard (Applications); without them the
+    // bank pages explain how to configure and nothing is fetched. Webhooks are
+    // accepted with the token sent in the X-Gamidas-Token header (registered
+    // by `php artisan bank:webhook`) or with a valid X-Pluggy-Signature when
+    // the dashboard's signing secret (whsec_...) is configured.
+    'pluggy' => [
+        'client_id' => env('PLUGGY_CLIENT_ID'),
+        'client_secret' => env('PLUGGY_CLIENT_SECRET'),
+        'base_url' => env('PLUGGY_BASE_URL', 'https://api.pluggy.ai'),
+        'webhook_token' => env('PLUGGY_WEBHOOK_TOKEN'),
+        'webhook_signing_secret' => env('PLUGGY_WEBHOOK_SIGNING_SECRET'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -57,6 +57,8 @@ export type Occurrence = {
     updated_at: string | null;
     paid_at: string | null;
     paid_by: UserRef | null;
+    /** The bank transaction proving the payment, from the bank inbox. */
+    bank_proof?: { date: string; member: string } | null;
     payment: {
         confirm_label: string;
         paid_label: string | null;

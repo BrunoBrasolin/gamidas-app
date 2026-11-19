@@ -14,6 +14,7 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import {
+    bankNavItems,
     collegeNavItems,
     mainNavItems,
     showNavItems,
@@ -47,6 +48,7 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain items={mainNavItems} />
+                <NavMain items={bankNavItems} label="Open Finance" />
                 <NavMain items={timeNavItems} label="Tempo" />
                 <NavMain
                     items={knowledgeNavItems}

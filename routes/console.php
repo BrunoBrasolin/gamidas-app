@@ -10,3 +10,7 @@ Schedule::command('expenses:generate')->dailyAt('00:20')->withoutOverlapping();
 // Delete knowledge attachments removed from their page more than a day ago and
 // files no attachment points to.
 Schedule::command('knowledge:prune-attachments')->dailyAt('03:20')->withoutOverlapping();
+
+// Bank data from Pluggy. Webhooks sync right away; this catches connections
+// whose webhook was lost or failed, and refreshes the others every few hours.
+Schedule::command('bank:sync')->cron('*/20 * * * *')->withoutOverlapping();

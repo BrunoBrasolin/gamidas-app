@@ -48,7 +48,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('game-writes', fn (Request $request) => Limit::perMinute(600)->by($request->ip()));
         RateLimiter::for('game-reads', fn (Request $request) => Limit::perMinute(1200)->by($request->ip()));
 
-        // Webhooks from the user's own servers (Jellyfin), before the token is checked.
+        // Webhooks (Jellyfin, Pluggy), before the token is checked.
         RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(120)->by($request->ip()));
     }
 

@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\Attention\AttentionGameController;
 use App\Http\Controllers\Attention\PlayController;
+use App\Http\Controllers\Bank\BankConnectionController;
+use App\Http\Controllers\Bank\BankInboxController;
+use App\Http\Controllers\Bank\BankRuleController;
 use App\Http\Controllers\Calendar\CalendarEventController;
 use App\Http\Controllers\ComplementaryHours\ComplementaryActivityController;
 use App\Http\Controllers\Finance\DashboardController;
@@ -96,6 +99,33 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
 
         Route::put('household/members/{member}', [MemberController::class, 'update'])->name('household.members.update');
         Route::put('household/salaries', [SalaryController::class, 'update'])->name('household.salaries.update');
+    });
+
+    // Open Finance through Pluggy: the member's connected banks and the
+    // inbox where imported transactions are catalogued, with the rules that
+    // suggest how. Everything belongs to the member who connected the bank;
+    // a transaction reaches the household only when catalogued as a
+    // household expense. Pluggy's webhook is in routes/api.php.
+    Route::prefix('bank')->name('bank.')->group(function () {
+        Route::get('/', [BankConnectionController::class, 'index'])->name('index');
+        Route::get('inbox', [BankInboxController::class, 'index'])->name('inbox');
+        Route::get('rules', [BankRuleController::class, 'index'])->name('rules.index');
+
+        Route::middleware('throttle:finance-writes')->group(function () {
+            Route::post('connect-token', [BankConnectionController::class, 'token'])->name('connect-token');
+            Route::post('connections', [BankConnectionController::class, 'store'])->name('connections.store');
+            Route::post('connections/{connection}/sync', [BankConnectionController::class, 'sync'])->name('connections.sync');
+            Route::delete('connections/{connection}', [BankConnectionController::class, 'destroy'])->name('connections.destroy');
+
+            Route::post('inbox/confirm-all', [BankInboxController::class, 'confirmAll'])->name('inbox.confirm-all');
+            Route::post('transactions/{transaction}/catalog', [BankInboxController::class, 'catalog'])->name('transactions.catalog');
+            Route::post('transactions/{transaction}/confirm', [BankInboxController::class, 'confirm'])->name('transactions.confirm');
+            Route::delete('transactions/{transaction}/catalog', [BankInboxController::class, 'reopen'])->name('transactions.reopen');
+
+            Route::post('rules', [BankRuleController::class, 'store'])->name('rules.store');
+            Route::put('rules/{rule}', [BankRuleController::class, 'update'])->name('rules.update');
+            Route::delete('rules/{rule}', [BankRuleController::class, 'destroy'])->name('rules.destroy');
+        });
     });
 
     // Personal time tracking by category. Every record belongs to the signed-in user.

@@ -31,7 +31,10 @@ final class ExpenseService
      * its own occurrence with the same amount, due on the same day of the
      * following months (clamped to shorter months). Returns the first one.
      *
-     * @param  array{scope: ExpenseScope, title: string, notes: ?string, amount_cents: int, due_date: CarbonImmutable}  $data
+     * A single expense may carry its own installment number ("Parcela 2/3"),
+     * as card installments imported from the bank do.
+     *
+     * @param  array{scope: ExpenseScope, title: string, notes: ?string, amount_cents: int, due_date: CarbonImmutable, installment_number?: ?int, installment_count?: ?int}  $data
      */
     public function create(Household $household, User $actor, array $data, int $installments = 1): ExpenseOccurrence
     {
@@ -51,8 +54,8 @@ final class ExpenseService
                     'household_id' => $household->id,
                     'owner_user_id' => $data['scope'] === ExpenseScope::Personal ? $actor->id : null,
                     'source' => OccurrenceSource::OneOff,
-                    'installment_number' => $installments > 1 ? $number : null,
-                    'installment_count' => $installments > 1 ? $installments : null,
+                    'installment_number' => $installments > 1 ? $number : ($data['installment_number'] ?? null),
+                    'installment_count' => $installments > 1 ? $installments : ($data['installment_count'] ?? null),
                     'billing_month' => $month,
                     'due_date' => Month::dueDate($month, $data['due_date']->day),
                     'created_by_user_id' => $actor->id,

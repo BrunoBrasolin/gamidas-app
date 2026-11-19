@@ -13,6 +13,7 @@ use App\Http\Requests\Finance\ExpenseRequest;
 use App\Models\ExpenseOccurrence;
 use App\Models\ExpenseShare;
 use App\Models\User;
+use App\Services\Bank\BankCatalogService;
 use App\Services\ExpenseService;
 use App\Services\HouseholdSummary;
 use App\Services\PaymentService;
@@ -28,7 +29,7 @@ class HouseholdExpenseController extends Controller
 {
     use InteractsWithHousehold;
 
-    public function index(Request $request, HouseholdSummary $summary): Response
+    public function index(Request $request, HouseholdSummary $summary, BankCatalogService $catalog): Response
     {
         $user = $this->user($request);
         $household = $this->household($request);
@@ -80,6 +81,7 @@ class HouseholdExpenseController extends Controller
             'totals' => $totals,
             'summary' => $summary->month($household, $month),
             'members' => $presenter->members(),
+            'bankInboxCount' => $catalog->pendingOf($user)->count(),
         ]);
     }
 

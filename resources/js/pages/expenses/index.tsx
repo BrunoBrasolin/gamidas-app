@@ -1,5 +1,13 @@
 import { Head, Link } from '@inertiajs/react';
-import { CheckCheck, Pencil, Plus, Receipt, Trash2 } from 'lucide-react';
+import {
+    CheckCheck,
+    Inbox,
+    Landmark,
+    Pencil,
+    Plus,
+    Receipt,
+    Trash2,
+} from 'lucide-react';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
 import { FilterSelect } from '@/components/finance/filter-select';
@@ -11,6 +19,7 @@ import { PageHeader } from '@/components/finance/page-header';
 import { Pagination } from '@/components/finance/pagination';
 import { PaymentActions } from '@/components/finance/payment-actions';
 import { StatusBadge } from '@/components/finance/status-badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,6 +35,7 @@ import {
 import { useQueryFilters } from '@/hooks/use-query-filters';
 import { formatDate, formatMonth } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
 import type {
     HouseholdMonthSummary,
@@ -57,6 +67,7 @@ type Props = {
     };
     summary: HouseholdMonthSummary;
     members: Member[];
+    bankInboxCount: number;
 };
 
 export default function ExpensesIndex({
@@ -64,6 +75,7 @@ export default function ExpensesIndex({
     occurrences,
     totals,
     members,
+    bankInboxCount,
 }: Props) {
     const apply = useQueryFilters(expenses.index.url(), filters);
     const isHousehold = filters.scope === 'household';
@@ -92,17 +104,50 @@ export default function ExpensesIndex({
                         month={filters.month}
                         onChange={(month) => apply({ month })}
                     />
+                    <Button variant="outline" asChild>
+                        <Link href={bank.inbox()}>
+                            <Inbox />
+                            Caixa de entrada
+                            {bankInboxCount > 0 && (
+                                <Badge className="ml-1">{bankInboxCount}</Badge>
+                            )}
+                        </Link>
+                    </Button>
                     <ExpenseFormDialog
                         month={filters.month}
                         scope={filters.scope}
                         trigger={
-                            <Button>
+                            <Button variant="outline">
                                 <Plus />
                                 Nova despesa
                             </Button>
                         }
                     />
                 </PageHeader>
+
+                {bankInboxCount > 0 && (
+                    <Alert>
+                        <Landmark />
+                        <AlertTitle>
+                            {bankInboxCount === 1
+                                ? '1 transação do seu banco para catalogar'
+                                : `${bankInboxCount} transações do seu banco para catalogar`}
+                        </AlertTitle>
+                        <AlertDescription>
+                            <p>
+                                Compras no cartão, PIX e transferências viram
+                                despesas da casa ou pessoais na{' '}
+                                <Link
+                                    href={bank.inbox()}
+                                    className="font-medium underline underline-offset-4"
+                                >
+                                    caixa de entrada
+                                </Link>
+                                . Cadastre à mão só o que não passa pelo banco.
+                            </p>
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 <nav
                     aria-label="Tipo de despesa"
@@ -539,6 +584,16 @@ function ExpenseTitle({ occurrence }: { occurrence: Occurrence }) {
                 )}
                 {occurrence.is_customized && (
                     <Badge variant="secondary">Ajustada no mês</Badge>
+                )}
+                {occurrence.bank_proof && (
+                    <Badge
+                        variant="outline"
+                        title={`Transação de ${formatDate(occurrence.bank_proof.date)} no banco de ${occurrence.bank_proof.member}`}
+                        className="border-emerald-500/60 text-emerald-700 dark:text-emerald-400"
+                    >
+                        <Landmark className="size-3" />
+                        Extrato de {occurrence.bank_proof.member}
+                    </Badge>
                 )}
                 {occurrence.awaits_amount && (
                     <Badge

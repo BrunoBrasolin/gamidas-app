@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Bank\PluggyWebhookController;
 use App\Http\Controllers\Watched\JellyfinWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -8,3 +9,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('webhooks/jellyfin', JellyfinWebhookController::class)
     ->middleware('throttle:webhooks')
     ->name('webhooks.jellyfin');
+
+Route::post('webhooks/pluggy', PluggyWebhookController::class)
+    ->middleware('throttle:webhooks')
+    ->name('webhooks.pluggy');

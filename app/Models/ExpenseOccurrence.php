@@ -11,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Database\Factories\ExpenseOccurrenceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -51,6 +52,7 @@ use Illuminate\Support\Carbon;
  * @property-read User $creator
  * @property-read User|null $editor
  * @property-read User|null $payer
+ * @property-read Collection<int, BankTransaction> $bankTransactions
  */
 #[Fillable([
     'household_id', 'scope', 'owner_user_id', 'source', 'recurring_expense_id',
@@ -235,6 +237,17 @@ class ExpenseOccurrence extends Model
     public function shares(): HasMany
     {
         return $this->hasMany(ExpenseShare::class);
+    }
+
+    /**
+     * Bank transactions catalogued as (or linked to) this expense: the proof
+     * of payment from a member's bank.
+     *
+     * @return HasMany<BankTransaction, $this>
+     */
+    public function bankTransactions(): HasMany
+    {
+        return $this->hasMany(BankTransaction::class);
     }
 
     /**

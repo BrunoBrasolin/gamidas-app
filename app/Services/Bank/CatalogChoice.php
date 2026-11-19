@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Services\Bank;
+
+use Carbon\CarbonImmutable;
+
+/**
+ * What the owner decided for an imported transaction.
+ *
+ * Actions: household, personal, income, investment (a new record), link (an
+ * expense that already exists, e.g. this month's rent) or ignore. Title and
+ * date default to the transaction's name and reference date.
+ */
+final readonly class CatalogChoice
+{
+    public const ACTIONS = ['household', 'personal', 'income', 'investment', 'link', 'ignore'];
+
+    public function __construct(
+        public string $action,
+        public ?string $title = null,
+        public ?CarbonImmutable $date = null,
+        public ?string $notes = null,
+        public ?int $occurrenceId = null,
+        public bool $remember = true,
+        public ?bool $autoApply = null,
+    ) {
+        //
+    }
+}

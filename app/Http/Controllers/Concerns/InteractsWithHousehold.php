@@ -36,8 +36,11 @@ trait InteractsWithHousehold
         app(OccurrenceGenerator::class)->generateForHousehold($household, $through);
     }
 
-    protected function toast(string $message, string $type = 'success'): void
+    /**
+     * @param  string|null  $description  A second line with details, shown for longer.
+     */
+    protected function toast(string $message, string $type = 'success', ?string $description = null): void
     {
-        Inertia::flash('toast', ['type' => $type, 'message' => $message]);
+        Inertia::flash('toast', array_filter(['type' => $type, 'message' => $message, 'description' => $description], fn (?string $value) => $value !== null));
     }
 }

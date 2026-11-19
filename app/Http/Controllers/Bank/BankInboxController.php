@@ -12,6 +12,7 @@ use App\Models\BankAccount;
 use App\Models\BankTransaction;
 use App\Services\Bank\BankCatalogService;
 use App\Services\Bank\BankOffsetService;
+use App\Services\Bank\BankRuleApplier;
 use App\Services\Bank\BankRuleBook;
 use App\Services\Bank\BankSettlementService;
 use App\Services\Bank\SettlementCandidate;
@@ -105,11 +106,17 @@ class BankInboxController extends Controller
         ]);
     }
 
-    public function catalog(CatalogBankTransactionRequest $request, BankTransaction $transaction, BankCatalogService $catalog): RedirectResponse
+    /**
+     * Catalogue one transaction; marking "Catalogar sozinho" also applies the
+     * rule to the other pending ones, and the toast tells how many.
+     */
+    public function catalog(CatalogBankTransactionRequest $request, BankTransaction $transaction, BankCatalogService $catalog, BankRuleApplier $applier): RedirectResponse
     {
         $choice = $request->toChoice();
+        $user = $this->user($request);
 
-        $catalog->catalog($transaction, $this->user($request), $choice);
+        $catalogued = $catalog->catalog($transaction, $user, $choice);
+        $applied = $applier->afterCatalog($catalogued, $user, $choice);
 
         $this->toast(match ($choice->action) {
             'ignore' => 'Transação ignorada.',
@@ -117,7 +124,7 @@ class BankInboxController extends Controller
             'offset' => 'As duas transações foram compensadas.',
             'settlement' => 'Acerto registrado: as despesas foram marcadas como pagas.',
             default => 'Transação catalogada.',
-        });
+        }, description: $applied === null ? null : 'Regra automática aplicada às pendentes: '.$applied->summary());
 
         return back();
     }

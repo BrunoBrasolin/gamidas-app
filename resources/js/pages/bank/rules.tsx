@@ -385,13 +385,19 @@ function RuleDialog({
                                         setAutoApply(checked === true)
                                     }
                                 />
-                                <Label
-                                    htmlFor="rule-auto"
-                                    className="leading-snug font-normal"
-                                >
-                                    Catalogar sozinho, sem passar pela caixa de
-                                    entrada
-                                </Label>
+                                <div className="grid gap-0.5">
+                                    <Label
+                                        htmlFor="rule-auto"
+                                        className="leading-snug font-normal"
+                                    >
+                                        Catalogar sozinho, sem passar pela caixa
+                                        de entrada
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Ao salvar, as pendentes que batem com a
+                                        regra também são catalogadas.
+                                    </p>
+                                </div>
                             </div>
                             <DialogFooter>
                                 <Button type="submit" disabled={processing}>

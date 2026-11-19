@@ -10,6 +10,7 @@ use App\Http\Presenters\BankPresenter;
 use App\Http\Requests\Bank\BankRuleRequest;
 use App\Models\BankRule;
 use App\Models\RecurringExpense;
+use App\Services\Bank\BankRuleApplier;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -49,21 +50,21 @@ class BankRuleController extends Controller
         ]);
     }
 
-    public function store(BankRuleRequest $request): RedirectResponse
+    public function store(BankRuleRequest $request, BankRuleApplier $applier): RedirectResponse
     {
         $data = $request->toData();
         $user = $this->user($request);
 
         $this->ensureUnique($user->id, $data['pattern'], $data['match_mode'], $data['amount_cents']);
 
-        BankRule::create([...$data, 'user_id' => $user->id]);
+        $rule = BankRule::create([...$data, 'user_id' => $user->id]);
 
-        $this->toast('Regra criada.');
+        $this->toastSaved('Regra criada.', $rule, $request, $applier);
 
         return back();
     }
 
-    public function update(BankRuleRequest $request, BankRule $rule): RedirectResponse
+    public function update(BankRuleRequest $request, BankRule $rule, BankRuleApplier $applier): RedirectResponse
     {
         $data = $request->toData();
 
@@ -71,7 +72,7 @@ class BankRuleController extends Controller
 
         $rule->update($data);
 
-        $this->toast('Regra atualizada.');
+        $this->toastSaved('Regra atualizada.', $rule, $request, $applier);
 
         return back();
     }
@@ -85,6 +86,23 @@ class BankRuleController extends Controller
         $this->toast('Regra removida. As transações já catalogadas não mudam.');
 
         return back();
+    }
+
+    /**
+     * An automatic rule is applied right away to the pending transactions it
+     * is for, and the toast tells how many were looked at and catalogued.
+     */
+    private function toastSaved(string $message, BankRule $rule, Request $request, BankRuleApplier $applier): void
+    {
+        if (! $rule->auto_apply) {
+            $this->toast($message);
+
+            return;
+        }
+
+        $applied = $applier->apply($rule, $this->user($request));
+
+        $this->toast($message, description: 'Aplicada às pendentes: '.$applied->summary());
     }
 
     private function ensureUnique(int $userId, string $pattern, BankRuleMatch $mode, ?int $amountCents, ?int $ignoreId = null): void

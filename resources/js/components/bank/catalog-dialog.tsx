@@ -488,13 +488,20 @@ export function CatalogDialog({
                                                 setAutoApply(checked === true)
                                             }
                                         />
-                                        <Label
-                                            htmlFor={`catalog-auto-${transaction.id}`}
-                                            className="leading-snug font-normal"
-                                        >
-                                            Catalogar sozinho, sem passar pela
-                                            caixa de entrada
-                                        </Label>
+                                        <div className="grid gap-0.5">
+                                            <Label
+                                                htmlFor={`catalog-auto-${transaction.id}`}
+                                                className="leading-snug font-normal"
+                                            >
+                                                Catalogar sozinho, sem passar
+                                                pela caixa de entrada
+                                            </Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                As pendentes que batem com a
+                                                regra também são catalogadas
+                                                agora.
+                                            </p>
+                                        </div>
                                     </div>
                                 )}
                             </div>

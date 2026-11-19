@@ -55,12 +55,7 @@ final class BankRuleBook
      */
     public function learn(User $owner, BankTransaction $transaction, BankRuleAction $action, ?string $title, ?int $recurringExpenseId, ?bool $autoApply, bool $onlyThisAmount = false): BankRule
     {
-        $rule = BankRule::query()->firstOrNew([
-            'user_id' => $owner->id,
-            'pattern' => $transaction->match_key,
-            'match_mode' => BankRuleMatch::Equals->value,
-            'amount_cents' => $onlyThisAmount ? $transaction->amount_cents : null,
-        ]);
+        $rule = BankRule::query()->firstOrNew($this->learnedKey($owner, $transaction, $onlyThisAmount));
 
         $rule->fill([
             'label' => Str::limit($transaction->displayName(), 160, ''),
@@ -76,6 +71,27 @@ final class BankRuleBook
         $this->used($rule);
 
         return $rule;
+    }
+
+    /**
+     * The rule learn() keeps for transactions like this one, if any.
+     */
+    public function learnedFrom(User $owner, BankTransaction $transaction, bool $onlyThisAmount = false): ?BankRule
+    {
+        return BankRule::query()->where($this->learnedKey($owner, $transaction, $onlyThisAmount))->first();
+    }
+
+    /**
+     * @return array{user_id: int, pattern: string, match_mode: string, amount_cents: ?int}
+     */
+    private function learnedKey(User $owner, BankTransaction $transaction, bool $onlyThisAmount): array
+    {
+        return [
+            'user_id' => $owner->id,
+            'pattern' => $transaction->match_key,
+            'match_mode' => BankRuleMatch::Equals->value,
+            'amount_cents' => $onlyThisAmount ? $transaction->amount_cents : null,
+        ];
     }
 
     /**

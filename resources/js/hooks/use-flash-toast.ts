@@ -13,7 +13,13 @@ export function useFlashToast(): void {
                 return;
             }
 
-            toast[data.type](data.message);
+            // A result with details stays longer, so it can be read.
+            toast[data.type](
+                data.message,
+                data.description
+                    ? { description: data.description, duration: 10_000 }
+                    : undefined,
+            );
         });
     }, []);
 }

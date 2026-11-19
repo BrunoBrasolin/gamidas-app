@@ -47,6 +47,23 @@ class TransactionClassifierTest extends TestCase
         $this->assertSame(BankChannel::Card, $refund['channel']);
     }
 
+    public function test_open_finance_calls_a_card_purchase_a_payment(): void
+    {
+        $purchase = $this->classify(['description' => 'Mercado Bom Preço', 'amount' => 152.3, 'operationType' => 'PAGAMENTO'], BankAccountType::Credit);
+
+        $this->assertSame(BankDirection::Out, $purchase['direction']);
+        $this->assertSame(BankChannel::Card, $purchase['channel']);
+
+        $fee = $this->classify(['description' => 'IOF de compra internacional', 'amount' => 3.21, 'operationType' => 'PAGAMENTO'], BankAccountType::Credit);
+
+        $this->assertSame(BankChannel::Fee, $fee['channel']);
+
+        $payment = $this->classify(['description' => 'Pagamento recebido', 'amount' => -950.4, 'type' => 'CREDIT', 'operationType' => 'PAGAMENTO_FATURA'], BankAccountType::Credit);
+
+        $this->assertSame(BankDirection::In, $payment['direction']);
+        $this->assertSame(BankChannel::BillPayment, $payment['channel']);
+    }
+
     public function test_bank_account_direction_comes_from_the_type_whatever_the_sign(): void
     {
         $this->assertSame(BankDirection::Out, $this->classify(['amount' => -100, 'type' => 'DEBIT'])['direction']);

@@ -164,6 +164,70 @@ class BankSyncTest extends TestCase
         $this->assertSame(0, app(BankCatalogService::class)->pendingOf($this->bruno)->count());
     }
 
+    public function test_card_purchases_open_finance_calls_payments_reach_the_inbox(): void
+    {
+        $this->pluggyTransaction('acc-card', 'tx-purchase', ['description' => 'Mercado Bom Preço', 'amount' => 152.3, 'operationType' => 'PAGAMENTO']);
+        $this->pluggyTransaction('acc-card', 'tx-payment', ['description' => 'Pagamento recebido', 'amount' => -950.4, 'type' => 'CREDIT', 'operationType' => 'PAGAMENTO_FATURA']);
+
+        $this->sync();
+
+        $purchase = BankTransaction::query()->firstWhere('pluggy_id', 'tx-purchase');
+        $this->assertSame(BankChannel::Card, $purchase->channel);
+        $this->assertSame(BankReviewStatus::Pending, $purchase->review_status);
+
+        $payment = BankTransaction::query()->firstWhere('pluggy_id', 'tx-payment');
+        $this->assertSame(BankChannel::BillPayment, $payment->channel);
+        $this->assertSame(BankReviewStatus::Ignored, $payment->review_status);
+    }
+
+    public function test_card_purchases_ignored_as_bill_payments_go_back_to_the_inbox(): void
+    {
+        $this->pluggyTransaction('acc-card', 'tx-purchase', ['description' => 'Mercado Bom Preço', 'amount' => 152.3, 'operationType' => 'PAGAMENTO']);
+        $this->pluggyTransaction('acc-card', 'tx-iof', ['description' => 'IOF de compra internacional', 'amount' => 3.21, 'operationType' => 'PAGAMENTO']);
+        $this->pluggyTransaction('acc-card', 'tx-refreshed', ['description' => 'Farmácia Central', 'amount' => 42, 'operationType' => 'PAGAMENTO']);
+        $this->pluggyTransaction('acc-card', 'tx-decided', ['description' => 'Loja de Presentes', 'amount' => 80, 'operationType' => 'PAGAMENTO']);
+        $this->pluggyTransaction('acc-card', 'tx-payment', ['description' => 'Pagamento recebido', 'amount' => -950.4, 'type' => 'CREDIT', 'operationType' => 'PAGAMENTO_FATURA']);
+        $this->pluggyTransaction('acc-checking', 'tx-bill', ['description' => 'Pagamento de fatura', 'amount' => -950.4, 'type' => 'DEBIT']);
+        $this->sync();
+
+        // As the previous classifier left them; a sync with the fixed one
+        // already restored the channel of a recent one, still ignored.
+        $wrong = ['channel' => BankChannel::BillPayment, 'review_status' => BankReviewStatus::Ignored, 'reviewed_at' => Date::now()];
+        BankTransaction::query()->whereIn('pluggy_id', ['tx-purchase', 'tx-iof'])->update([...$wrong, 'ignore_reason' => BankTransaction::IGNORED_BILL_PAYMENT]);
+        BankTransaction::query()->where('pluggy_id', 'tx-refreshed')->update([...$wrong, 'channel' => BankChannel::Card, 'ignore_reason' => BankTransaction::IGNORED_BILL_PAYMENT]);
+        BankTransaction::query()->where('pluggy_id', 'tx-decided')->update([...$wrong, 'ignore_reason' => BankTransaction::IGNORED_BY_USER]);
+
+        (require database_path('migrations/2026_11_19_000004_reopen_card_purchases_ignored_as_bill_payments.php'))->up();
+
+        $purchase = BankTransaction::query()->firstWhere('pluggy_id', 'tx-purchase');
+        $this->assertSame(BankChannel::Card, $purchase->channel);
+        $this->assertSame(BankReviewStatus::Pending, $purchase->review_status);
+        $this->assertNull($purchase->ignore_reason);
+        $this->assertNull($purchase->reviewed_at);
+
+        $fee = BankTransaction::query()->firstWhere('pluggy_id', 'tx-iof');
+        $this->assertSame(BankChannel::Fee, $fee->channel);
+        $this->assertSame(BankReviewStatus::Pending, $fee->review_status);
+
+        $refreshed = BankTransaction::query()->firstWhere('pluggy_id', 'tx-refreshed');
+        $this->assertSame(BankChannel::Card, $refreshed->channel);
+        $this->assertSame(BankReviewStatus::Pending, $refreshed->review_status);
+        $this->assertNull($refreshed->ignore_reason);
+
+        $decided = BankTransaction::query()->firstWhere('pluggy_id', 'tx-decided');
+        $this->assertSame(BankChannel::Card, $decided->channel);
+        $this->assertSame(BankReviewStatus::Ignored, $decided->review_status);
+        $this->assertSame(BankTransaction::IGNORED_BY_USER, $decided->ignore_reason);
+
+        foreach (['tx-payment', 'tx-bill'] as $billPayment) {
+            $transaction = BankTransaction::query()->firstWhere('pluggy_id', $billPayment);
+            $this->assertSame(BankChannel::BillPayment, $transaction->channel);
+            $this->assertSame(BankReviewStatus::Ignored, $transaction->review_status);
+        }
+
+        $this->assertSame(3, app(BankCatalogService::class)->pendingOf($this->bruno)->count());
+    }
+
     public function test_a_pending_purchase_the_bank_recreates_keeps_its_catalogue(): void
     {
         $this->pluggyTransaction('acc-card', 'tx-old-id', ['description' => 'Restaurante Sabor', 'amount' => 89.9, 'status' => 'PENDING']);

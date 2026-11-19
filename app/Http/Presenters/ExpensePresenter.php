@@ -95,6 +95,7 @@ final class ExpensePresenter
             'can' => [
                 'update' => $this->viewer->can('update', $occurrence),
                 'delete' => $this->viewer->can('delete', $occurrence),
+                'move_to_personal' => $this->viewer->can('moveToPersonal', $occurrence),
             ],
         ];
     }

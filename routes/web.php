@@ -79,6 +79,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
         Route::post('expenses/pay-all', [HouseholdExpenseController::class, 'payAll'])->name('expenses.pay-all');
         Route::put('expenses/{occurrence}', [HouseholdExpenseController::class, 'update'])->name('expenses.update');
         Route::delete('expenses/{occurrence}', [HouseholdExpenseController::class, 'destroy'])->name('expenses.destroy');
+        Route::post('expenses/{occurrence}/move-to-personal', [HouseholdExpenseController::class, 'moveToPersonal'])->name('expenses.move-to-personal');
         Route::post('expenses/{occurrence}/payment', [ExpensePaymentController::class, 'store'])->name('expenses.payment.store');
         Route::delete('expenses/{occurrence}/payment', [ExpensePaymentController::class, 'destroy'])->name('expenses.payment.destroy');
 

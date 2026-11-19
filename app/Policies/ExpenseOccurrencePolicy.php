@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
@@ -32,6 +33,42 @@ class ExpenseOccurrencePolicy
     public function delete(User $user, ExpenseOccurrence $occurrence): Response
     {
         return $this->update($user, $occurrence);
+    }
+
+    /**
+     * Any member can take a pending household expense into their own personal
+     * finances (it then counts in full for them and leaves the split). Never
+     * into someone else's: personal records are only written by their owner.
+     * An expense backed by another member's bank transaction stays with
+     * them, so their inbox never points at someone else's private expense.
+     */
+    public function moveToPersonal(User $user, ExpenseOccurrence $occurrence): Response
+    {
+        if (! $this->view($user, $occurrence)) {
+            return Response::denyAsNotFound();
+        }
+
+        if (! $occurrence->isHousehold()) {
+            return Response::deny('Esta despesa já é pessoal.');
+        }
+
+        if ($occurrence->isPaid()) {
+            return Response::deny('Despesas pagas não podem ser movidas. Reabra o pagamento primeiro.');
+        }
+
+        $transactions = $occurrence->relationLoaded('bankTransactions')
+            ? $occurrence->bankTransactions
+            : $occurrence->bankTransactions()->get(['id', 'expense_occurrence_id', 'user_id']);
+
+        $foreign = $transactions->first(fn (BankTransaction $transaction) => $transaction->user_id !== $user->id);
+
+        if ($foreign !== null) {
+            $owner = User::query()->find($foreign->user_id)?->firstName() ?? 'outro membro';
+
+            return Response::deny("Esta despesa está vinculada ao extrato de {$owner}; só {$owner} pode movê-la para as próprias finanças pessoais.");
+        }
+
+        return Response::allow();
     }
 
     /**

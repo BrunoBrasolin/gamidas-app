@@ -134,6 +134,71 @@ final class ExpenseService
         });
     }
 
+    /**
+     * Move a pending household expense to the actor's personal finances: it
+     * leaves the split and counts in full as one of their personal bills.
+     *
+     * A one-off expense (or one installment) changes in place. A month of a
+     * recurring expense leaves the series instead: the household month is
+     * removed (soft deleted, so it is not generated again, as when a month
+     * is removed by hand) and becomes a one-off personal bill with the same
+     * title, notes, amount and due date. Bank transactions catalogued as (or
+     * linked to) the expense follow it. Returns the personal expense.
+     */
+    public function moveToPersonal(ExpenseOccurrence $occurrence, User $actor): ExpenseOccurrence
+    {
+        return DB::transaction(function () use ($occurrence, $actor) {
+            $occurrence = ExpenseOccurrence::query()->lockForUpdate()->findOrFail($occurrence->id);
+            $this->ensurePending($occurrence);
+
+            if (! $occurrence->isHousehold()) {
+                throw ValidationException::withMessages([
+                    'expense' => 'Esta despesa já é pessoal.',
+                ]);
+            }
+
+            $old = $this->snapshot($occurrence);
+
+            if ($occurrence->source === OccurrenceSource::Recurring) {
+                $personal = ExpenseOccurrence::create([
+                    'household_id' => $occurrence->household_id,
+                    'scope' => ExpenseScope::Personal,
+                    'owner_user_id' => $actor->id,
+                    'source' => OccurrenceSource::OneOff,
+                    'title' => $occurrence->title,
+                    'notes' => $occurrence->notes,
+                    'billing_month' => $occurrence->billing_month,
+                    'due_date' => $occurrence->due_date,
+                    'amount_cents' => $occurrence->amount_cents,
+                    'created_by_user_id' => $occurrence->created_by_user_id,
+                    'updated_by_user_id' => $actor->id,
+                ]);
+
+                $occurrence->bankTransactions()->update(['expense_occurrence_id' => $personal->id]);
+                $occurrence->update(['updated_by_user_id' => $actor->id]);
+                $occurrence->delete();
+            } else {
+                $occurrence->update([
+                    'scope' => ExpenseScope::Personal,
+                    'owner_user_id' => $actor->id,
+                    'updated_by_user_id' => $actor->id,
+                ]);
+
+                $personal = $occurrence;
+            }
+
+            $this->shares->sync($personal);
+
+            $this->audit->record('expense.moved_to_personal', $occurrence, $actor, $occurrence->household_id, $old, [
+                ...$this->snapshot($personal),
+                'owner_user_id' => $actor->id,
+                'personal_occurrence_id' => $personal->id,
+            ]);
+
+            return $personal;
+        });
+    }
+
     private function ensurePending(ExpenseOccurrence $occurrence): void
     {
         if ($occurrence->isPaid()) {

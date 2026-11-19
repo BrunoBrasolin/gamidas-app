@@ -4,6 +4,7 @@ namespace App\Http\Presenters;
 
 use App\Enums\BankCatalogType;
 use App\Enums\BankRuleAction;
+use App\Enums\ExpenseScope;
 use App\Models\BankAccount;
 use App\Models\BankBill;
 use App\Models\BankConnection;
@@ -139,7 +140,11 @@ final class BankPresenter
             ],
             'review_status' => $transaction->review_status->value,
             'catalog_type' => $transaction->catalog_type?->value,
-            'catalog_label' => $transaction->catalog_type?->label(),
+            // A household expense created here may have been moved to the
+            // owner's personal finances later.
+            'catalog_label' => $transaction->catalog_type === BankCatalogType::Household && $occurrence?->scope === ExpenseScope::Personal
+                ? 'Conta pessoal'
+                : $transaction->catalog_type?->label(),
             'ignore_reason' => $transaction->ignore_reason,
             'removed' => $transaction->removed_at !== null,
             'expense' => $transaction->expense_occurrence_id === null ? null : ($occurrence === null

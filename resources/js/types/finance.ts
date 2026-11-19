@@ -75,6 +75,8 @@ export type Occurrence = {
     can: {
         update: boolean;
         delete: boolean;
+        /** Take this household expense into the viewer's personal finances. */
+        move_to_personal: boolean;
     };
     history?: PaymentEvent[];
 };

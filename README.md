@@ -8,7 +8,7 @@ Construída sobre o **Laravel React Starter Kit** (Laravel 13, Inertia v3, React
 
 - **Painel** do mês: total da casa, parte de cada membro, renda combinada e proporções, pagas × pendentes, vencidas, próximos vencimentos, composição (fixas, extras temporárias, avulsas), resumo pessoal e próximos eventos da agenda.
 - **Agenda** (`/dashboard/calendar`): eventos da casa em visão de calendário mensal ou lista, com título, data, horário opcional, descrição, cor e ícone; eventos recorrentes (diários, semanais, mensais, anuais ou personalizados); criação clicando no dia e impressão do mês em paisagem.
-- **Despesas da casa**: tabela mensal com total, parte de cada membro, vencimento, criador, confirmação de pagamento e situação; filtros por mês, criador, situação e origem; aba de despesas pessoais.
+- **Despesas da casa**: tabela mensal com total, parte de cada membro, vencimento, criador, confirmação de pagamento e situação; filtros por mês, criador, situação e origem; aba de despesas pessoais; uma despesa da casa pendente pode ser movida para as suas despesas pessoais.
 - **Open Finance (Pluggy)** (`/bank`, privado de cada usuário): conta corrente, cartão de crédito (com faturas) e investimentos conectados pelo Open Finance via [Pluggy](https://pluggy.ai). As movimentações — PIX, compras no cartão (inclusive parceladas), transferências, boletos — chegam sozinhas (webhook + busca agendada) numa **caixa de entrada** (`/bank/inbox`) onde cada uma vira despesa da casa, despesa pessoal, receita, investimento, é vinculada a uma despesa já existente (o aluguel do mês, a conta de luz, uma parcela cadastrada à mão) ou ignorada. Cada escolha vira uma **regra** por contraparte ou descrição (`/bank/rules`), que sugere a mesma classificação nas próximas transações (ou cataloga sozinha).
 - **Despesas recorrentes**: fixas (sem prazo ou até um mês final) e extras temporárias (valor mensal por N meses), com geração mensal idempotente.
 - **Finanças pessoais** (privadas): receitas, despesas e investimentos; resumo mensal e anual com fluxo líquido e saldo disponível.
@@ -232,6 +232,11 @@ Em **Settings › Secrets and variables › Actions**:
     - **Fluxo líquido** = receitas − despesas − investimentos.
     - **Saldo disponível** = fluxo líquido acumulado de todos os meses até o fim do período.
 - Como a parte da casa entra automaticamente, a contribuição para a casa **não deve** ser lançada manualmente como despesa pessoal (a interface avisa isso).
+- **Mover para pessoais** (botão da carteira em Despesas, aba Casa): qualquer membro pode levar uma despesa da casa **pendente** para as **próprias** finanças pessoais — nunca para as do outro, porque registros pessoais só são escritos pelo dono. Ela sai da divisão (as partes são apagadas) e passa a contar inteira como conta pessoal de quem a moveu, que é o único a vê-la e quem marca o pagamento; quem cadastrou continua registrado. Despesas pagas precisam ser reabertas antes.
+    - Uma avulsa ou uma parcela muda no lugar; as outras parcelas continuam na casa.
+    - Um mês de recorrência sai da série: o mês da casa é removido como na exclusão de um mês (a vaga fica reservada e não é gerada de novo) e vira uma conta pessoal avulsa com a mesma descrição, observações, valor (ou "valor a definir") e vencimento. Os outros meses continuam na casa, e editar, encerrar ou excluir a recorrência não mexe na conta pessoal.
+    - Transações do banco catalogadas como (ou vinculadas à) despesa vão junto: a caixa de entrada mostra "Conta pessoal" e **Desfazer** continua removendo a despesa criada. Por isso, uma despesa vinculada ao extrato do outro membro só pode ser movida por ele. As regras de catalogação não mudam: a próxima parcela que chegar do banco segue a regra dela (ajuste-a em `/bank/rules`, se for o caso).
+    - Fica na auditoria (`expense.moved_to_personal`, com o id da conta pessoal).
 
 ### Agenda
 
@@ -348,7 +353,7 @@ Em **Settings › Secrets and variables › Actions**:
 - Políticas verificam residência e dono em toda leitura e escrita. Registros de outra residência ou de outro dono respondem **404**, e a autorização acontece antes da validação.
 - IDs enviados pelo navegador (membro) só são aceitos se pertencerem à residência do usuário.
 - Escritas financeiras usam transações, bloqueio de linha (`lockForUpdate`), chaves estrangeiras e limite de 60 requisições/minuto por usuário.
-- Auditoria (`audit_logs`) de salários, pagamentos, reaberturas, criação, edição e exclusão de despesas e recorrências.
+- Auditoria (`audit_logs`) de salários, pagamentos, reaberturas, criação, edição, exclusão e mudança para pessoal de despesas e recorrências.
 - Membros de uma residência não podem excluir a própria conta, para preservar o histórico.
 
 ## Premissas e limitações

@@ -8,6 +8,7 @@ import {
     Plus,
     Receipt,
     Trash2,
+    Wallet,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
@@ -651,6 +652,27 @@ function RowActions({
                     }
                 />
             )}
+            {occurrence.can.move_to_personal && (
+                <ConfirmDialog
+                    method="post"
+                    destructive={false}
+                    url={expenses.moveToPersonal.url(occurrence.id)}
+                    title="Mover para suas despesas pessoais?"
+                    description={moveToPersonalDescription(occurrence)}
+                    confirmLabel="Mover para pessoais"
+                    trigger={
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-8"
+                            title="Mover para despesas pessoais"
+                            aria-label={`Mover ${occurrence.title} para suas despesas pessoais`}
+                        >
+                            <Wallet className="size-4" />
+                        </Button>
+                    }
+                />
+            )}
             {occurrence.can.delete && (
                 <ConfirmDialog
                     url={expenses.destroy.url(occurrence.id)}
@@ -675,6 +697,28 @@ function RowActions({
             )}
         </div>
     );
+}
+
+/**
+ * What moving a household expense to the viewer's personal finances does:
+ * it leaves the split and counts in full for them. Only this month of a
+ * recurring expense, and only this installment, change.
+ */
+function moveToPersonalDescription(occurrence: Occurrence): string {
+    const amount = occurrence.awaits_amount
+        ? 'com o valor ainda a definir'
+        : `com o valor inteiro (${formatMoney(occurrence.amount_cents)})`;
+    const description = `“${occurrence.title}” sai da divisão da casa e vira uma despesa pessoal sua, ${amount}. Só você vai vê-la e marcar o pagamento.`;
+
+    if (occurrence.source === 'recurring') {
+        return `${description} Só este mês muda: nos outros meses a recorrência continua na casa.`;
+    }
+
+    if (occurrence.installment_number) {
+        return `${description} Só esta parcela muda: as outras continuam na casa.`;
+    }
+
+    return description;
 }
 
 ExpensesIndex.layout = {

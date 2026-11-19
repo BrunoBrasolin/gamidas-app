@@ -120,6 +120,23 @@ class HouseholdExpenseController extends Controller
     }
 
     /**
+     * Take a pending household expense into the user's personal finances.
+     */
+    public function moveToPersonal(Request $request, ExpenseOccurrence $occurrence, ExpenseService $expenses): RedirectResponse
+    {
+        Gate::authorize('moveToPersonal', $occurrence);
+
+        $personal = $expenses->moveToPersonal($occurrence, $this->user($request));
+
+        $this->toast(
+            "“{$personal->title}” agora é uma despesa pessoal sua.",
+            description: 'Ela saiu da divisão da casa e está na aba “Pessoais”.',
+        );
+
+        return back();
+    }
+
+    /**
      * "Pagar tudo": confirm every pending expense of the month (honoring the
      * filters on screen) that the user is allowed to confirm. Household
      * expenses the user created still wait for the other member, and months

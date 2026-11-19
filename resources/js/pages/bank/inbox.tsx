@@ -654,7 +654,7 @@ function undoDescription(transaction: BankTransaction): string {
 
     switch (transaction.catalog_type) {
         case 'household':
-            return 'A despesa da casa criada a partir desta transação é removida (se ainda estiver pendente) e a transação volta para a caixa de entrada.';
+            return 'A despesa criada a partir desta transação é removida (se ainda estiver pendente) e a transação volta para a caixa de entrada.';
         case 'personal':
         case 'income':
         case 'investment':

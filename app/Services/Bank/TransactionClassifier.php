@@ -153,10 +153,14 @@ final class TransactionClassifier
         $paymentMethod = strtoupper($paymentMethod);
 
         if ($isCard) {
+            // On a card, Open Finance calls a purchase "PAGAMENTO" (a payment
+            // made with the card): only money coming in pays the bill.
             return match (true) {
-                in_array($operationType, ['PAGAMENTO', 'PAGAMENTO_FATURA'], true),
-                $direction === BankDirection::In && preg_match(self::BILL_PAYMENT, $description) === 1,
-                $direction === BankDirection::In && preg_match('/^pagamento\b/iu', $description) === 1 => BankChannel::BillPayment,
+                $direction === BankDirection::In && (
+                    in_array($operationType, ['PAGAMENTO', 'PAGAMENTO_FATURA'], true)
+                    || preg_match(self::BILL_PAYMENT, $description) === 1
+                    || preg_match('/^pagamento\b/iu', $description) === 1
+                ) => BankChannel::BillPayment,
                 in_array($operationType, ['TARIFA', 'OPERACOES_CREDITO_CONTRATADAS_CARTAO'], true),
                 preg_match(self::FEE, $description) === 1 => BankChannel::Fee,
                 default => BankChannel::Card,

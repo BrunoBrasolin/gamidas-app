@@ -1,5 +1,13 @@
 import { Form, usePage } from '@inertiajs/react';
-import { Ban, Home, Link2, PiggyBank, TrendingUp, User } from 'lucide-react';
+import {
+    ArrowLeftRight,
+    Ban,
+    Home,
+    Link2,
+    PiggyBank,
+    TrendingUp,
+    User,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { FormField } from '@/components/finance/form-field';
@@ -74,6 +82,13 @@ const OUT_ACTIONS: {
     },
 ];
 
+const OFFSET_ACTION: (typeof OUT_ACTIONS)[number] = {
+    value: 'offset',
+    label: 'Compensar com outra',
+    hint: 'Estorno e cobrança que se anulam',
+    icon: ArrowLeftRight,
+};
+
 const IN_ACTIONS: typeof OUT_ACTIONS = [
     {
         value: 'income',
@@ -104,7 +119,11 @@ export function CatalogDialog({
 }) {
     const { household, auth } = usePage<SharedHousehold>().props;
     const outgoing = transaction.direction === 'out';
-    const actions = outgoing ? OUT_ACTIONS : IN_ACTIONS;
+    const canOffset = transaction.offset_candidates.length > 0;
+    const actions = [
+        ...(outgoing ? OUT_ACTIONS : IN_ACTIONS),
+        ...(canOffset ? [OFFSET_ACTION] : []),
+    ];
     const initialAction =
         transaction.suggestion?.action ??
         (outgoing
@@ -119,8 +138,15 @@ export function CatalogDialog({
         transaction.candidates.find((candidate) => candidate.strong)?.id ??
         null;
 
+    // The suggested pair, or the closest pending one.
+    const initialOffset =
+        transaction.suggestion?.offset_transaction_id ??
+        transaction.offset_candidates[0]?.id ??
+        null;
+
     const [open, setOpen] = useState(false);
     const [action, setAction] = useState<BankCatalogAction>(initialAction);
+    const [offsetId, setOffsetId] = useState<number | null>(initialOffset);
     const [occurrenceId, setOccurrenceId] = useState<number | null>(
         initialOccurrence,
     );
@@ -163,6 +189,7 @@ export function CatalogDialog({
                 if (next) {
                     setAction(initialAction);
                     setOccurrenceId(initialOccurrence);
+                    setOffsetId(initialOffset);
                     setRemember(true);
                     setAutoApply(false);
                     setAmountChoice(null);
@@ -308,6 +335,15 @@ export function CatalogDialog({
                                 </>
                             )}
 
+                            {action === 'offset' && (
+                                <OffsetCandidates
+                                    transaction={transaction}
+                                    value={offsetId}
+                                    onChange={setOffsetId}
+                                    error={errors.offset_transaction_id}
+                                />
+                            )}
+
                             {action === 'link' && (
                                 <LinkCandidates
                                     transaction={transaction}
@@ -317,7 +353,12 @@ export function CatalogDialog({
                                 />
                             )}
 
-                            <div className="space-y-2 rounded-md border p-3">
+                            <div
+                                className={cn(
+                                    'space-y-2 rounded-md border p-3',
+                                    action === 'offset' && 'hidden',
+                                )}
+                            >
                                 <input
                                     type="hidden"
                                     name="remember"
@@ -426,15 +467,19 @@ export function CatalogDialog({
                                     disabled={
                                         processing ||
                                         (action === 'link' &&
-                                            occurrenceId === null)
+                                            occurrenceId === null) ||
+                                        (action === 'offset' &&
+                                            offsetId === null)
                                     }
                                 >
                                     {processing && <Spinner />}
                                     {action === 'ignore'
                                         ? 'Ignorar'
-                                        : action === 'link'
-                                          ? 'Vincular'
-                                          : 'Catalogar'}
+                                        : action === 'offset'
+                                          ? 'Compensar'
+                                          : action === 'link'
+                                            ? 'Vincular'
+                                            : 'Catalogar'}
                                 </Button>
                             </DialogFooter>
                         </>
@@ -442,6 +487,84 @@ export function CatalogDialog({
                 </Form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * The pending transactions of the same account, value and opposite
+ * direction that cancel this one out (a refund and its charge). Both end up
+ * ignored, pointing at each other.
+ */
+function OffsetCandidates({
+    transaction,
+    value,
+    onChange,
+    error,
+}: {
+    transaction: BankTransaction;
+    value: number | null;
+    onChange: (id: number) => void;
+    error?: string;
+}) {
+    return (
+        <fieldset className="grid gap-1.5">
+            <legend className="mb-1.5 text-sm font-medium">
+                Com qual transação?
+            </legend>
+            <div className="grid gap-2">
+                {transaction.offset_candidates.map((other) => (
+                    <label
+                        key={other.id}
+                        className={cn(
+                            'flex cursor-pointer items-start justify-between gap-3 rounded-md border p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-muted',
+                            'has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
+                        )}
+                    >
+                        <input
+                            type="radio"
+                            name="offset_transaction_id"
+                            value={other.id}
+                            checked={value === other.id}
+                            onChange={() => onChange(other.id)}
+                            className="sr-only"
+                        />
+                        <span className="min-w-0">
+                            <span className="block font-medium break-words">
+                                {other.display_name}
+                            </span>
+                            {other.display_name !== other.description && (
+                                <span className="block truncate text-xs text-muted-foreground">
+                                    {other.description}
+                                </span>
+                            )}
+                        </span>
+                        <span className="shrink-0 text-right">
+                            <Money
+                                cents={
+                                    other.direction === 'out'
+                                        ? -transaction.amount_cents
+                                        : transaction.amount_cents
+                                }
+                                signed
+                            />
+                            <span className="block text-xs text-muted-foreground">
+                                {formatDate(other.date)}
+                            </span>
+                        </span>
+                    </label>
+                ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+                As duas ficam ignoradas, uma apontando para a outra: nada vira
+                despesa e o saldo fica zerado. “Desfazer” em qualquer uma
+                devolve as duas para a caixa de entrada.
+            </p>
+            {error && (
+                <p className="text-sm text-red-600 dark:text-red-400">
+                    {error}
+                </p>
+            )}
+        </fieldset>
     );
 }
 

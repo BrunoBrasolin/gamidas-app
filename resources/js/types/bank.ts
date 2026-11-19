@@ -59,7 +59,18 @@ export type BankCatalogAction =
     | 'income'
     | 'investment'
     | 'link'
-    | 'ignore';
+    | 'ignore'
+    | 'offset';
+
+/** The other side of a refund and its charge, which cancel each other out. */
+export type BankOffsetSide = {
+    id: number;
+    display_name: string;
+    description: string;
+    date: string;
+    direction: 'out' | 'in';
+    removed: boolean;
+};
 
 export type BankCandidate = {
     id: number;
@@ -101,7 +112,7 @@ export type BankTransaction = {
         | 'investment'
         | null;
     catalog_label: string | null;
-    ignore_reason: 'bill_payment' | 'user' | null;
+    ignore_reason: 'bill_payment' | 'user' | 'offset' | null;
     removed: boolean;
     expense:
         | { missing: true }
@@ -125,8 +136,11 @@ export type BankTransaction = {
               month: string;
           }
         | null;
+    offset: BankOffsetSide | null;
+    offset_candidates: BankOffsetSide[];
     suggestion: {
         action: BankCatalogAction;
+        offset_transaction_id: number | null;
         label: string;
         title: string | null;
         occurrence_id: number | null;

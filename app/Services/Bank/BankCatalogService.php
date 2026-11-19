@@ -61,6 +61,7 @@ final class BankCatalogService
         private readonly ExpenseService $expenses,
         private readonly PaymentService $payments,
         private readonly BankRuleBook $rules,
+        private readonly BankOffsetService $offsets,
         private readonly AuditLogger $audit,
     ) {
         //
@@ -85,6 +86,12 @@ final class BankCatalogService
         }
 
         if ($this->inheritFromReplaced($transaction)) {
+            return;
+        }
+
+        // Before the rules: an automatic rule must not catalogue a charge
+        // its refund is about to cancel out.
+        if ($this->offsets->autoPair($transaction)) {
             return;
         }
 
@@ -113,6 +120,10 @@ final class BankCatalogService
      */
     public function catalog(BankTransaction $transaction, User $actor, CatalogChoice $choice): BankTransaction
     {
+        if ($choice->action === 'offset') {
+            return $this->offset($transaction, $actor, $choice->offsetTransactionId);
+        }
+
         return DB::transaction(function () use ($transaction, $actor, $choice) {
             $transaction = BankTransaction::query()->with(['account', 'bill'])->lockForUpdate()->findOrFail($transaction->id);
             $this->ensureOwner($transaction, $actor);
@@ -283,6 +294,20 @@ final class BankCatalogService
                 throw ValidationException::withMessages(['transaction' => 'Esta transação já está na caixa de entrada.']);
             }
 
+            // A pair that cancels out is undone as a whole.
+            if ($transaction->isOffset()) {
+                $partner = $this->offsets->unpair($transaction);
+
+                foreach (array_filter([$transaction, $partner]) as $side) {
+                    $this->audit->record('bank.reopened', $side, $actor, $actor->householdId(), [
+                        'review_status' => BankReviewStatus::Ignored->value,
+                        'ignore_reason' => BankTransaction::IGNORED_OFFSET,
+                    ]);
+                }
+
+                return;
+            }
+
             $old = [
                 'review_status' => $transaction->review_status->value,
                 'catalog_type' => $transaction->catalog_type?->value,
@@ -330,6 +355,20 @@ final class BankCatalogService
     {
         if (! $transaction->isPending() || $transaction->removed_at !== null) {
             return null;
+        }
+
+        $offset = $this->offsets->find($transaction);
+
+        if ($offset !== null) {
+            $other = $offset['transaction'];
+            $when = $other->date->format('d/m');
+
+            return new BankSuggestion(
+                new CatalogChoice('offset', remember: false, offsetTransactionId: $other->id),
+                $other->isPending()
+                    ? 'Anula “'.$other->displayName().'” de '.$when.': compensar as duas'
+                    : 'Estorno de “'.$other->displayName().'” de '.$when.' (já catalogada): desfazer e compensar',
+            );
         }
 
         $rule = $this->rules->match($transaction, $rules);
@@ -637,13 +676,52 @@ final class BankCatalogService
                 'ignore_reason' => $replaced->ignore_reason,
                 'expense_occurrence_id' => $replaced->expense_occurrence_id,
                 'personal_transaction_id' => $replaced->personal_transaction_id,
+                'offset_transaction_id' => $replaced->offset_transaction_id,
                 'reviewed_at' => $replaced->reviewed_at,
             ]);
+
+            // The other side of a pair now points at the new transaction.
+            if ($replaced->offset_transaction_id !== null) {
+                BankTransaction::query()
+                    ->whereKey($replaced->offset_transaction_id)
+                    ->where('offset_transaction_id', $replaced->id)
+                    ->update(['offset_transaction_id' => $transaction->id]);
+            }
 
             $replaced->delete();
         });
 
         return true;
+    }
+
+    /**
+     * Pair the transaction with one that cancels it out. A counterpart
+     * already catalogued or ignored is first put back in the inbox (which
+     * removes the expense it created, as long as it is not paid).
+     */
+    private function offset(BankTransaction $transaction, User $actor, ?int $otherId): BankTransaction
+    {
+        return DB::transaction(function () use ($transaction, $actor, $otherId) {
+            $this->ensureOwner($transaction, $actor);
+
+            $other = $otherId === null ? null : BankTransaction::query()->where('user_id', $actor->id)->find($otherId);
+
+            if ($other === null) {
+                throw ValidationException::withMessages(['offset_transaction_id' => 'Escolha a transação que anula esta.']);
+            }
+
+            if (! $transaction->fresh()?->isPending()) {
+                throw ValidationException::withMessages(['transaction' => 'Esta transação já foi catalogada. Desfaça antes de catalogar de novo.']);
+            }
+
+            if (! $other->isPending() && ! $other->isOffset()) {
+                $this->reopen($other, $actor);
+            }
+
+            $this->offsets->pair($transaction, $other, $actor);
+
+            return $transaction->fresh() ?? $transaction;
+        });
     }
 
     private function ensureOwner(BankTransaction $transaction, User $actor): void
@@ -665,7 +743,7 @@ final class BankCatalogService
 
         $fits = match ($action) {
             'income' => ! $transaction->isOutgoing(),
-            'ignore' => true,
+            'ignore', 'offset' => true,
             default => $transaction->isOutgoing(),
         };
 

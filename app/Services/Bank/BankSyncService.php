@@ -34,6 +34,7 @@ final class BankSyncService
         private readonly BankConnectionService $connections,
         private readonly TransactionClassifier $classifier,
         private readonly BankCatalogService $catalog,
+        private readonly BankOffsetService $offsets,
     ) {
         //
     }
@@ -288,13 +289,34 @@ final class BankSyncService
             $this->markVanished($account, $windowFrom, array_keys($window));
         }
 
-        $created = 0;
+        $created = [];
 
         foreach ($fetched as $pluggyId => [$data, $allowOld]) {
-            $created += $this->import($connection, $account, $pluggyId, $data, $allowOld) ? 1 : 0;
+            $transaction = $this->import($connection, $account, $pluggyId, $data, $allowOld);
+
+            if ($transaction !== null) {
+                $created[] = $transaction;
+            }
         }
 
-        return $created;
+        // Only now, with the whole batch stored, are the new ones handled:
+        // a refund and its charge arriving together pair up whatever their
+        // order, before an automatic rule could catalogue the charge.
+        foreach ($created as $transaction) {
+            $transaction->refresh();
+
+            if ($transaction->isPending()) {
+                $transaction->setRelation('account', $account);
+                $this->catalog->onImported($transaction);
+            }
+        }
+
+        // A pair whose side the bank removed (and did not re-create, which
+        // would have inherited it) is undone: the other side is back to the
+        // inbox.
+        $this->offsets->releaseVanished($account);
+
+        return count($created);
     }
 
     /**
@@ -321,8 +343,9 @@ final class BankSyncService
      * except those created after the connection (installments).
      *
      * @param  array<string, mixed>  $data
+     * @return BankTransaction|null The transaction created, if it is new.
      */
-    private function import(BankConnection $connection, BankAccount $account, string $pluggyId, array $data, bool $allowOld): bool
+    private function import(BankConnection $connection, BankAccount $account, string $pluggyId, array $data, bool $allowOld): ?BankTransaction
     {
         $attributes = $this->classifier->classify($data, $account->type);
         $existing = BankTransaction::query()->firstWhere('pluggy_id', $pluggyId);
@@ -330,29 +353,29 @@ final class BankSyncService
         if ($existing !== null) {
             if ($existing->bank_account_id === $account->id) {
                 $existing->update([...$attributes, 'removed_at' => null]);
+                $existing->setRelation('account', $account);
+
+                // Pairs that arrived before they could be matched (or before
+                // matching existed) are caught when they are read again.
+                $this->offsets->autoPair($existing);
             }
 
-            return false;
+            return null;
         }
 
         /** @var CarbonImmutable $date */
         $date = $attributes['date'];
 
         if ($attributes['amount_cents'] === 0 || (! $allowOld && $date->lt($connection->import_from))) {
-            return false;
+            return null;
         }
 
-        $transaction = BankTransaction::create([
+        return BankTransaction::create([
             ...$attributes,
             'bank_account_id' => $account->id,
             'user_id' => $connection->user_id,
             'pluggy_id' => $pluggyId,
         ]);
-        $transaction->setRelation('account', $account);
-
-        $this->catalog->onImported($transaction);
-
-        return true;
     }
 
     /**

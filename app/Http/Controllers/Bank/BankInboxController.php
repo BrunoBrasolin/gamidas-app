@@ -11,6 +11,7 @@ use App\Http\Requests\Bank\CatalogBankTransactionRequest;
 use App\Models\BankAccount;
 use App\Models\BankTransaction;
 use App\Services\Bank\BankCatalogService;
+use App\Services\Bank\BankOffsetService;
 use App\Services\Bank\BankRuleBook;
 use App\Support\Month;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,13 +29,13 @@ class BankInboxController extends Controller
 {
     use InteractsWithHousehold;
 
-    public function index(Request $request, BankCatalogService $catalog, BankRuleBook $rules, BankPresenter $presenter): Response
+    public function index(Request $request, BankCatalogService $catalog, BankRuleBook $rules, BankOffsetService $offsets, BankPresenter $presenter): Response
     {
         $user = $this->user($request);
         $filters = $this->filters($request);
 
         $transactions = $this->filteredQuery($user->id, $filters)
-            ->with(['account', 'bill', 'expenseOccurrence', 'personalTransaction'])
+            ->with(['account', 'bill', 'expenseOccurrence', 'personalTransaction', 'offsetTransaction'])
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->paginate(50)
@@ -45,6 +46,7 @@ class BankInboxController extends Controller
 
         $userRules = $rules->rulesOf($user->id);
         $candidates = $catalog->candidates($items, $user);
+        $offsetCandidates = $offsets->candidates($items);
 
         // Only needed to catalogue, i.e. when money going out is pending.
         // (Checked before through(), which turns the items into arrays.)
@@ -66,6 +68,7 @@ class BankInboxController extends Controller
                 $catalog->referenceDate($transaction),
                 $catalog->suggest($transaction, $userRules, $candidates[$transaction->id] ?? []),
                 $candidates[$transaction->id] ?? [],
+                $offsetCandidates[$transaction->id] ?? [],
             )),
             'counts' => [
                 'pending' => $catalog->pendingOf($user)->count(),
@@ -89,6 +92,7 @@ class BankInboxController extends Controller
         $this->toast(match ($choice->action) {
             'ignore' => 'Transação ignorada.',
             'link' => 'Transação vinculada à despesa.',
+            'offset' => 'As duas transações foram compensadas.',
             default => 'Transação catalogada.',
         });
 

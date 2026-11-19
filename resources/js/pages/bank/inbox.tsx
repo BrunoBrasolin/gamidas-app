@@ -26,7 +26,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useQueryFilters } from '@/hooks/use-query-filters';
-import { formatDate, formatMoney, formatMonth } from '@/lib/format';
+import {
+    formatDate,
+    formatMoney,
+    formatMonth,
+    formatShortDate,
+} from '@/lib/format';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
@@ -473,7 +478,15 @@ function ReviewedRow({ transaction }: { transaction: BankTransaction }) {
                     aria-hidden
                 />
                 <span>
-                    {ignored ? (
+                    {ignored && transaction.offset ? (
+                        <>
+                            Compensada com “{transaction.offset.display_name}” (
+                            {formatShortDate(transaction.offset.date)})
+                            <span className="block text-xs text-muted-foreground">
+                                Uma anula a outra: nada vira despesa.
+                            </span>
+                        </>
+                    ) : ignored ? (
                         <>
                             Ignorada
                             {transaction.ignore_reason === 'bill_payment' &&
@@ -571,6 +584,10 @@ function Destination({ transaction }: { transaction: BankTransaction }) {
 }
 
 function undoDescription(transaction: BankTransaction): string {
+    if (transaction.offset) {
+        return `Esta transação e “${transaction.offset.display_name}” deixam de se anular e voltam as duas para a caixa de entrada.`;
+    }
+
     switch (transaction.catalog_type) {
         case 'household':
             return 'A despesa da casa criada a partir desta transação é removida (se ainda estiver pendente) e a transação volta para a caixa de entrada.';

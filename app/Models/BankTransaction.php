@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $ignore_reason
  * @property int|null $expense_occurrence_id
  * @property int|null $personal_transaction_id
+ * @property int|null $offset_transaction_id The transaction this one cancels out (both sides point at each other).
  * @property CarbonImmutable|null $reviewed_at
  * @property CarbonImmutable|null $removed_at
  * @property CarbonImmutable|null $created_at
@@ -51,12 +52,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read ExpenseOccurrence|null $expenseOccurrence
  * @property-read PersonalTransaction|null $personalTransaction
  * @property-read BankBill|null $bill
+ * @property-read BankTransaction|null $offsetTransaction
  */
 #[Fillable([
     'bank_account_id', 'user_id', 'pluggy_id', 'date', 'description', 'amount_cents', 'direction', 'channel',
     'bank_status', 'operation_type', 'counterparty_name', 'counterparty_document', 'match_key',
     'installment_number', 'installment_count', 'pluggy_bill_id', 'purchase_date', 'review_status',
-    'catalog_type', 'ignore_reason', 'expense_occurrence_id', 'personal_transaction_id',
+    'catalog_type', 'ignore_reason', 'expense_occurrence_id', 'personal_transaction_id', 'offset_transaction_id',
     'reviewed_at', 'removed_at',
 ])]
 class BankTransaction extends Model
@@ -71,6 +73,11 @@ class BankTransaction extends Model
      * Ignored by the owner.
      */
     public const IGNORED_BY_USER = 'user';
+
+    /**
+     * Cancelled out by another transaction (a refund and its charge).
+     */
+    public const IGNORED_OFFSET = 'offset';
 
     /**
      * @var array<string, mixed>
@@ -107,6 +114,11 @@ class BankTransaction extends Model
     public function isCatalogued(): bool
     {
         return $this->review_status === BankReviewStatus::Catalogued;
+    }
+
+    public function isOffset(): bool
+    {
+        return $this->ignore_reason === self::IGNORED_OFFSET && $this->offset_transaction_id !== null;
     }
 
     public function isOutgoing(): bool
@@ -168,6 +180,16 @@ class BankTransaction extends Model
     public function personalTransaction(): BelongsTo
     {
         return $this->belongsTo(PersonalTransaction::class);
+    }
+
+    /**
+     * The transaction this one cancels out.
+     *
+     * @return BelongsTo<BankTransaction, $this>
+     */
+    public function offsetTransaction(): BelongsTo
+    {
+        return $this->belongsTo(BankTransaction::class, 'offset_transaction_id');
     }
 
     /**

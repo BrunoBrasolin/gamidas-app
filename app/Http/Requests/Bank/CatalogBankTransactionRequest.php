@@ -23,6 +23,7 @@ class CatalogBankTransactionRequest extends FinanceRequest
             'date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:2100-12-31'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'occurrence_id' => ['nullable', 'required_if:action,link', 'integer'],
+            'offset_transaction_id' => ['nullable', 'required_if:action,offset', 'integer'],
             'remember' => ['boolean'],
             'remember_amount' => ['boolean'],
             'auto_apply' => ['boolean'],
@@ -40,6 +41,7 @@ class CatalogBankTransactionRequest extends FinanceRequest
             'date' => 'data',
             'notes' => 'observações',
             'occurrence_id' => 'despesa',
+            'offset_transaction_id' => 'transação',
         ];
     }
 
@@ -56,6 +58,7 @@ class CatalogBankTransactionRequest extends FinanceRequest
             remember: $this->boolean('remember'),
             autoApply: $this->has('auto_apply') ? $this->boolean('auto_apply') : null,
             rememberAmount: $this->boolean('remember_amount'),
+            offsetTransactionId: $this->nullableInt('offset_transaction_id'),
         );
     }
 }

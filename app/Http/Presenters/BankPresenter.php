@@ -103,10 +103,13 @@ final class BankPresenter
 
     /**
      * @param  list<array{occurrence: ExpenseOccurrence, score: int, strong: bool}>  $candidates
+     * @param  list<BankTransaction>  $offsetCandidates  Pending transactions that could cancel this one out.
      * @return array<string, mixed>
      */
-    public function transaction(BankTransaction $transaction, CarbonImmutable $referenceDate, ?BankSuggestion $suggestion = null, array $candidates = []): array
+    public function transaction(BankTransaction $transaction, CarbonImmutable $referenceDate, ?BankSuggestion $suggestion = null, array $candidates = [], array $offsetCandidates = []): array
     {
+        $offset = $transaction->offsetTransaction;
+
         $occurrence = $transaction->expenseOccurrence;
         $entry = $transaction->personalTransaction;
 
@@ -157,8 +160,11 @@ final class BankPresenter
                         'title' => $entry->title,
                         'month' => $entry->transaction_date->format('Y-m'),
                     ]),
+            'offset' => $offset === null ? null : $this->offsetSide($offset),
+            'offset_candidates' => array_map(fn (BankTransaction $other) => $this->offsetSide($other), $offsetCandidates),
             'suggestion' => $suggestion === null ? null : [
                 'action' => $suggestion->choice->action,
+                'offset_transaction_id' => $suggestion->choice->offsetTransactionId,
                 'label' => $suggestion->label,
                 'title' => $suggestion->choice->title,
                 'occurrence_id' => $suggestion->choice->occurrenceId,
@@ -195,6 +201,23 @@ final class BankPresenter
             'auto_apply' => $rule->auto_apply,
             'hits' => $rule->hits,
             'last_used_at' => $rule->last_used_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * The other side of a pair that cancels out.
+     *
+     * @return array{id: int, display_name: string, description: string, date: string, direction: string, removed: bool}
+     */
+    private function offsetSide(BankTransaction $other): array
+    {
+        return [
+            'id' => $other->id,
+            'display_name' => $other->displayName(),
+            'description' => $other->description,
+            'date' => $other->date->toDateString(),
+            'direction' => $other->direction->value,
+            'removed' => $other->removed_at !== null,
         ];
     }
 

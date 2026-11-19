@@ -98,7 +98,7 @@ class BankRuleRequest extends FinanceRequest
             'amount_cents' => filled($this->validated('amount')) ? $this->cents('amount') : null,
             'action' => $action,
             'recurring_expense_id' => $action === BankRuleAction::Recurring ? $this->nullableInt('recurring_expense_id') : null,
-            'title' => in_array($action, [BankRuleAction::Recurring, BankRuleAction::Ignore], true) ? null : $this->nullableText('title'),
+            'title' => in_array($action, [BankRuleAction::Recurring, BankRuleAction::Ignore, BankRuleAction::Settlement], true) ? null : $this->nullableText('title'),
             'auto_apply' => $this->boolean('auto_apply'),
         ];
     }

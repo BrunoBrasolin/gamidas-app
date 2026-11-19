@@ -2,6 +2,7 @@ import { Form, usePage } from '@inertiajs/react';
 import {
     ArrowLeftRight,
     Ban,
+    HandCoins,
     Home,
     Link2,
     PiggyBank,
@@ -11,6 +12,7 @@ import {
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { FormField } from '@/components/finance/form-field';
+import { SettlementCandidates } from '@/components/bank/settlement-candidates';
 import { Money } from '@/components/finance/money';
 import { StatusBadge } from '@/components/finance/status-badge';
 import { Badge } from '@/components/ui/badge';
@@ -90,6 +92,13 @@ const OFFSET_ACTION: (typeof OUT_ACTIONS)[number] = {
     icon: ArrowLeftRight,
 };
 
+const SETTLEMENT_ACTION: (typeof OUT_ACTIONS)[number] = {
+    value: 'settlement',
+    label: 'Acerto da casa',
+    hint: 'A parte das contas da casa, entre vocês dois',
+    icon: HandCoins,
+};
+
 const IN_ACTIONS: typeof OUT_ACTIONS = [
     {
         value: 'income',
@@ -107,9 +116,10 @@ const IN_ACTIONS: typeof OUT_ACTIONS = [
 
 /**
  * Catalogues an imported transaction: a new household or personal expense,
- * a link to an expense that already exists, income, an investment, or
- * ignored. The choice can be remembered as a rule for the counterparty, so
- * the next transactions come with it suggested (or applied).
+ * a link to an expense that already exists, income, an investment, a house
+ * settlement between the two members, or ignored. The choice can be
+ * remembered as a rule for the counterparty, so the next transactions come
+ * with it suggested (or applied).
  */
 export function CatalogDialog({
     transaction,
@@ -121,8 +131,16 @@ export function CatalogDialog({
     const { household, auth } = usePage<SharedHousehold>().props;
     const outgoing = transaction.direction === 'out';
     const canOffset = transaction.offset_candidates.length > 0;
+    const others = (household?.members ?? []).filter(
+        (member) => member.user_id !== auth.user.id,
+    );
+    // The house settlement is between the two members of the household.
+    const partner = others.length === 1 ? others[0] : null;
+    const base = outgoing ? OUT_ACTIONS : IN_ACTIONS;
     const actions = [
-        ...(outgoing ? OUT_ACTIONS : IN_ACTIONS),
+        ...base.slice(0, outgoing ? 2 : 1),
+        ...(partner ? [SETTLEMENT_ACTION] : []),
+        ...base.slice(outgoing ? 2 : 1),
         ...(canOffset ? [OFFSET_ACTION] : []),
     ];
     const initialAction =
@@ -131,7 +149,16 @@ export function CatalogDialog({
             ? transaction.candidates.some((candidate) => candidate.strong)
                 ? 'link'
                 : 'household'
-            : 'income');
+            : partner && transaction.settlement_ids.length > 0
+              ? 'settlement'
+              : 'income');
+
+    // The suggested expenses, or the month whose shares add up.
+    const initialSettlement =
+        transaction.suggestion?.action === 'settlement' &&
+        transaction.suggestion.occurrence_ids.length > 0
+            ? transaction.suggestion.occurrence_ids
+            : transaction.settlement_ids;
 
     // Only a suggested or clearly matching expense comes preselected.
     const initialOccurrence =
@@ -151,6 +178,8 @@ export function CatalogDialog({
     const [occurrenceId, setOccurrenceId] = useState<number | null>(
         initialOccurrence,
     );
+    const [settlementIds, setSettlementIds] =
+        useState<number[]>(initialSettlement);
     const [remember, setRemember] = useState(true);
     const [autoApply, setAutoApply] = useState(false);
     const [amountChoice, setAmountChoice] = useState<boolean | null>(null);
@@ -171,11 +200,7 @@ export function CatalogDialog({
         amountChoice ??
         (adjustsRule || (ruleSuggestion?.rule?.amount_cents ?? null) !== null);
 
-    const others = (household?.members ?? []).filter(
-        (member) => member.user_id !== auth.user.id,
-    );
-    const otherName =
-        others.length === 1 ? others[0].first_name : 'o outro membro';
+    const otherName = partner?.first_name ?? 'o outro membro';
     const createsRecord = [
         'household',
         'personal',
@@ -190,6 +215,7 @@ export function CatalogDialog({
                 if (next) {
                     setAction(initialAction);
                     setOccurrenceId(initialOccurrence);
+                    setSettlementIds(initialSettlement);
                     setOffsetId(initialOffset);
                     setRemember(true);
                     setAutoApply(false);
@@ -345,6 +371,17 @@ export function CatalogDialog({
                                 />
                             )}
 
+                            {action === 'settlement' && partner && (
+                                <SettlementCandidates
+                                    transaction={transaction}
+                                    meId={auth.user.id}
+                                    partner={partner}
+                                    value={settlementIds}
+                                    onChange={setSettlementIds}
+                                    error={errors.occurrence_ids}
+                                />
+                            )}
+
                             {action === 'link' && (
                                 <LinkCandidates
                                     transaction={transaction}
@@ -470,7 +507,9 @@ export function CatalogDialog({
                                         (action === 'link' &&
                                             occurrenceId === null) ||
                                         (action === 'offset' &&
-                                            offsetId === null)
+                                            offsetId === null) ||
+                                        (action === 'settlement' &&
+                                            settlementIds.length === 0)
                                     }
                                 >
                                     {processing && <Spinner />}
@@ -480,7 +519,9 @@ export function CatalogDialog({
                                           ? 'Compensar'
                                           : action === 'link'
                                             ? 'Vincular'
-                                            : 'Catalogar'}
+                                            : action === 'settlement'
+                                              ? 'Registrar acerto'
+                                              : 'Catalogar'}
                                 </Button>
                             </DialogFooter>
                         </>

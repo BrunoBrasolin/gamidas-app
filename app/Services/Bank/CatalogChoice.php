@@ -8,15 +8,20 @@ use Carbon\CarbonImmutable;
  * What the owner decided for an imported transaction.
  *
  * Actions: household, personal, income, investment (a new record), link (an
- * expense that already exists, e.g. this month's rent), ignore, or offset
- * (cancel out with another transaction: a refund and its charge). Title and
+ * expense that already exists, e.g. this month's rent), ignore, offset
+ * (cancel out with another transaction: a refund and its charge), or
+ * settlement (a transfer between the members that pays their shares of
+ * several household expenses, the "Acerto da casa"). Title and
  * date default to the transaction's name and reference date. Remembering
  * creates a rule for the counterparty, for any value or only for this one.
  */
 final readonly class CatalogChoice
 {
-    public const ACTIONS = ['household', 'personal', 'income', 'investment', 'link', 'ignore', 'offset'];
+    public const ACTIONS = ['household', 'personal', 'income', 'investment', 'link', 'ignore', 'offset', 'settlement'];
 
+    /**
+     * @param  list<int>  $occurrenceIds  The household expenses a settlement pays.
+     */
     public function __construct(
         public string $action,
         public ?string $title = null,
@@ -27,6 +32,7 @@ final readonly class CatalogChoice
         public ?bool $autoApply = null,
         public bool $rememberAmount = false,
         public ?int $offsetTransactionId = null,
+        public array $occurrenceIds = [],
     ) {
         //
     }

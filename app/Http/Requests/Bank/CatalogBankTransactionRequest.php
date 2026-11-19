@@ -24,6 +24,8 @@ class CatalogBankTransactionRequest extends FinanceRequest
             'notes' => ['nullable', 'string', 'max:2000'],
             'occurrence_id' => ['nullable', 'required_if:action,link', 'integer'],
             'offset_transaction_id' => ['nullable', 'required_if:action,offset', 'integer'],
+            'occurrence_ids' => ['nullable', 'required_if:action,settlement', 'array', 'max:500'],
+            'occurrence_ids.*' => ['integer', 'distinct'],
             'remember' => ['boolean'],
             'remember_amount' => ['boolean'],
             'auto_apply' => ['boolean'],
@@ -42,6 +44,8 @@ class CatalogBankTransactionRequest extends FinanceRequest
             'notes' => 'observações',
             'occurrence_id' => 'despesa',
             'offset_transaction_id' => 'transação',
+            'occurrence_ids' => 'despesas',
+            'occurrence_ids.*' => 'despesa',
         ];
     }
 
@@ -59,6 +63,7 @@ class CatalogBankTransactionRequest extends FinanceRequest
             autoApply: $this->has('auto_apply') ? $this->boolean('auto_apply') : null,
             rememberAmount: $this->boolean('remember_amount'),
             offsetTransactionId: $this->nullableInt('offset_transaction_id'),
+            occurrenceIds: array_values(array_map(intval(...), (array) ($this->validated('occurrence_ids') ?? []))),
         );
     }
 }

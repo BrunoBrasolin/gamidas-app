@@ -156,7 +156,7 @@ export function OccurrenceDetails({
                                     </span>{' '}
                                     —{' '}
                                     {event.type === 'paid'
-                                        ? `pagamento confirmado por ${event.user}`
+                                        ? `pagamento confirmado por ${event.user}${event.reason ? ` — ${event.reason}` : ''}`
                                         : `pagamento reaberto por ${event.user}: “${event.reason}”`}
                                 </li>
                             ))}

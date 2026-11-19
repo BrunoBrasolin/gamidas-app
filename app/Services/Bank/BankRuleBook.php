@@ -65,7 +65,7 @@ final class BankRuleBook
         $rule->fill([
             'label' => Str::limit($transaction->displayName(), 160, ''),
             'action' => $action,
-            'title' => in_array($action, [BankRuleAction::Recurring, BankRuleAction::Ignore], true) ? null : $title,
+            'title' => in_array($action, [BankRuleAction::Recurring, BankRuleAction::Ignore, BankRuleAction::Settlement], true) ? null : $title,
             'recurring_expense_id' => $action === BankRuleAction::Recurring ? $recurringExpenseId : null,
         ]);
 

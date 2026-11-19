@@ -183,6 +183,10 @@ function destination(rule: BankRule): string {
         return 'ignorar';
     }
 
+    if (rule.action === 'settlement') {
+        return 'acerto da casa';
+    }
+
     return rule.title
         ? `${rule.action_label}: ${rule.title}`
         : rule.action_label;
@@ -351,7 +355,8 @@ function RuleDialog({
                                     </NativeSelect>
                                 </FormField>
                             ) : (
-                                action !== 'ignore' && (
+                                action !== 'ignore' &&
+                                action !== 'settlement' && (
                                     <FormField
                                         id="rule-title"
                                         label="Título"

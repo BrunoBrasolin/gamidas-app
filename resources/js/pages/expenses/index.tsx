@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import {
     CheckCheck,
+    HandCoins,
     Inbox,
     Landmark,
     Pencil,
@@ -33,7 +34,12 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useQueryFilters } from '@/hooks/use-query-filters';
-import { formatDate, formatMonth } from '@/lib/format';
+import {
+    formatDate,
+    formatMoney,
+    formatMonth,
+    formatShortDate,
+} from '@/lib/format';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
@@ -593,6 +599,17 @@ function ExpenseTitle({ occurrence }: { occurrence: Occurrence }) {
                     >
                         <Landmark className="size-3" />
                         Extrato de {occurrence.bank_proof.member}
+                    </Badge>
+                )}
+                {occurrence.settlement_proof && (
+                    <Badge
+                        variant="outline"
+                        title={`Paga no acerto da casa: ${occurrence.settlement_proof.channel} de ${formatMoney(occurrence.settlement_proof.amount_cents)} em ${formatDate(occurrence.settlement_proof.date)}, no banco de ${occurrence.settlement_proof.member}`}
+                        className="border-emerald-500/60 text-emerald-700 dark:text-emerald-400"
+                    >
+                        <HandCoins className="size-3" />
+                        Acerto de{' '}
+                        {formatShortDate(occurrence.settlement_proof.date)}
                     </Badge>
                 )}
                 {occurrence.awaits_amount && (

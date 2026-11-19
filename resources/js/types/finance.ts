@@ -59,6 +59,13 @@ export type Occurrence = {
     paid_by: UserRef | null;
     /** The bank transaction proving the payment, from the bank inbox. */
     bank_proof?: { date: string; member: string } | null;
+    /** The transfer between the members that paid it (house settlement). */
+    settlement_proof?: {
+        date: string;
+        member: string;
+        amount_cents: number;
+        channel: string;
+    } | null;
     payment: {
         confirm_label: string;
         paid_label: string | null;

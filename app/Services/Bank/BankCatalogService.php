@@ -12,6 +12,7 @@ use App\Enums\OccurrenceSource;
 use App\Enums\OccurrenceStatus;
 use App\Enums\TransactionType;
 use App\Models\BankRule;
+use App\Models\BankSettlementItem;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
 use App\Models\PersonalTransaction;
@@ -38,7 +39,9 @@ use Illuminate\Validation\ValidationException;
  *
  * Payment confirmation keeps its rule: linking marks the expense as paid
  * only when the policy lets the owner confirm it; a household expense the
- * owner created waits for the other member, who sees the bank proof.
+ * owner created waits for the other member, who sees the bank proof. The
+ * exception is the house settlement (see {@see BankSettlementService}): a
+ * transfer between the members pays their shares of the chosen expenses.
  */
 final class BankCatalogService
 {
@@ -77,6 +80,7 @@ final class BankCatalogService
         private readonly BankRuleBook $rules,
         private readonly BankOffsetService $offsets,
         private readonly CardBillCalendar $bills,
+        private readonly BankSettlementService $settlements,
         private readonly AuditLogger $audit,
     ) {
         //
@@ -154,6 +158,7 @@ final class BankCatalogService
             $now = Date::now();
             $ruleAction = null;
             $recurringExpenseId = null;
+            $settled = null;
 
             $attributes = ['review_status' => BankReviewStatus::Catalogued, 'ignore_reason' => null, 'reviewed_at' => $now];
 
@@ -207,6 +212,12 @@ final class BankCatalogService
                     }
                     break;
 
+                case 'settlement':
+                    $settled = $this->settlements->settle($transaction, $actor, $choice->occurrenceIds);
+                    $attributes += ['catalog_type' => BankCatalogType::Settlement];
+                    $ruleAction = BankRuleAction::Settlement;
+                    break;
+
                 default:
                     $attributes = [
                         'review_status' => BankReviewStatus::Ignored,
@@ -223,7 +234,7 @@ final class BankCatalogService
                 'amount_cents' => $transaction->amount_cents,
                 'expense_occurrence_id' => $transaction->expense_occurrence_id,
                 'personal_transaction_id' => $transaction->personal_transaction_id,
-            ]);
+            ] + ($settled !== null ? ['settlement' => $settled + ['occurrence_ids' => $choice->occurrenceIds]] : []));
 
             if ($choice->remember && $ruleAction !== null) {
                 $this->rules->learn($actor, $transaction, $ruleAction, $title, $recurringExpenseId, $choice->autoApply, $choice->rememberAmount);
@@ -330,6 +341,11 @@ final class BankCatalogService
                 'personal_transaction_id' => $transaction->personal_transaction_id,
             ];
 
+            // A settlement's expenses become pending again.
+            if ($transaction->catalog_type === BankCatalogType::Settlement) {
+                $this->settlements->undo($transaction, $actor);
+            }
+
             if ($transaction->catalog_type === BankCatalogType::Household && $transaction->expense_occurrence_id !== null) {
                 $occurrence = ExpenseOccurrence::query()->find($transaction->expense_occurrence_id);
 
@@ -396,7 +412,11 @@ final class BankCatalogService
         $best = $candidates[0] ?? null;
 
         if ($best === null || ! $best['strong']) {
-            return null;
+            // A PIX between the members whose value is exactly what one owes
+            // the other for a month: the house settlement.
+            return in_array($transaction->channel, [BankChannel::Pix, BankChannel::Transfer], true)
+                ? $this->settlementSuggestion($transaction)
+                : null;
         }
 
         return new BankSuggestion(
@@ -438,6 +458,10 @@ final class BankCatalogService
 
     public function suggestionFromRule(BankTransaction $transaction, BankRule $rule): ?BankSuggestion
     {
+        if ($rule->action === BankRuleAction::Settlement) {
+            return $this->settlementSuggestion($transaction, $rule);
+        }
+
         if ($rule->action === BankRuleAction::Recurring) {
             $occurrence = $this->recurringOccurrence($transaction, $rule);
 
@@ -776,6 +800,10 @@ final class BankCatalogService
                 'reviewed_at' => $replaced->reviewed_at,
             ]);
 
+            BankSettlementItem::query()
+                ->where('bank_transaction_id', $replaced->id)
+                ->update(['bank_transaction_id' => $transaction->id]);
+
             // The other side of a pair now points at the new transaction.
             if ($replaced->offset_transaction_id !== null) {
                 BankTransaction::query()
@@ -839,7 +867,7 @@ final class BankCatalogService
 
         $fits = match ($action) {
             'income' => ! $transaction->isOutgoing(),
-            'ignore', 'offset' => true,
+            'ignore', 'offset', 'settlement' => true,
             default => $transaction->isOutgoing(),
         };
 
@@ -847,7 +875,7 @@ final class BankCatalogService
             throw ValidationException::withMessages([
                 'action' => $transaction->isOutgoing()
                     ? 'Saídas de dinheiro não podem ser receitas.'
-                    : 'Entradas de dinheiro só podem ser receitas ou ignoradas.',
+                    : 'Entradas de dinheiro só podem ser receitas, acertos da casa ou ignoradas.',
             ]);
         }
     }
@@ -887,6 +915,36 @@ final class BankCatalogService
     /**
      * "novembro/2026".
      */
+    /**
+     * The house settlement for a transfer: the month whose shares add up to
+     * its value. A settlement rule without such a month still suggests the
+     * settlement, leaving the expenses to be picked.
+     */
+    private function settlementSuggestion(BankTransaction $transaction, ?BankRule $rule = null): ?BankSuggestion
+    {
+        if ($this->settlements->partnerOf($transaction->user) === null) {
+            return null;
+        }
+
+        $match = $this->settlements->match($transaction);
+
+        if ($match === null) {
+            return $rule === null ? null : new BankSuggestion(
+                new CatalogChoice('settlement', remember: false),
+                'Acerto da casa (escolha as despesas)',
+                $rule,
+            );
+        }
+
+        $count = count($match['ids']);
+
+        return new BankSuggestion(
+            new CatalogChoice('settlement', remember: $rule === null, occurrenceIds: $match['ids']),
+            'Acerto da casa: '.$this->monthLabel($match['month']).' ('.($count === 1 ? '1 despesa' : "{$count} despesas").')',
+            $rule,
+        );
+    }
+
     private function monthLabel(CarbonImmutable $month): string
     {
         $names = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];

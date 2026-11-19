@@ -61,8 +61,38 @@ class ExpenseOccurrencePolicy
     }
 
     /**
+     * The house settlement ("Acerto da casa"): a transfer between the two
+     * members, seen in the bank of either one, pays the share each owes on
+     * the chosen household expenses. Unlike the reciprocal confirmation, the
+     * creator may settle their own expense: the proof is the other member's
+     * money arriving in their bank, not their word. The payment is recorded
+     * in the name of the member who owed the share.
+     */
+    public function settle(User $user, ExpenseOccurrence $occurrence): Response
+    {
+        if (! $this->view($user, $occurrence)) {
+            return Response::denyAsNotFound();
+        }
+
+        if (! $occurrence->isHousehold()) {
+            return Response::deny('Só despesas da casa entram no acerto.');
+        }
+
+        if ($occurrence->isPaid()) {
+            return Response::deny("“{$occurrence->title}” já foi paga.");
+        }
+
+        if ($occurrence->awaitsAmount()) {
+            return Response::deny("Informe o valor de “{$occurrence->title}” antes do acerto.");
+        }
+
+        return Response::allow();
+    }
+
+    /**
      * Only the member who confirmed a household payment can reopen it.
-     * Personal expenses are reopened by their owner.
+     * Personal expenses are reopened by their owner. An expense paid by a
+     * house settlement is reopened by undoing the settlement in the inbox.
      */
     public function reopenPayment(User $user, ExpenseOccurrence $occurrence): Response
     {
@@ -72,6 +102,10 @@ class ExpenseOccurrencePolicy
 
         if (! $occurrence->isPaid()) {
             return Response::deny('Esta despesa não está paga.');
+        }
+
+        if ($occurrence->isSettled()) {
+            return Response::deny('Esta despesa foi paga num acerto da casa. Para reabri-la, desfaça o acerto na caixa de entrada do banco.');
         }
 
         if ($occurrence->isHousehold() && $occurrence->paid_by_user_id !== $user->id) {

@@ -17,6 +17,9 @@ enum BankRuleAction: string
 
     case Ignore = 'ignore';
 
+    /** A transfer between the members that settles household expenses. */
+    case Settlement = 'settlement';
+
     public function label(): string
     {
         return match ($this) {
@@ -26,6 +29,7 @@ enum BankRuleAction: string
             self::Investment => 'Investimento',
             self::Recurring => 'Despesa recorrente',
             self::Ignore => 'Ignorar',
+            self::Settlement => 'Acerto da casa',
         };
     }
 
@@ -36,7 +40,7 @@ enum BankRuleAction: string
     {
         return match ($this) {
             self::Income => $direction === BankDirection::In,
-            self::Ignore => true,
+            self::Ignore, self::Settlement => true,
             default => $direction === BankDirection::Out,
         };
     }

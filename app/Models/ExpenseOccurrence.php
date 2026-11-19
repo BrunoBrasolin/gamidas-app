@@ -53,6 +53,7 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $editor
  * @property-read User|null $payer
  * @property-read Collection<int, BankTransaction> $bankTransactions
+ * @property-read Collection<int, BankSettlementItem> $settlementItems
  */
 #[Fillable([
     'household_id', 'scope', 'owner_user_id', 'source', 'recurring_expense_id',
@@ -114,6 +115,17 @@ class ExpenseOccurrence extends Model
     public function awaitsAmount(): bool
     {
         return ! $this->isPaid() && $this->amount_cents === 0;
+    }
+
+    /**
+     * Paid by a house settlement ("Acerto da casa"): only undoing the
+     * settlement in the bank inbox reopens it.
+     */
+    public function isSettled(): bool
+    {
+        return $this->relationLoaded('settlementItems')
+            ? $this->settlementItems->isNotEmpty()
+            : $this->settlementItems()->exists();
     }
 
     public function isHousehold(): bool
@@ -248,6 +260,16 @@ class ExpenseOccurrence extends Model
     public function bankTransactions(): HasMany
     {
         return $this->hasMany(BankTransaction::class);
+    }
+
+    /**
+     * The house settlements that paid this expense (one per member's bank).
+     *
+     * @return HasMany<BankSettlementItem, $this>
+     */
+    public function settlementItems(): HasMany
+    {
+        return $this->hasMany(BankSettlementItem::class);
     }
 
     /**

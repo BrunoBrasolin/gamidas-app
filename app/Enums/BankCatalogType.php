@@ -22,6 +22,9 @@ enum BankCatalogType: string
     /** An investment in the owner's personal ledger. */
     case Investment = 'investment';
 
+    /** A transfer between the members that pays their shares of several household expenses. */
+    case Settlement = 'settlement';
+
     public function label(): string
     {
         return match ($this) {
@@ -30,6 +33,7 @@ enum BankCatalogType: string
             self::Linked => 'Vinculada a despesa',
             self::Income => 'Receita',
             self::Investment => 'Investimento',
+            self::Settlement => 'Acerto da casa',
         };
     }
 }

@@ -31,10 +31,14 @@ final class PaymentService
      * Mark an occurrence as paid. Its shares are brought up to date one last
      * time and then frozen as history. The payment date defaults to now; a
      * payment proven by a bank transaction carries the transaction's date.
+     *
+     * The payment is in the actor's name unless a payer is given: a house
+     * settlement records it for the member who paid the share, while the
+     * history keeps who registered it and the note says how.
      */
-    public function confirm(ExpenseOccurrence $occurrence, User $actor, ?CarbonInterface $paidAt = null): ExpenseOccurrence
+    public function confirm(ExpenseOccurrence $occurrence, User $actor, ?CarbonInterface $paidAt = null, ?User $payer = null, ?string $note = null): ExpenseOccurrence
     {
-        return DB::transaction(function () use ($occurrence, $actor, $paidAt) {
+        return DB::transaction(function () use ($occurrence, $actor, $paidAt, $payer, $note) {
             $occurrence = ExpenseOccurrence::query()->lockForUpdate()->findOrFail($occurrence->id);
 
             if ($occurrence->isPaid()) {
@@ -50,7 +54,7 @@ final class PaymentService
             $occurrence->update([
                 'status' => OccurrenceStatus::Paid,
                 'paid_at' => $paidAt ?? $now,
-                'paid_by_user_id' => $actor->id,
+                'paid_by_user_id' => ($payer ?? $actor)->id,
             ]);
 
             PaymentEvent::create([
@@ -58,13 +62,16 @@ final class PaymentService
                 'user_id' => $actor->id,
                 'type' => PaymentEventType::Paid,
                 'amount_cents' => $occurrence->amount_cents,
+                'reason' => $note,
                 'created_at' => $now,
             ]);
 
-            $this->audit->record('payment.confirmed', $occurrence, $actor, $occurrence->household_id, null, [
+            $this->audit->record('payment.confirmed', $occurrence, $actor, $occurrence->household_id, null, array_filter([
                 'amount_cents' => $occurrence->amount_cents,
                 'shares' => $occurrence->shares()->pluck('amount_cents', 'user_id')->all(),
-            ]);
+                'paid_by_user_id' => $payer !== null && $payer->id !== $actor->id ? $payer->id : null,
+                'note' => $note,
+            ], fn ($value) => $value !== null));
 
             return $occurrence;
         });

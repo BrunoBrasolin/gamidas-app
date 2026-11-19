@@ -60,7 +60,8 @@ export type BankCatalogAction =
     | 'investment'
     | 'link'
     | 'ignore'
-    | 'offset';
+    | 'offset'
+    | 'settlement';
 
 /** The other side of a refund and its charge, which cancel each other out. */
 export type BankOffsetSide = {
@@ -70,6 +71,24 @@ export type BankOffsetSide = {
     date: string;
     direction: 'out' | 'in';
     removed: boolean;
+};
+
+/**
+ * A household expense a transfer between the members may settle: the share
+ * of the member who did not register it.
+ */
+export type BankSettlementCandidate = {
+    id: number;
+    title: string;
+    amount_cents: number;
+    due_date: string;
+    billing_month: string;
+    installment_number: number | null;
+    installment_count: number | null;
+    payer_user_id: number;
+    share_cents: number;
+    /** Already paid by the same transfer seen in the other member's bank. */
+    settled_by_partner: boolean;
 };
 
 export type BankCandidate = {
@@ -113,6 +132,7 @@ export type BankTransaction = {
         | 'linked'
         | 'income'
         | 'investment'
+        | 'settlement'
         | null;
     catalog_label: string | null;
     ignore_reason: 'bill_payment' | 'user' | 'offset' | null;
@@ -139,6 +159,10 @@ export type BankTransaction = {
               month: string;
           }
         | null;
+    /** What a house settlement paid. */
+    settlement: { count: number; months: string[] } | null;
+    /** The household expenses whose shares add up to the transfer. */
+    settlement_ids: number[];
     offset: BankOffsetSide | null;
     offset_candidates: BankOffsetSide[];
     suggestion: {
@@ -147,6 +171,7 @@ export type BankTransaction = {
         label: string;
         title: string | null;
         occurrence_id: number | null;
+        occurrence_ids: number[];
         rule: {
             id: number;
             label: string;
@@ -162,7 +187,8 @@ export type BankRuleAction =
     | 'income'
     | 'investment'
     | 'recurring'
-    | 'ignore';
+    | 'ignore'
+    | 'settlement';
 
 export type BankRule = {
     id: number;

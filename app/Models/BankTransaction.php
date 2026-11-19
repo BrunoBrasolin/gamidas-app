@@ -10,8 +10,10 @@ use App\Enums\BankReviewStatus;
 use App\Services\Bank\TransactionClassifier;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A movement imported from the bank (a PIX, a card purchase, a transfer...)
@@ -53,6 +55,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read PersonalTransaction|null $personalTransaction
  * @property-read BankBill|null $bill
  * @property-read BankTransaction|null $offsetTransaction
+ * @property-read Collection<int, BankSettlementItem> $settlementItems
  */
 #[Fillable([
     'bank_account_id', 'user_id', 'pluggy_id', 'date', 'description', 'amount_cents', 'direction', 'channel',
@@ -190,6 +193,16 @@ class BankTransaction extends Model
     public function offsetTransaction(): BelongsTo
     {
         return $this->belongsTo(BankTransaction::class, 'offset_transaction_id');
+    }
+
+    /**
+     * The household expenses a house settlement ("Acerto da casa") paid.
+     *
+     * @return HasMany<BankSettlementItem, $this>
+     */
+    public function settlementItems(): HasMany
+    {
+        return $this->hasMany(BankSettlementItem::class);
     }
 
     /**

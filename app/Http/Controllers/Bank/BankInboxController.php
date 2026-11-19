@@ -13,6 +13,8 @@ use App\Models\BankTransaction;
 use App\Services\Bank\BankCatalogService;
 use App\Services\Bank\BankOffsetService;
 use App\Services\Bank\BankRuleBook;
+use App\Services\Bank\BankSettlementService;
+use App\Services\Bank\SettlementCandidate;
 use App\Support\Month;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -29,7 +31,7 @@ class BankInboxController extends Controller
 {
     use InteractsWithHousehold;
 
-    public function index(Request $request, BankCatalogService $catalog, BankRuleBook $rules, BankOffsetService $offsets, BankPresenter $presenter): Response
+    public function index(Request $request, BankCatalogService $catalog, BankRuleBook $rules, BankOffsetService $offsets, BankSettlementService $settlements, BankPresenter $presenter): Response
     {
         $user = $this->user($request);
         $filters = $this->filters($request);
@@ -43,7 +45,7 @@ class BankInboxController extends Controller
         }
 
         $transactions = $query
-            ->with(['account', 'bill', 'expenseOccurrence', 'personalTransaction', 'offsetTransaction'])
+            ->with(['account', 'bill', 'expenseOccurrence', 'personalTransaction', 'offsetTransaction', 'settlementItems.occurrence:id,title,billing_month,status'])
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->paginate(50)
@@ -62,6 +64,16 @@ class BankInboxController extends Controller
             ? $catalog->linkable($user, $items)->map(fn ($occurrence) => $presenter->candidate($occurrence))->values()->all()
             : [];
 
+        // The household expenses a transfer between the members may settle
+        // (both directions), with the month that adds up preselected.
+        $settleable = $items->contains(fn (BankTransaction $transaction) => $transaction->isPending())
+            ? array_map(fn (SettlementCandidate $candidate) => $presenter->settlementCandidate($candidate), $settlements->candidates($user))
+            : [];
+        $settlementIds = $settleable === [] ? [] : $items
+            ->filter(fn (BankTransaction $transaction) => $transaction->isPending() && $transaction->removed_at === null)
+            ->mapWithKeys(fn (BankTransaction $transaction) => [$transaction->id => $settlements->match($transaction)['ids'] ?? []])
+            ->all();
+
         return Inertia::render('bank/inbox', [
             'filters' => $filters,
             'accounts' => BankAccount::query()
@@ -77,6 +89,7 @@ class BankInboxController extends Controller
                 $catalog->suggest($transaction, $userRules, $candidates[$transaction->id] ?? []),
                 $candidates[$transaction->id] ?? [],
                 $offsetCandidates[$transaction->id] ?? [],
+                $settlementIds[$transaction->id] ?? [],
             )),
             'counts' => [
                 'pending' => $catalog->pendingOf($user)->count(),
@@ -88,6 +101,7 @@ class BankInboxController extends Controller
             ],
             'hasConnections' => BankAccount::query()->where('user_id', $user->id)->exists(),
             'linkable' => $linkable,
+            'settleable' => $settleable,
         ]);
     }
 
@@ -101,6 +115,7 @@ class BankInboxController extends Controller
             'ignore' => 'Transação ignorada.',
             'link' => 'Transação vinculada à despesa.',
             'offset' => 'As duas transações foram compensadas.',
+            'settlement' => 'Acerto registrado: as despesas foram marcadas como pagas.',
             default => 'Transação catalogada.',
         });
 

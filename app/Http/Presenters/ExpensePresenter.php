@@ -4,6 +4,7 @@ namespace App\Http\Presenters;
 
 use App\Enums\OccurrenceSource;
 use App\Enums\RecurringKind;
+use App\Models\BankSettlementItem;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
 use App\Models\ExpenseShare;
@@ -30,6 +31,7 @@ final class ExpensePresenter
         'shares',
         'recurringExpense:id,kind',
         'bankTransactions:id,expense_occurrence_id,user_id,date,removed_at',
+        'settlementItems.bankTransaction:id,user_id,date,amount_cents,channel',
     ];
 
     /**
@@ -83,6 +85,7 @@ final class ExpensePresenter
             'paid_at' => $occurrence->paid_at?->toIso8601String(),
             'paid_by' => $occurrence->payer ? ['id' => $occurrence->payer->id, 'name' => $occurrence->payer->name] : null,
             'bank_proof' => $this->bankProof($occurrence),
+            'settlement_proof' => $this->settlementProof($occurrence),
             'payment' => [
                 'confirm_label' => $this->confirmLabel($occurrence),
                 'paid_label' => $this->paidLabel($occurrence),
@@ -151,6 +154,35 @@ final class ExpensePresenter
         return [
             'date' => $transaction->date->toDateString(),
             'member' => $this->members->get($transaction->user_id)?->user->firstName() ?? 'membro',
+        ];
+    }
+
+    /**
+     * The house settlement that paid the expense: the transfer between the
+     * members, when, from whose bank and for how much in total.
+     *
+     * @return array{date: string, member: string, amount_cents: int, channel: string}|null
+     */
+    private function settlementProof(ExpenseOccurrence $occurrence): ?array
+    {
+        if (! $occurrence->relationLoaded('settlementItems')) {
+            return null;
+        }
+
+        $transaction = $occurrence->settlementItems
+            ->map(fn (BankSettlementItem $item) => $item->bankTransaction)
+            ->filter()
+            ->first();
+
+        if ($transaction === null) {
+            return null;
+        }
+
+        return [
+            'date' => $transaction->date->toDateString(),
+            'member' => $this->members->get($transaction->user_id)?->user->firstName() ?? 'membro',
+            'amount_cents' => $transaction->amount_cents,
+            'channel' => $transaction->channel->label(),
         ];
     }
 

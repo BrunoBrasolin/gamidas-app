@@ -458,22 +458,30 @@ function PendingActions({ transaction }: { transaction: BankTransaction }) {
                 </span>
             )}
             <div className="flex flex-wrap justify-end gap-2">
-                {transaction.suggestion && (
-                    <Button
-                        size="sm"
-                        disabled={processing !== null}
-                        onClick={() =>
-                            post(
-                                bank.transactions.confirm.url(transaction.id),
-                                {},
-                                'confirm',
-                            )
-                        }
-                    >
-                        {processing === 'confirm' ? <Spinner /> : <Check />}
-                        Confirmar
-                    </Button>
-                )}
+                {transaction.suggestion &&
+                    // A settlement rule with no month adding up still needs
+                    // the expenses picked in the dialog.
+                    !(
+                        transaction.suggestion.action === 'settlement' &&
+                        transaction.suggestion.occurrence_ids.length === 0
+                    ) && (
+                        <Button
+                            size="sm"
+                            disabled={processing !== null}
+                            onClick={() =>
+                                post(
+                                    bank.transactions.confirm.url(
+                                        transaction.id,
+                                    ),
+                                    {},
+                                    'confirm',
+                                )
+                            }
+                        >
+                            {processing === 'confirm' ? <Spinner /> : <Check />}
+                            Confirmar
+                        </Button>
+                    )}
                 <CatalogDialog
                     transaction={transaction}
                     trigger={catalogButton}
@@ -549,7 +557,32 @@ function ReviewedRow({ transaction }: { transaction: BankTransaction }) {
 }
 
 function Destination({ transaction }: { transaction: BankTransaction }) {
-    const { expense, entry } = transaction;
+    const { expense, entry, settlement } = transaction;
+
+    if (settlement) {
+        return (
+            <>
+                {' · '}
+                {settlement.count === 1
+                    ? '1 despesa paga'
+                    : `${settlement.count} despesas pagas`}
+                {settlement.months.length > 0 && ' de '}
+                {settlement.months.map((month, index) => (
+                    <span key={month}>
+                        {index > 0 && ', '}
+                        <Link
+                            href={expenses.index({
+                                query: { month, scope: 'household' },
+                            })}
+                            className="font-medium underline underline-offset-4"
+                        >
+                            {formatMonth(month)}
+                        </Link>
+                    </span>
+                ))}
+            </>
+        );
+    }
 
     if (expense) {
         if (expense.missing) {
@@ -628,6 +661,8 @@ function undoDescription(transaction: BankTransaction): string {
             return 'O lançamento pessoal criado a partir desta transação é excluído e a transação volta para a caixa de entrada.';
         case 'linked':
             return 'A transação é desvinculada da despesa e volta para a caixa de entrada. O valor e o pagamento da despesa não mudam.';
+        case 'settlement':
+            return 'As despesas pagas por este acerto voltam a ficar pendentes (as que o outro membro também acertou pelo banco dele continuam pagas) e a transação volta para a caixa de entrada.';
         default:
             return 'A transação volta para a caixa de entrada.';
     }

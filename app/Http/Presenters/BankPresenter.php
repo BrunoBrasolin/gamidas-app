@@ -2,16 +2,19 @@
 
 namespace App\Http\Presenters;
 
+use App\Enums\BankCatalogType;
 use App\Enums\BankRuleAction;
 use App\Models\BankAccount;
 use App\Models\BankBill;
 use App\Models\BankConnection;
 use App\Models\BankInvestment;
 use App\Models\BankRule;
+use App\Models\BankSettlementItem;
 use App\Models\BankTransaction;
 use App\Models\ExpenseOccurrence;
 use App\Services\Bank\BankConnectionService;
 use App\Services\Bank\BankSuggestion;
+use App\Services\Bank\SettlementCandidate;
 use Carbon\CarbonImmutable;
 
 /**
@@ -104,9 +107,10 @@ final class BankPresenter
     /**
      * @param  list<array{occurrence: ExpenseOccurrence, score: int, strong: bool}>  $candidates
      * @param  list<BankTransaction>  $offsetCandidates  Pending transactions that could cancel this one out.
+     * @param  list<int>  $settlementIds  The household expenses whose shares add up to the transfer.
      * @return array<string, mixed>
      */
-    public function transaction(BankTransaction $transaction, CarbonImmutable $referenceDate, ?BankSuggestion $suggestion = null, array $candidates = [], array $offsetCandidates = []): array
+    public function transaction(BankTransaction $transaction, CarbonImmutable $referenceDate, ?BankSuggestion $suggestion = null, array $candidates = [], array $offsetCandidates = [], array $settlementIds = []): array
     {
         $offset = $transaction->offsetTransaction;
 
@@ -160,6 +164,10 @@ final class BankPresenter
                         'title' => $entry->title,
                         'month' => $entry->transaction_date->format('Y-m'),
                     ]),
+            'settlement' => $transaction->catalog_type === BankCatalogType::Settlement && $transaction->relationLoaded('settlementItems')
+                ? $this->settlement($transaction)
+                : null,
+            'settlement_ids' => $settlementIds,
             'offset' => $offset === null ? null : $this->offsetSide($offset),
             'offset_candidates' => array_map(fn (BankTransaction $other) => $this->offsetSide($other), $offsetCandidates),
             'suggestion' => $suggestion === null ? null : [
@@ -168,6 +176,7 @@ final class BankPresenter
                 'label' => $suggestion->label,
                 'title' => $suggestion->choice->title,
                 'occurrence_id' => $suggestion->choice->occurrenceId,
+                'occurrence_ids' => $suggestion->choice->occurrenceIds,
                 'rule' => $suggestion->rule === null ? null : [
                     'id' => $suggestion->rule->id,
                     'label' => $suggestion->rule->label,
@@ -218,6 +227,51 @@ final class BankPresenter
             'date' => $other->date->toDateString(),
             'direction' => $other->direction->value,
             'removed' => $other->removed_at !== null,
+        ];
+    }
+
+    /**
+     * What a house settlement paid: how many expenses, of which months.
+     *
+     * @return array{count: int, months: list<string>}
+     */
+    private function settlement(BankTransaction $transaction): array
+    {
+        $occurrences = $transaction->settlementItems
+            ->map(fn (BankSettlementItem $item) => $item->occurrence)
+            ->filter();
+
+        return [
+            'count' => $transaction->settlementItems->count(),
+            'months' => array_values($occurrences
+                ->map(fn (ExpenseOccurrence $occurrence) => $occurrence->billing_month->format('Y-m'))
+                ->unique()
+                ->sort()
+                ->all()),
+        ];
+    }
+
+    /**
+     * A household expense a transfer between the members may settle: whose
+     * share it is (the member who did not register it) and how much.
+     *
+     * @return array<string, mixed>
+     */
+    public function settlementCandidate(SettlementCandidate $candidate): array
+    {
+        $occurrence = $candidate->occurrence;
+
+        return [
+            'id' => $occurrence->id,
+            'title' => $occurrence->title,
+            'amount_cents' => $occurrence->amount_cents,
+            'due_date' => $occurrence->due_date->toDateString(),
+            'billing_month' => $occurrence->billing_month->format('Y-m'),
+            'installment_number' => $occurrence->installment_number,
+            'installment_count' => $occurrence->installment_count,
+            'payer_user_id' => $candidate->payerId,
+            'share_cents' => $candidate->shareCents,
+            'settled_by_partner' => $candidate->settledByPartner,
         ];
     }
 

@@ -29,6 +29,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read HouseholdMember|null $membership
+ * @property-read SteamAccount|null $steamAccount
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -59,6 +60,14 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function membership(): HasOne
     {
         return $this->hasOne(HouseholdMember::class);
+    }
+
+    /**
+     * @return HasOne<SteamAccount, $this>
+     */
+    public function steamAccount(): HasOne
+    {
+        return $this->hasOne(SteamAccount::class);
     }
 
     /**

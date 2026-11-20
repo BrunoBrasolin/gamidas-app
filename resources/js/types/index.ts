@@ -11,3 +11,4 @@ export type * from './knowledge';
 export type * from './complementary-hours';
 export type * from './attention';
 export type * from './bank';
+export type * from './games';

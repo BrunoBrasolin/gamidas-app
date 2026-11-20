@@ -14,6 +14,8 @@ use App\Http\Controllers\Finance\PersonalFinanceController;
 use App\Http\Controllers\Finance\PersonalTransactionController;
 use App\Http\Controllers\Finance\RecurringExpenseController;
 use App\Http\Controllers\Finance\ReportController;
+use App\Http\Controllers\Games\GameLibraryController;
+use App\Http\Controllers\Games\SteamAccountController;
 use App\Http\Controllers\Household\MemberController;
 use App\Http\Controllers\Household\SalaryController;
 use App\Http\Controllers\Knowledge\KnowledgeAttachmentController;
@@ -192,6 +194,22 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             Route::delete('jellyfin', [JellyfinConnectionController::class, 'destroy'])->name('jellyfin.destroy');
             Route::delete('progress/{progress}', [WatchProgressController::class, 'destroy'])->whereNumber('progress')->name('progress.destroy');
             Route::delete('{item}', [WatchedItemController::class, 'destroy'])->whereNumber('item')->name('destroy');
+        });
+    });
+
+    // Each user's Steam library: profile, playtime, achievements and the
+    // store page of each game. Everything belongs to the user who connected
+    // the account; the scheduled steam:sync keeps it fresh.
+    Route::prefix('games')->name('games.')->group(function () {
+        Route::get('/', [GameLibraryController::class, 'index'])->name('index');
+        Route::get('steam/callback', [SteamAccountController::class, 'callback'])->name('steam.callback');
+        Route::get('{game}', [GameLibraryController::class, 'show'])->whereNumber('game')->name('show');
+
+        Route::middleware('throttle:finance-writes')->group(function () {
+            Route::get('steam/connect', [SteamAccountController::class, 'redirect'])->name('steam.connect');
+            Route::post('steam', [SteamAccountController::class, 'store'])->name('steam.store');
+            Route::post('steam/sync', [SteamAccountController::class, 'sync'])->name('steam.sync');
+            Route::delete('steam', [SteamAccountController::class, 'destroy'])->name('steam.destroy');
         });
     });
 

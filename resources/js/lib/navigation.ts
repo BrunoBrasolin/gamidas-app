@@ -5,6 +5,7 @@ import {
     Clapperboard,
     Dices,
     FolderOpen,
+    Gamepad2,
     GraduationCap,
     Inbox,
     Landmark,
@@ -25,6 +26,7 @@ import bank from '@/routes/bank';
 import calendar from '@/routes/calendar';
 import complementaryHours from '@/routes/complementary-hours';
 import expenses from '@/routes/expenses';
+import games from '@/routes/games';
 import knowledge from '@/routes/knowledge';
 import personal from '@/routes/personal';
 import recurringExpenses from '@/routes/recurring-expenses';
@@ -179,7 +181,8 @@ export const navGroups: NavGroup[] = [
         ],
     },
     {
-        // Shared by the household.
+        // Shows, watch history and the roulette are shared by the household;
+        // each user's Steam library is private to them.
         label: 'Lazer',
         items: [
             {
@@ -193,6 +196,12 @@ export const navGroups: NavGroup[] = [
                 href: watched.index(),
                 icon: Clapperboard,
                 activePrefix: '/watched',
+            },
+            {
+                title: 'Jogos',
+                href: games.index(),
+                icon: Gamepad2,
+                activePrefix: '/games',
             },
             {
                 title: 'Roleta',

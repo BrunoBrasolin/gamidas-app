@@ -50,6 +50,17 @@ return [
         'webhook_signing_secret' => env('PLUGGY_WEBHOOK_SIGNING_SECRET'),
     ],
 
+    // Each user's Steam library (games, playtime, achievements). The Web API
+    // key comes from https://steamcommunity.com/dev/apikey; without it the
+    // games page explains how to configure and nothing is fetched. Profiles
+    // must show "Game details" publicly. Texts in STEAM_LANGUAGE (Steam's
+    // language names, e.g. brazilian) and prices in STEAM_COUNTRY's currency.
+    'steam' => [
+        'key' => env('STEAM_API_KEY'),
+        'language' => env('STEAM_LANGUAGE', 'brazilian'),
+        'country' => env('STEAM_COUNTRY', 'br'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -14,3 +14,7 @@ Schedule::command('knowledge:prune-attachments')->dailyAt('03:20')->withoutOverl
 // Bank data from Pluggy. Webhooks sync right away; this catches connections
 // whose webhook was lost or failed, and refreshes the others every few hours.
 Schedule::command('bank:sync')->cron('*/20 * * * *')->withoutOverlapping();
+
+// Steam profiles, libraries and playtime of the connected accounts (each
+// read again after an hour), plus the achievements of games played since.
+Schedule::command('steam:sync')->cron('*/20 * * * *')->withoutOverlapping();

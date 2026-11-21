@@ -11,6 +11,7 @@ import {
     Search,
     Trash2,
     Trophy,
+    X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/finance/confirm-dialog';
@@ -20,8 +21,10 @@ import { StatCard } from '@/components/finance/stat-card';
 import { GameImage } from '@/components/games/game-image';
 import { GamesTabs } from '@/components/games/games-tabs';
 import { TierBadge } from '@/components/games/tier-badge';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -31,6 +34,9 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import { today } from '@/lib/format';
 import { formatDay, formatPlaytime, headerUrl, normalize } from '@/lib/games';
 import games from '@/routes/games';
 import type { BacklogEntry, BacklogStatus, SteamGame } from '@/types';
@@ -240,8 +246,11 @@ function CompletedRow({ entry }: { entry: BacklogEntry }) {
     );
 }
 
-/** Pick a game of the library to add to the queue. */
-function AddGameDialog({
+/**
+ * Pick games of the library to add to the queue, in the order they are
+ * picked; or, with "Já zerei", straight to the finished ones.
+ */
+function AddGamesDialog({
     library,
     listed,
 }: {
@@ -250,6 +259,16 @@ function AddGameDialog({
 }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
+    const [picked, setPicked] = useState<SteamGame[]>([]);
+    const [finished, setFinished] = useState(false);
+    const [finishedOn, setFinishedOn] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const pickedIds = useMemo(
+        () => new Set(picked.map((game) => game.id)),
+        [picked],
+    );
 
     const results = useMemo(() => {
         const needle = normalize(query.trim());
@@ -263,20 +282,71 @@ function AddGameDialog({
             .slice(0, PICKER_RESULTS);
     }, [library, listed, query]);
 
+    function toggle(game: SteamGame) {
+        setPicked(
+            pickedIds.has(game.id)
+                ? picked.filter((other) => other.id !== game.id)
+                : [...picked, game],
+        );
+    }
+
+    function reset() {
+        setQuery('');
+        setPicked([]);
+        setFinished(false);
+        setFinishedOn('');
+        setError(null);
+    }
+
+    function submit() {
+        router.post(
+            games.backlog.add.url(),
+            {
+                game_ids: picked.map((game) => game.id),
+                finished,
+                finished_on: finished && finishedOn !== '' ? finishedOn : null,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onError: (errors) =>
+                    setError(
+                        Object.values(errors)[0] ??
+                            'Não foi possível adicionar.',
+                    ),
+                onSuccess: () => {
+                    setOpen(false);
+                    reset();
+                },
+            },
+        );
+    }
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(value) => {
+                setOpen(value);
+
+                if (!value) {
+                    reset();
+                }
+            }}
+        >
             <DialogTrigger asChild>
                 <Button>
                     <Plus />
-                    Adicionar jogo
+                    Adicionar jogos
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Adicionar à lista para zerar</DialogTitle>
                     <DialogDescription>
-                        O jogo entra no fim da fila. Os mais jogados aparecem
-                        primeiro.
+                        Marque quantos jogos quiser, buscando de novo quando
+                        precisar. Eles entram no fim da fila, na ordem em que
+                        foram marcados.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="relative">
@@ -294,7 +364,7 @@ function AddGameDialog({
                         onChange={(event) => setQuery(event.target.value)}
                     />
                 </div>
-                <ul className="-mx-2 max-h-80 overflow-y-auto">
+                <ul className="-mx-2 max-h-72 overflow-y-auto">
                     {results.length === 0 ? (
                         <li className="px-2 py-6 text-center text-sm text-muted-foreground">
                             Nenhum jogo encontrado.
@@ -302,20 +372,12 @@ function AddGameDialog({
                     ) : (
                         results.map((game) => (
                             <li key={game.id}>
-                                <button
-                                    type="button"
-                                    className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-muted"
-                                    onClick={() =>
-                                        router.post(
-                                            games.backlog.store.url(game.id),
-                                            {},
-                                            {
-                                                preserveScroll: true,
-                                                onSuccess: () => setOpen(false),
-                                            },
-                                        )
-                                    }
-                                >
+                                <label className="flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted">
+                                    <Checkbox
+                                        checked={pickedIds.has(game.id)}
+                                        onCheckedChange={() => toggle(game)}
+                                        aria-label={game.name}
+                                    />
                                     <GameImage
                                         urls={[headerUrl(game.app_id)]}
                                         name={game.name}
@@ -331,11 +393,90 @@ function AddGameDialog({
                                               )
                                             : 'Nunca jogado'}
                                     </span>
-                                </button>
+                                </label>
                             </li>
                         ))
                     )}
                 </ul>
+
+                {picked.length > 0 && (
+                    <div className="space-y-1.5">
+                        <p className="text-xs text-muted-foreground">
+                            {picked.length}{' '}
+                            {picked.length === 1 ? 'marcado' : 'marcados'}
+                        </p>
+                        <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+                            {picked.map((game) => (
+                                <Badge
+                                    key={game.id}
+                                    variant="secondary"
+                                    className="gap-1 pr-1"
+                                >
+                                    <span className="max-w-40 truncate">
+                                        {game.name}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggle(game)}
+                                        aria-label={`Desmarcar ${game.name}`}
+                                        className="rounded-sm p-0.5 hover:bg-background"
+                                    >
+                                        <X className="size-3" />
+                                    </button>
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id="backlog-finished"
+                                checked={finished}
+                                onCheckedChange={(value) =>
+                                    setFinished(value === true)
+                                }
+                            />
+                            <Label
+                                htmlFor="backlog-finished"
+                                className="text-sm font-normal"
+                            >
+                                Já zerei
+                            </Label>
+                        </div>
+                        {finished && (
+                            <Input
+                                type="date"
+                                aria-label="Data em que zerou (opcional)"
+                                title="Data em que zerou (opcional; sem data, conta hoje)"
+                                className="h-8 w-40"
+                                max={today()}
+                                value={finishedOn}
+                                onChange={(event) =>
+                                    setFinishedOn(event.target.value)
+                                }
+                            />
+                        )}
+                    </div>
+                    <Button
+                        disabled={picked.length === 0 || saving}
+                        onClick={submit}
+                    >
+                        {saving && <Spinner />}
+                        {finished
+                            ? `Marcar como zerado${picked.length > 1 ? 's' : ''}`
+                            : 'Adicionar'}
+                        {picked.length > 0 && ` (${picked.length})`}
+                    </Button>
+                </div>
+                {finished && (
+                    <p className="-mt-1 text-xs text-muted-foreground">
+                        Sem data, conta como zerado hoje.
+                    </p>
+                )}
+                {error && <p className="text-sm text-destructive">{error}</p>}
             </DialogContent>
         </Dialog>
     );
@@ -380,7 +521,7 @@ export default function GamesBacklog({
                     title="Jogos"
                     description="Sua biblioteca da Steam: jogos, tempo de jogo, conquistas e estatísticas."
                 >
-                    <AddGameDialog library={library} listed={listed} />
+                    <AddGamesDialog library={library} listed={listed} />
                 </PageHeader>
 
                 <GamesTabs />
@@ -408,7 +549,7 @@ export default function GamesBacklog({
                     <EmptyState
                         icon={ListTodo}
                         title="Nenhum jogo para zerar"
-                        description='Adicione os jogos que você quer terminar. Também dá para adicionar pela página de cada jogo, em "Quero zerar".'
+                        description='Adicione os jogos que você quer terminar (vários de uma vez, se quiser). Também dá para adicionar pela página de cada jogo, em "Quero zerar".'
                     />
                 ) : (
                     <>

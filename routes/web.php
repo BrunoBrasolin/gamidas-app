@@ -217,6 +217,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             Route::put('tiers', [GameListsController::class, 'updateTiers'])->name('tiers.update');
             Route::put('{game}/tier', [GameListsController::class, 'tier'])->whereNumber('game')->name('tier');
             Route::post('{game}/backlog', [GameListsController::class, 'addToBacklog'])->whereNumber('game')->name('backlog.store');
+            Route::post('backlog', [GameListsController::class, 'addManyToBacklog'])->name('backlog.add');
             Route::put('backlog/order', [GameListsController::class, 'orderBacklog'])->name('backlog.order');
             Route::put('backlog/{entry}', [GameListsController::class, 'updateBacklog'])->whereNumber('entry')->name('backlog.update');
             Route::delete('backlog/{entry}', [GameListsController::class, 'removeFromBacklog'])->whereNumber('entry')->name('backlog.destroy');

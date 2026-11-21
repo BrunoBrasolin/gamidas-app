@@ -186,6 +186,59 @@ class GameListsTest extends TestCase
         $this->actingAs($this->leticia)->post(route('games.backlog.store', $this->portal))->assertNotFound();
     }
 
+    public function test_several_games_join_the_queue_at_once_in_the_order_picked(): void
+    {
+        $this->actingAs($this->bruno)->post(route('games.backlog.store', $this->hades));
+
+        $this->actingAs($this->bruno)
+            ->from(route('games.backlog'))
+            ->post(route('games.backlog.add'), ['game_ids' => [$this->celeste->id, $this->hades->id, $this->portal->id]])
+            ->assertRedirect(route('games.backlog'))
+            ->assertSessionHasNoErrors()
+            ->assertInertiaFlash('toast.message', '2 jogos entraram na lista para zerar.');
+
+        $queue = SteamBacklogEntry::query()->orderBy('position')->get();
+        // Hades was already queued: it keeps its place.
+        $this->assertSame(['Hades', 'Celeste', 'Portal 2'], $queue->pluck('name')->all());
+        $this->assertSame([BacklogStatus::Queued], $queue->pluck('status')->unique()->values()->all());
+        $this->assertSame(600, $queue[2]->playtime_at_add);
+    }
+
+    public function test_games_already_finished_go_straight_to_the_finished_ones(): void
+    {
+        $this->actingAs($this->bruno)->post(route('games.backlog.store', $this->hades));
+
+        $this->actingAs($this->bruno)
+            ->post(route('games.backlog.add'), ['game_ids' => [$this->portal->id, $this->hades->id], 'finished' => true, 'finished_on' => '2025-03-14'])
+            ->assertSessionHasNoErrors()
+            ->assertInertiaFlash('toast.message', '2 jogos marcados como zerados.');
+
+        $portal = SteamBacklogEntry::query()->where('app_id', 620)->sole();
+        $this->assertSame(BacklogStatus::Completed, $portal->status);
+        $this->assertSame('2025-03-14 12:00:00', $portal->completed_at?->toDateTimeString());
+        $this->assertSame(600, $portal->playtime_at_completion);
+        // Already queued, now finished too.
+        $this->assertSame(BacklogStatus::Completed, SteamBacklogEntry::query()->where('app_id', 1145360)->sole()->status);
+
+        // Without a day: finished now.
+        $this->actingAs($this->bruno)->post(route('games.backlog.add'), ['game_ids' => [$this->celeste->id], 'finished' => true]);
+
+        $this->assertSame('2026-11-20 10:00:00', SteamBacklogEntry::query()->where('app_id', 504230)->sole()->completed_at?->toDateTimeString());
+    }
+
+    public function test_adding_several_games_is_validated(): void
+    {
+        $outsider = $this->connectSteam($this->leticia, self::LETICIA_STEAM_ID);
+        $hers = SteamGame::factory()->for($outsider, 'account')->create(['app_id' => 999]);
+
+        $this->actingAs($this->bruno)->post(route('games.backlog.add'), ['game_ids' => [$this->portal->id, $hers->id]])->assertSessionHasErrors('game_ids');
+        $this->actingAs($this->bruno)->post(route('games.backlog.add'), ['game_ids' => []])->assertSessionHasErrors('game_ids');
+        $this->actingAs($this->bruno)->post(route('games.backlog.add'), ['game_ids' => [$this->portal->id], 'finished' => true, 'finished_on' => '2026-11-21'])->assertSessionHasErrors('finished_on');
+        $this->actingAs($this->bruno)->post(route('games.backlog.add'), ['game_ids' => [$this->portal->id], 'finished' => true, 'finished_on' => '14/03/2025'])->assertSessionHasErrors('finished_on');
+
+        $this->assertDatabaseCount('steam_backlog_entries', 0);
+    }
+
     public function test_a_backlog_game_is_started_finished_and_queued_again(): void
     {
         $this->actingAs($this->bruno)->post(route('games.backlog.store', $this->hades));

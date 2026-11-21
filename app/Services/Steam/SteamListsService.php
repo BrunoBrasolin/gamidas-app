@@ -8,6 +8,7 @@ use App\Models\SteamBacklogEntry;
 use App\Models\SteamGame;
 use App\Models\SteamTierEntry;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -191,18 +192,54 @@ class SteamListsService
     }
 
     /**
-     * Move a game between waiting, playing and finished. Finishing records
-     * the date and the Steam playtime at that moment; going back to the
-     * queue puts it at the end and forgets when it was started or finished.
+     * Add several games at once, in the given order, at the end of the
+     * queue; or, when they were already finished, straight to the finished
+     * ones on the given day (today when none). Games already on the list
+     * keep their place, except that marking them finished finishes them.
+     *
+     * @param  iterable<SteamGame>  $games
+     * @return int how many games were added (or finished)
      */
-    public function setStatus(SteamBacklogEntry $entry, BacklogStatus $status): void
+    public function addManyToBacklog(User $user, iterable $games, bool $finished = false, ?CarbonImmutable $finishedOn = null): int
+    {
+        $at = match (true) {
+            ! $finished => null,
+            $finishedOn === null || $finishedOn->isToday() => Date::now(),
+            default => $finishedOn->setTime(12, 0),
+        };
+
+        return DB::transaction(function () use ($user, $games, $at) {
+            $changed = 0;
+
+            foreach ($games as $game) {
+                $entry = $this->addToBacklog($user, $game);
+
+                if ($at !== null && $entry->status !== BacklogStatus::Completed) {
+                    $this->setStatus($entry, BacklogStatus::Completed, $at);
+                    $changed++;
+                } elseif ($entry->wasRecentlyCreated) {
+                    $changed++;
+                }
+            }
+
+            return $changed;
+        });
+    }
+
+    /**
+     * Move a game between waiting, playing and finished. Finishing records
+     * the date (now, or the given moment) and the Steam playtime at that
+     * moment; going back to the queue puts it at the end and forgets when it
+     * was started or finished.
+     */
+    public function setStatus(SteamBacklogEntry $entry, BacklogStatus $status, ?CarbonImmutable $at = null): void
     {
         if ($entry->status === $status) {
             return;
         }
 
         $user = $entry->user;
-        $now = Date::now();
+        $now = $at ?? Date::now();
 
         $entry->fill(match ($status) {
             BacklogStatus::Queued => [

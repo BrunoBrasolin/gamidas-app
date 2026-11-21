@@ -6,6 +6,7 @@ use App\Enums\BacklogStatus;
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\SteamPresenter;
+use App\Http\Requests\Games\BacklogAddRequest;
 use App\Http\Requests\Games\BacklogOrderRequest;
 use App\Http\Requests\Games\BacklogStatusRequest;
 use App\Http\Requests\Games\GameTierRequest;
@@ -17,6 +18,7 @@ use App\Services\Steam\SteamStats;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -98,6 +100,35 @@ class GameListsController extends Controller
         $entry = $this->lists->addToBacklog($this->user($request), $game);
 
         $this->toast($entry->wasRecentlyCreated ? "{$game->name} entrou na lista para zerar." : "{$game->name} já está na lista para zerar.");
+
+        return back();
+    }
+
+    /**
+     * Add the games picked in the library, in the order they were picked.
+     */
+    public function addManyToBacklog(BacklogAddRequest $request): RedirectResponse
+    {
+        $user = $this->user($request);
+        $ids = $request->gameIds();
+        $games = $user->steamAccount?->games()->whereIn('id', $ids)->get()->keyBy('id') ?? collect();
+
+        if ($games->count() !== count($ids)) {
+            throw ValidationException::withMessages(['game_ids' => 'Algum jogo não está na sua biblioteca da Steam.']);
+        }
+
+        $changed = $this->lists->addManyToBacklog(
+            $user,
+            array_map(fn (int $id) => $games->get($id), $ids),
+            $request->finished(),
+            $request->finishedOn(),
+        );
+
+        $this->toast(match (true) {
+            $changed === 0 => 'Esses jogos já estavam na lista para zerar.',
+            $request->finished() => $changed === 1 ? '1 jogo marcado como zerado.' : "{$changed} jogos marcados como zerados.",
+            default => $changed === 1 ? '1 jogo entrou na lista para zerar.' : "{$changed} jogos entraram na lista para zerar.",
+        });
 
         return back();
     }

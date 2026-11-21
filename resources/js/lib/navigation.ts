@@ -11,6 +11,7 @@ import {
     Landmark,
     LayoutGrid,
     LibraryBig,
+    PiggyBank,
     Receipt,
     Sheet,
     SlidersHorizontal,
@@ -25,6 +26,7 @@ import bank from '@/routes/bank';
 import calendar from '@/routes/calendar';
 import complementaryHours from '@/routes/complementary-hours';
 import expenses from '@/routes/expenses';
+import investments from '@/routes/investments';
 import games from '@/routes/games';
 import knowledge from '@/routes/knowledge';
 import personal from '@/routes/personal';
@@ -92,11 +94,15 @@ export const navGroups: NavGroup[] = [
                         title: 'Contas',
                         href: personal.bills(),
                     },
-                    {
-                        title: 'Investimentos',
-                        href: personal.transactions.index('investments'),
-                    },
                 ],
+            },
+            {
+                // Bank positions, gains and history; the contributions
+                // entered by hand are linked from the page.
+                title: 'Investimentos',
+                href: investments.index(),
+                icon: PiggyBank,
+                activePrefix: '/investments',
             },
             {
                 title: 'Relatórios',

@@ -11,6 +11,7 @@ use App\Models\BankAccount;
 use App\Models\BankBill;
 use App\Models\BankConnection;
 use App\Models\BankInvestment;
+use App\Models\BankInvestmentSnapshot;
 use App\Models\BankTransaction;
 use App\Services\Bank\BankCatalogService;
 use App\Services\Bank\BankSyncService;
@@ -49,6 +50,43 @@ class BankSyncTest extends TestCase
     private function sync(array $updatedIds = []): ?int
     {
         return app(BankSyncService::class)->sync($this->connection->fresh(), $updatedIds);
+    }
+
+    public function test_each_sync_records_the_days_investment_balance(): void
+    {
+        $this->pluggyInvestments['item-nubank'] = [[
+            'id' => 'inv-1', 'name' => 'Caixinha Viagem', 'type' => 'FIXED_INCOME', 'subtype' => 'CDB',
+            'balance' => 2500.75, 'amountOriginal' => 2400, 'amountProfit' => 100.75, 'amountWithdrawal' => 2480.6,
+        ], [
+            'id' => 'inv-2', 'name' => 'Fundo sem aplicado', 'type' => 'MUTUAL_FUND',
+            'balance' => 1000, 'amountProfit' => 50,
+        ]];
+
+        $this->sync();
+
+        $caixinha = BankInvestment::query()->firstWhere('pluggy_id', 'inv-1');
+        $this->assertSame(10075, $caixinha->profit_cents);
+        $this->assertSame(248060, $caixinha->withdrawal_cents);
+        // Without the invested amount, it is the balance minus the profit.
+        $this->assertSame(95000, BankInvestment::query()->firstWhere('pluggy_id', 'inv-2')->investedCents());
+
+        // Later the same day: the day's row is updated, not duplicated.
+        $this->pluggyInvestments['item-nubank'][0]['balance'] = 2510;
+        $this->sync();
+        $this->assertSame(2, BankInvestmentSnapshot::query()->count());
+        $this->assertSame(251000, BankInvestmentSnapshot::query()->firstWhere('pluggy_id', 'inv-1')->balance_cents);
+
+        // The next day adds a row; a withdrawn position keeps its history.
+        Date::setTestNow('2026-11-20 12:00:00');
+        unset($this->pluggyInvestments['item-nubank'][1]);
+        $this->sync();
+        $this->assertSame(3, BankInvestmentSnapshot::query()->count());
+        $this->assertSame(1, BankInvestment::query()->count());
+        $this->assertSame(['2026-11-19', '2026-11-20'], BankInvestmentSnapshot::query()->where('pluggy_id', 'inv-1')->orderBy('date')->get()->map(fn ($row) => $row->date->toDateString())->all());
+
+        // Disconnecting deletes the history with everything else.
+        $this->connection->delete();
+        $this->assertSame(0, BankInvestmentSnapshot::query()->count());
     }
 
     public function test_the_first_sync_imports_accounts_bills_investments_and_transactions(): void

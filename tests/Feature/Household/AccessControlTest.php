@@ -60,6 +60,7 @@ class AccessControlTest extends TestCase
         yield 'personal income' => ['/personal/income'];
         yield 'personal expenses' => ['/personal/expenses'];
         yield 'personal investments' => ['/personal/investments'];
+        yield 'investments' => ['/investments'];
         yield 'reports' => ['/reports'];
         yield 'household members' => ['/household/members'];
         yield 'household salaries' => ['/household/salaries'];

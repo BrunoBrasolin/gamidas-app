@@ -7,6 +7,7 @@ use App\Models\BankAccount;
 use App\Models\BankBill;
 use App\Models\BankConnection;
 use App\Models\BankInvestment;
+use App\Models\BankInvestmentSnapshot;
 use App\Models\BankTransaction;
 use App\Services\Pluggy\PluggyClient;
 use App\Services\Pluggy\PluggyException;
@@ -211,6 +212,7 @@ final class BankSyncService
         }
 
         $seen = [];
+        $today = Date::today();
 
         foreach ($investments as $data) {
             $pluggyId = $data['id'] ?? null;
@@ -221,7 +223,7 @@ final class BankSyncService
 
             $seen[] = $pluggyId;
 
-            BankInvestment::query()->updateOrCreate(['pluggy_id' => $pluggyId], [
+            $investment = BankInvestment::query()->updateOrCreate(['pluggy_id' => $pluggyId], [
                 'bank_connection_id' => $connection->id,
                 'user_id' => $connection->user_id,
                 'name' => $this->text($data['name'] ?? null, 160) ?? 'Investimento',
@@ -230,13 +232,24 @@ final class BankSyncService
                 'status' => $this->text($data['status'] ?? null, 16),
                 'balance_cents' => TransactionClassifier::cents($data['balance'] ?? $data['amount'] ?? 0),
                 'invested_cents' => isset($data['amountOriginal']) ? TransactionClassifier::cents($data['amountOriginal']) : null,
+                'profit_cents' => isset($data['amountProfit']) ? TransactionClassifier::cents($data['amountProfit']) : null,
+                'withdrawal_cents' => isset($data['amountWithdrawal']) ? TransactionClassifier::cents($data['amountWithdrawal']) : null,
                 'rate' => $this->rate($data),
                 'due_date' => TransactionClassifier::date($data['dueDate'] ?? null),
                 'balance_at' => TransactionClassifier::date($data['date'] ?? null),
             ]);
+
+            // Today's balance for the history chart; the day's last sync wins.
+            BankInvestmentSnapshot::query()->updateOrCreate(['pluggy_id' => $pluggyId, 'date' => $today->toDateString()], [
+                'bank_connection_id' => $connection->id,
+                'user_id' => $connection->user_id,
+                'balance_cents' => $investment->balance_cents,
+                'invested_cents' => $investment->investedCents(),
+            ]);
         }
 
-        // Positions fully withdrawn stop being listed by the bank.
+        // Positions fully withdrawn stop being listed by the bank (their
+        // history stays, so the total's chart does not change backwards).
         $connection->investments()->whereNotIn('pluggy_id', $seen)->delete();
     }
 

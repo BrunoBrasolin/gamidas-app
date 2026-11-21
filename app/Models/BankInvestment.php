@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $status
  * @property int $balance_cents
  * @property int|null $invested_cents
+ * @property int|null $profit_cents
+ * @property int|null $withdrawal_cents
  * @property string|null $rate
  * @property CarbonImmutable|null $due_date
  * @property CarbonImmutable|null $balance_at
@@ -31,7 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'bank_connection_id', 'user_id', 'pluggy_id', 'name', 'type', 'subtype', 'status',
-    'balance_cents', 'invested_cents', 'rate', 'due_date', 'balance_at',
+    'balance_cents', 'invested_cents', 'profit_cents', 'withdrawal_cents', 'rate', 'due_date', 'balance_at',
 ])]
 class BankInvestment extends Model
 {
@@ -43,9 +45,20 @@ class BankInvestment extends Model
         return [
             'balance_cents' => 'integer',
             'invested_cents' => 'integer',
+            'profit_cents' => 'integer',
+            'withdrawal_cents' => 'integer',
             'due_date' => DateOnly::class,
             'balance_at' => 'datetime',
         ];
+    }
+
+    /**
+     * What was put in: as the bank tells it or, without it, the balance
+     * minus the profit the bank reports. Null when neither is known.
+     */
+    public function investedCents(): ?int
+    {
+        return $this->invested_cents ?? ($this->profit_cents !== null ? $this->balance_cents - $this->profit_cents : null);
     }
 
     /**

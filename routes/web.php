@@ -10,6 +10,7 @@ use App\Http\Controllers\ComplementaryHours\ComplementaryActivityController;
 use App\Http\Controllers\Finance\DashboardController;
 use App\Http\Controllers\Finance\ExpensePaymentController;
 use App\Http\Controllers\Finance\HouseholdExpenseController;
+use App\Http\Controllers\Finance\InvestmentController;
 use App\Http\Controllers\Finance\PersonalFinanceController;
 use App\Http\Controllers\Finance\PersonalTransactionController;
 use App\Http\Controllers\Finance\RecurringExpenseController;
@@ -75,6 +76,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
     Route::get('personal/{type}', [PersonalTransactionController::class, 'index'])
         ->whereIn('type', ['income', 'expenses', 'investments'])
         ->name('personal.transactions.index');
+    Route::get('investments', InvestmentController::class)->name('investments.index');
     Route::get('reports', ReportController::class)->name('reports.index');
 
     Route::redirect('household', '/household/salaries')->name('household');

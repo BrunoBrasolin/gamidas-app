@@ -53,7 +53,9 @@ class AccessControlTest extends TestCase
     {
         yield 'dashboard' => ['/dashboard'];
         yield 'expenses' => ['/expenses'];
-        yield 'recurring expenses' => ['/recurring-expenses'];
+        yield 'recurring expenses' => ['/expenses/recurring'];
+        yield 'personal bills' => ['/personal/bills'];
+        yield 'personal recurring bills' => ['/personal/bills/recurring'];
         yield 'personal summary' => ['/personal'];
         yield 'personal income' => ['/personal/income'];
         yield 'personal expenses' => ['/personal/expenses'];

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Finance;
 
+use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceStatus;
 use App\Enums\RecurringKind;
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
@@ -23,7 +24,23 @@ class RecurringExpenseController extends Controller
 {
     use InteractsWithHousehold;
 
+    /**
+     * The household's recurring expenses, a tab of Despesas da casa.
+     */
     public function index(Request $request): Response
+    {
+        return $this->listing($request, ExpenseScope::Household);
+    }
+
+    /**
+     * The member's own recurring bills, a tab of the personal bills.
+     */
+    public function personal(Request $request): Response
+    {
+        return $this->listing($request, ExpenseScope::Personal);
+    }
+
+    private function listing(Request $request, ExpenseScope $scope): Response
     {
         $user = $this->user($request);
         $household = $this->household($request);
@@ -37,6 +54,7 @@ class RecurringExpenseController extends Controller
 
         $templates = RecurringExpense::query()
             ->visibleTo($user)
+            ->where('scope', $scope)
             ->when($filters['kind'], fn (Builder $query, string $kind) => $query->where('kind', $kind))
             ->when($filters['status'] === 'active', fn (Builder $query) => $query->where(fn (Builder $query) => $query
                 ->whereNull('end_month')->orWhere('end_month', '>=', $current)))
@@ -57,7 +75,8 @@ class RecurringExpenseController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('recurring-expenses/index', [
+        return Inertia::render($scope === ExpenseScope::Personal ? 'personal/recurring' : 'recurring-expenses/index', [
+            'scope' => $scope->value,
             'filters' => $filters,
             'currentMonth' => Month::key(Month::current()),
             'templates' => $templates->through(fn (RecurringExpense $template) => [

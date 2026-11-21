@@ -44,7 +44,6 @@ import calendar from '@/routes/calendar';
 import expenses from '@/routes/expenses';
 import household from '@/routes/household';
 import personal from '@/routes/personal';
-import recurringExpenses from '@/routes/recurring-expenses';
 import shows from '@/routes/shows';
 import type {
     CalendarEvent,
@@ -91,12 +90,12 @@ export default function Dashboard({
         {
             label: 'Fixas recorrentes',
             cents: summary.by_source.fixed,
-            href: recurringExpenses.index({ query: { kind: 'fixed' } }),
+            href: expenses.recurring({ query: { kind: 'fixed' } }),
         },
         {
             label: 'Extras temporárias',
             cents: summary.by_source.temporary,
-            href: recurringExpenses.index({ query: { kind: 'temporary' } }),
+            href: expenses.recurring({ query: { kind: 'temporary' } }),
         },
         {
             label: 'Avulsas',

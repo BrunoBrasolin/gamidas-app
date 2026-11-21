@@ -66,8 +66,12 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('dashboard/calendar', [CalendarEventController::class, 'index'])->name('calendar.index');
     Route::get('expenses', [HouseholdExpenseController::class, 'index'])->name('expenses.index');
-    Route::get('recurring-expenses', [RecurringExpenseController::class, 'index'])->name('recurring-expenses.index');
+    Route::get('expenses/recurring', [RecurringExpenseController::class, 'index'])->name('expenses.recurring');
+    // The recurring expenses used to have a page of their own.
+    Route::redirect('recurring-expenses', '/expenses/recurring')->name('recurring-expenses.index');
     Route::get('personal', PersonalFinanceController::class)->name('personal.index');
+    Route::get('personal/bills', [HouseholdExpenseController::class, 'personal'])->name('personal.bills');
+    Route::get('personal/bills/recurring', [RecurringExpenseController::class, 'personal'])->name('personal.bills.recurring');
     Route::get('personal/{type}', [PersonalTransactionController::class, 'index'])
         ->whereIn('type', ['income', 'expenses', 'investments'])
         ->name('personal.transactions.index');

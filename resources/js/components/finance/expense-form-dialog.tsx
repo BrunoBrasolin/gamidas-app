@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { FormField } from '@/components/finance/form-field';
 import { MoneyInput } from '@/components/finance/money-input';
-import { ScopeField } from '@/components/finance/scope-field';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -99,9 +98,10 @@ export function ExpenseFormDialog({
                     {({ errors, processing }) => (
                         <>
                             {!editing && (
-                                <ScopeField
-                                    defaultValue={scope}
-                                    error={errors.scope}
+                                <input
+                                    type="hidden"
+                                    name="scope"
+                                    value={scope}
                                 />
                             )}
 

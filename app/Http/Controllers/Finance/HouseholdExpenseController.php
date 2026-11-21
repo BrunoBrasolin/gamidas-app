@@ -21,6 +21,7 @@ use App\Support\Month;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,7 +30,29 @@ class HouseholdExpenseController extends Controller
 {
     use InteractsWithHousehold;
 
-    public function index(Request $request, HouseholdSummary $summary, BankCatalogService $catalog): Response
+    /**
+     * Despesas da casa. Personal bills live in Finanças pessoais
+     * (personal.bills); links from before the move still land there.
+     */
+    public function index(Request $request, HouseholdSummary $summary, BankCatalogService $catalog): Response|RedirectResponse
+    {
+        if ($request->query('scope') === ExpenseScope::Personal->value) {
+            return to_route('personal.bills', Arr::except($request->query(), ['scope']));
+        }
+
+        return $this->listing($request, ExpenseScope::Household, $summary, $catalog);
+    }
+
+    /**
+     * The member's personal bills (with due date and payment status), in
+     * Finanças pessoais.
+     */
+    public function personal(Request $request, HouseholdSummary $summary, BankCatalogService $catalog): Response
+    {
+        return $this->listing($request, ExpenseScope::Personal, $summary, $catalog);
+    }
+
+    private function listing(Request $request, ExpenseScope $scope, HouseholdSummary $summary, BankCatalogService $catalog): Response
     {
         $user = $this->user($request);
         $household = $this->household($request);
@@ -37,7 +60,7 @@ class HouseholdExpenseController extends Controller
 
         $this->ensureGenerated($household, $month);
 
-        $filters = $this->filters($request);
+        $filters = $this->filters($request, $scope);
         $query = $this->filteredQuery($user, $filters);
 
         $occurrences = (clone $query)
@@ -65,7 +88,7 @@ class HouseholdExpenseController extends Controller
             'payable_cents' => (int) (clone $payable)->sum('amount_cents'),
         ];
 
-        return Inertia::render('expenses/index', [
+        return Inertia::render($scope === ExpenseScope::Personal ? 'personal/bills' : 'expenses/index', [
             'filters' => $filters,
             'occurrences' => $occurrences->through(fn (ExpenseOccurrence $occurrence) => [
                 ...$presenter->occurrence($occurrence),
@@ -171,14 +194,15 @@ class HouseholdExpenseController extends Controller
      *
      * @return array{month: string, scope: string, creator: ?int, status: ?string, source: ?string}
      */
-    private function filters(Request $request): array
+    private function filters(Request $request, ?ExpenseScope $scope = null): array
     {
         $status = $request->input('status');
         $source = $request->input('source');
+        $scope ??= $request->input('scope') === ExpenseScope::Personal->value ? ExpenseScope::Personal : ExpenseScope::Household;
 
         return [
             'month' => Month::key(Month::fromInput($request->input('month'))),
-            'scope' => $request->input('scope') === ExpenseScope::Personal->value ? ExpenseScope::Personal->value : ExpenseScope::Household->value,
+            'scope' => $scope->value,
             'creator' => $request->integer('creator') ?: null,
             'status' => in_array($status, ['paid', 'pending', 'overdue', 'awaiting_amount'], true) ? $status : null,
             'source' => in_array($source, ['one_off', 'fixed', 'temporary'], true) ? $source : null,

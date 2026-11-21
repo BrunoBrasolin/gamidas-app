@@ -98,13 +98,13 @@ class HouseholdExpenseTest extends TestCase
         $this->assertSame([], $this->sharesOf($expense));
 
         $this->actingAs($this->leticia)
-            ->get(route('expenses.index', ['scope' => 'personal']))
+            ->get(route('personal.bills'))
             ->assertInertia(fn (Assert $page) => $page->has('occurrences.data', 0));
         $this->actingAs($this->leticia)
             ->get(route('expenses.index'))
             ->assertInertia(fn (Assert $page) => $page->has('occurrences.data', 0));
         $this->actingAs($this->bruno)
-            ->get(route('expenses.index', ['scope' => 'personal']))
+            ->get(route('personal.bills'))
             ->assertInertia(fn (Assert $page) => $page->has('occurrences.data', 1));
 
         $this->actingAs($this->leticia)->put(route('expenses.update', $expense), ['title' => 'x'])->assertNotFound();

@@ -72,7 +72,7 @@ class MoveExpenseToPersonalTest extends TestCase
         $this->assertSame(0, app(PersonalSummary::class)->month($this->leticia, $month)['household_share_cents']);
 
         $this->actingAs($this->bruno)
-            ->get(route('expenses.index', ['scope' => 'personal']))
+            ->get(route('personal.bills'))
             ->assertInertia(fn (Assert $page) => $page->where('occurrences.data.0.id', $expense->id));
         $this->actingAs($this->leticia)
             ->get(route('expenses.index'))

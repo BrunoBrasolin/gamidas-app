@@ -35,7 +35,6 @@ import {
 } from '@/components/ui/table';
 import { capitalize, formatDate, formatMonth } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import expenses from '@/routes/expenses';
 import personal from '@/routes/personal';
 import type {
     OccurrenceStatus,
@@ -287,8 +286,8 @@ export default function PersonalIndex({
                                     </ul>
                                 )}
                                 <Link
-                                    href={expenses.index({
-                                        query: { month, scope: 'personal' },
+                                    href={personal.bills({
+                                        query: { month },
                                     })}
                                     className="mt-3 inline-block text-sm font-medium underline underline-offset-4"
                                 >

@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { EmptyState } from '@/components/finance/empty-state';
 import { FilterSelect } from '@/components/finance/filter-select';
 import { ExpenseFormDialog } from '@/components/finance/expense-form-dialog';
+import { ExpenseTabs } from '@/components/finance/expense-tabs';
 import { Money } from '@/components/finance/money';
 import { MonthNavigator } from '@/components/finance/month-navigator';
 import { OccurrenceDetails } from '@/components/finance/occurrence-details';
@@ -41,6 +42,7 @@ import {
     formatMonth,
     formatShortDate,
 } from '@/lib/format';
+import { expensesPage } from '@/lib/expense-pages';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
@@ -84,7 +86,11 @@ export default function ExpensesIndex({
     members,
     bankInboxCount,
 }: Props) {
-    const apply = useQueryFilters(expenses.index.url(), filters);
+    // The scope comes from the page itself (/expenses or /personal/bills).
+    const apply = useQueryFilters(expensesPage(filters.scope).url, {
+        ...filters,
+        scope: null,
+    });
     const isHousehold = filters.scope === 'household';
     const hasFilters =
         filters.creator !== null ||
@@ -93,18 +99,16 @@ export default function ExpensesIndex({
 
     return (
         <>
-            <Head title="Despesas da casa" />
+            <Head
+                title={isHousehold ? 'Despesas da casa' : 'Contas pessoais'}
+            />
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <PageHeader
-                    title={
-                        isHousehold
-                            ? 'Despesas da casa'
-                            : 'Minhas despesas pessoais'
-                    }
+                    title={isHousehold ? 'Despesas da casa' : 'Contas pessoais'}
                     description={
                         isHousehold
                             ? 'Contas compartilhadas, divididas pela proporção dos salários.'
-                            : 'Contas só suas, com vencimento e situação de pagamento.'
+                            : 'Contas só suas, com vencimento e situação de pagamento (inclusive as recorrentes). Gastos do dia a dia ficam em Finanças pessoais › Despesas.'
                     }
                 >
                     <MonthNavigator
@@ -156,36 +160,11 @@ export default function ExpensesIndex({
                     </Alert>
                 )}
 
-                <nav
-                    aria-label="Tipo de despesa"
-                    className="inline-flex w-fit rounded-lg bg-muted p-1 text-sm"
-                >
-                    {(
-                        [
-                            ['household', 'Casa'],
-                            ['personal', 'Pessoais'],
-                        ] as const
-                    ).map(([scope, label]) => (
-                        <Link
-                            key={scope}
-                            href={expenses.index({
-                                query: { month: filters.month, scope },
-                            })}
-                            preserveScroll
-                            aria-current={
-                                filters.scope === scope ? 'page' : undefined
-                            }
-                            className={cn(
-                                'rounded-md px-4 py-1.5 font-medium transition-colors',
-                                filters.scope === scope
-                                    ? 'bg-background shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground',
-                            )}
-                        >
-                            {label}
-                        </Link>
-                    ))}
-                </nav>
+                <ExpenseTabs
+                    scope={filters.scope}
+                    current="month"
+                    month={filters.month}
+                />
 
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {isHousehold && (

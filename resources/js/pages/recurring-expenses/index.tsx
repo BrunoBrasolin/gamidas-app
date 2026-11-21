@@ -17,7 +17,7 @@ import { Money } from '@/components/finance/money';
 import { MoneyInput } from '@/components/finance/money-input';
 import { PageHeader } from '@/components/finance/page-header';
 import { Pagination } from '@/components/finance/pagination';
-import { ScopeField } from '@/components/finance/scope-field';
+import { ExpenseTabs } from '@/components/finance/expense-tabs';
 import { StatusBadge } from '@/components/finance/status-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +50,8 @@ import {
     shiftMonth,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { recurringPage } from '@/lib/expense-pages';
+import expenses from '@/routes/expenses';
 import recurringExpenses from '@/routes/recurring-expenses';
 import type { OccurrenceStatus, Paginated, Scope } from '@/types';
 
@@ -85,12 +87,14 @@ type Template = {
 };
 
 type Props = {
+    scope: Scope;
     filters: { kind: Kind | null; status: 'active' | 'ended' };
     currentMonth: string;
     templates: Paginated<Template>;
 };
 
 export default function RecurringExpensesIndex({
+    scope,
     filters,
     currentMonth,
     templates,
@@ -103,14 +107,25 @@ export default function RecurringExpensesIndex({
 
     return (
         <>
-            <Head title="Despesas recorrentes" />
+            <Head
+                title={
+                    scope === 'household'
+                        ? 'Despesas recorrentes da casa'
+                        : 'Contas pessoais recorrentes'
+                }
+            />
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <PageHeader
-                    title="Despesas recorrentes"
-                    description="Cadastre uma vez e o sistema gera cada mês com valor e pagamento independentes."
+                    title={
+                        scope === 'household'
+                            ? 'Despesas da casa'
+                            : 'Contas pessoais'
+                    }
+                    description="Contas que se repetem: cadastre uma vez e o sistema gera cada mês com valor e pagamento independentes."
                 >
                     <RecurringFormDialog
                         kind="fixed"
+                        scope={scope}
                         currentMonth={currentMonth}
                         trigger={
                             <Button>
@@ -121,6 +136,7 @@ export default function RecurringExpensesIndex({
                     />
                     <RecurringFormDialog
                         kind="temporary"
+                        scope={scope}
                         currentMonth={currentMonth}
                         trigger={
                             <Button variant="outline">
@@ -130,6 +146,8 @@ export default function RecurringExpensesIndex({
                         }
                     />
                 </PageHeader>
+
+                <ExpenseTabs scope={scope} current="recurring" />
 
                 <Alert>
                     <Info />
@@ -153,11 +171,9 @@ export default function RecurringExpensesIndex({
                         {tabs.map((tab) => (
                             <Link
                                 key={tab.label}
-                                href={recurringExpenses.index({
-                                    query: {
-                                        kind: tab.kind,
-                                        status: filters.status,
-                                    },
+                                href={recurringPage(scope, {
+                                    kind: tab.kind,
+                                    status: filters.status,
                                 })}
                                 preserveScroll
                                 aria-current={
@@ -188,8 +204,9 @@ export default function RecurringExpensesIndex({
                         ).map(([status, label]) => (
                             <Link
                                 key={status}
-                                href={recurringExpenses.index({
-                                    query: { kind: filters.kind, status },
+                                href={recurringPage(scope, {
+                                    kind: filters.kind,
+                                    status,
                                 })}
                                 preserveScroll
                                 aria-current={
@@ -256,11 +273,6 @@ function TemplateCard({
                                     {template.kind === 'fixed'
                                         ? 'Fixa'
                                         : 'Extra temporária'}
-                                </Badge>
-                                <Badge variant="secondary">
-                                    {template.scope === 'household'
-                                        ? 'Casa'
-                                        : 'Pessoal'}
                                 </Badge>
                                 {!template.is_active && (
                                     <Badge variant="outline">Encerrada</Badge>
@@ -409,11 +421,13 @@ function periodLabel(template: Template): string {
 
 function RecurringFormDialog({
     kind,
+    scope = 'household',
     template,
     currentMonth,
     trigger,
 }: {
     kind: Kind;
+    scope?: Scope;
     template?: Template;
     currentMonth: string;
     trigger: ReactNode;
@@ -469,7 +483,11 @@ function RecurringFormDialog({
                                         name="kind"
                                         value={kind}
                                     />
-                                    <ScopeField error={errors.scope} />
+                                    <input
+                                        type="hidden"
+                                        name="scope"
+                                        value={scope}
+                                    />
                                 </>
                             )}
 
@@ -757,9 +775,7 @@ function EndDialog({
 
 RecurringExpensesIndex.layout = {
     breadcrumbs: [
-        {
-            title: 'Despesas recorrentes',
-            href: recurringExpenses.index(),
-        },
+        { title: 'Despesas da casa', href: expenses.index() },
+        { title: 'Recorrentes', href: expenses.recurring() },
     ],
 };

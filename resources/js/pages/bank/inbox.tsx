@@ -42,6 +42,7 @@ import {
     formatMonth,
     formatShortDate,
 } from '@/lib/format';
+import { expensesPage } from '@/lib/expense-pages';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
@@ -607,9 +608,7 @@ function Destination({ transaction }: { transaction: BankTransaction }) {
                     <span key={month}>
                         {index > 0 && ', '}
                         <Link
-                            href={expenses.index({
-                                query: { month, scope: 'household' },
-                            })}
+                            href={expenses.index({ query: { month } })}
                             className="font-medium underline underline-offset-4"
                         >
                             {formatMonth(month)}
@@ -645,11 +644,8 @@ function ExpenseDestination({ expense }: { expense: BankDestinationExpense }) {
         <>
             {' · '}
             <Link
-                href={expenses.index({
-                    query: {
-                        month: expense.billing_month,
-                        scope: expense.scope,
-                    },
+                href={expensesPage(expense.scope, {
+                    month: expense.billing_month,
                 })}
                 className="font-medium underline underline-offset-4"
             >

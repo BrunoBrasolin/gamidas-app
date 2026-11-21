@@ -12,7 +12,6 @@ import {
     LayoutGrid,
     LibraryBig,
     Receipt,
-    Repeat,
     Sheet,
     SlidersHorizontal,
     Tags,
@@ -29,7 +28,6 @@ import expenses from '@/routes/expenses';
 import games from '@/routes/games';
 import knowledge from '@/routes/knowledge';
 import personal from '@/routes/personal';
-import recurringExpenses from '@/routes/recurring-expenses';
 import reports from '@/routes/reports';
 import roulette from '@/routes/roulette';
 import shows from '@/routes/shows';
@@ -67,14 +65,11 @@ export const navGroups: NavGroup[] = [
         label: 'Finanças',
         items: [
             {
+                // The monthly listing and its "Recorrentes" tab.
                 title: 'Despesas da casa',
                 href: expenses.index(),
                 icon: Receipt,
-            },
-            {
-                title: 'Despesas recorrentes',
-                href: recurringExpenses.index(),
-                icon: Repeat,
+                activePrefix: '/expenses',
             },
             {
                 title: 'Finanças pessoais',
@@ -90,6 +85,12 @@ export const navGroups: NavGroup[] = [
                     {
                         title: 'Despesas',
                         href: personal.transactions.index('expenses'),
+                    },
+                    {
+                        // Bills with due date and payment status, and the
+                        // recurring ones.
+                        title: 'Contas',
+                        href: personal.bills(),
                     },
                     {
                         title: 'Investimentos',

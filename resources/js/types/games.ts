@@ -205,3 +205,43 @@ export type SteamFriendList = {
     private: boolean;
     error: string | null;
 };
+
+export type GameTier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+
+/** A game on one of the user's lists; library data is null when it left the library. */
+export type ListGame = {
+    app_id: number;
+    name: string;
+    /** The game's page, while it is in the library. */
+    game_id: number | null;
+    playtime_minutes: number | null;
+    last_played_at: string | null;
+};
+
+export type BacklogStatus = 'queued' | 'playing' | 'completed';
+
+/** A game on the "para zerar" list. */
+export type BacklogEntry = ListGame & {
+    id: number;
+    status: BacklogStatus;
+    position: number;
+    /** Steam playtime (minutes) when it entered the list. */
+    playtime_at_add: number;
+    /** Steam playtime (minutes) when it was finished. */
+    playtime_at_completion: number | null;
+    added_at: string;
+    started_at: string | null;
+    completed_at: string | null;
+    tier: GameTier | null;
+};
+
+/** Where a game is on the user's lists. */
+export type GameLists = {
+    tier: GameTier | null;
+    backlog: {
+        id: number;
+        status: BacklogStatus;
+        added_at: string;
+        completed_at: string | null;
+    } | null;
+};

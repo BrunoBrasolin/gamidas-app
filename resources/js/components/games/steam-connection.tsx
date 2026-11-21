@@ -132,7 +132,7 @@ export function SteamAccountCard({ account }: { account: SteamAccount }) {
                         </Button>
                     }
                     title="Desconectar a Steam?"
-                    description="A biblioteca, as conquistas e o histórico de tempo de jogo registrado aqui são apagados. Conectar de novo lê a biblioteca outra vez, mas o histórico por dia recomeça do zero."
+                    description="A biblioteca, as conquistas e o histórico de tempo de jogo registrado aqui são apagados; a tier list e a lista para zerar ficam guardadas. Conectar de novo lê a biblioteca outra vez, mas o histórico por dia recomeça do zero."
                     confirmLabel="Desconectar"
                     url={games.steam.destroy.url()}
                 />

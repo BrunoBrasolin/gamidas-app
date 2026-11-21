@@ -15,6 +15,7 @@ use App\Http\Controllers\Finance\PersonalTransactionController;
 use App\Http\Controllers\Finance\RecurringExpenseController;
 use App\Http\Controllers\Finance\ReportController;
 use App\Http\Controllers\Games\GameLibraryController;
+use App\Http\Controllers\Games\GameListsController;
 use App\Http\Controllers\Games\SteamAccountController;
 use App\Http\Controllers\Household\MemberController;
 use App\Http\Controllers\Household\SalaryController;
@@ -198,15 +199,28 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
     });
 
     // Each user's Steam library: profile, playtime, achievements, stats and
-    // the store page of each game, the wishlist and the friends list.
+    // the store page of each game, the wishlist, the friends list, and the
+    // user's tier list and "para zerar" list of their games.
     // Everything belongs to the user who connected the account; the
     // scheduled steam:sync keeps it fresh.
     Route::prefix('games')->name('games.')->group(function () {
         Route::get('/', [GameLibraryController::class, 'index'])->name('index');
+        Route::get('backlog', [GameListsController::class, 'backlog'])->name('backlog');
+        Route::get('tiers', [GameListsController::class, 'tiers'])->name('tiers');
         Route::get('wishlist', [GameLibraryController::class, 'wishlist'])->name('wishlist');
         Route::get('friends', [GameLibraryController::class, 'friends'])->name('friends');
         Route::get('steam/callback', [SteamAccountController::class, 'callback'])->name('steam.callback');
         Route::get('{game}', [GameLibraryController::class, 'show'])->whereNumber('game')->name('show');
+
+        // The tier list and the "para zerar" list save on every move.
+        Route::middleware('throttle:games-writes')->group(function () {
+            Route::put('tiers', [GameListsController::class, 'updateTiers'])->name('tiers.update');
+            Route::put('{game}/tier', [GameListsController::class, 'tier'])->whereNumber('game')->name('tier');
+            Route::post('{game}/backlog', [GameListsController::class, 'addToBacklog'])->whereNumber('game')->name('backlog.store');
+            Route::put('backlog/order', [GameListsController::class, 'orderBacklog'])->name('backlog.order');
+            Route::put('backlog/{entry}', [GameListsController::class, 'updateBacklog'])->whereNumber('entry')->name('backlog.update');
+            Route::delete('backlog/{entry}', [GameListsController::class, 'removeFromBacklog'])->whereNumber('entry')->name('backlog.destroy');
+        });
 
         Route::middleware('throttle:finance-writes')->group(function () {
             Route::get('steam/connect', [SteamAccountController::class, 'redirect'])->name('steam.connect');

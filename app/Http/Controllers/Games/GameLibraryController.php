@@ -6,11 +6,14 @@ use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\SteamPresenter;
 use App\Models\SteamAchievement;
+use App\Models\SteamBacklogEntry;
 use App\Models\SteamGame;
+use App\Models\SteamTierEntry;
 use App\Models\SteamWishlistItem;
 use App\Services\Steam\SteamClient;
 use App\Services\Steam\SteamException;
 use App\Services\Steam\SteamFriends;
+use App\Services\Steam\SteamListsService;
 use App\Services\Steam\SteamStats;
 use App\Services\Steam\SteamStoreDetails;
 use App\Services\Steam\SteamSyncService;
@@ -35,9 +38,10 @@ class GameLibraryController extends Controller
 
     private const TOP_GAMES = 10;
 
-    public function index(Request $request, SteamClient $steam, SteamStats $stats): Response
+    public function index(Request $request, SteamClient $steam, SteamStats $stats, SteamListsService $lists): Response
     {
-        $account = $this->user($request)->steamAccount;
+        $user = $this->user($request);
+        $account = $user->steamAccount;
 
         if ($account === null) {
             return Inertia::render('games/index', [
@@ -64,6 +68,7 @@ class GameLibraryController extends Controller
             'months' => $stats->months($account),
             'days' => $stats->days($account),
             'history_since' => $stats->historySince($account),
+            'tiers' => (object) $lists->tierByApp($user),
         ]);
     }
 
@@ -127,15 +132,27 @@ class GameLibraryController extends Controller
      * the game was played since) come as deferred props, each in its own
      * request.
      */
-    public function show(SteamGame $game, SteamClient $steam, SteamSyncService $sync, SteamStats $stats, SteamStoreDetails $store): Response
+    public function show(Request $request, SteamGame $game, SteamClient $steam, SteamSyncService $sync, SteamStats $stats, SteamStoreDetails $store): Response
     {
         Gate::authorize('view', $game);
 
         $account = $game->account;
+        $userId = $this->user($request)->id;
+        $backlog = SteamBacklogEntry::query()->where('user_id', $userId)->where('app_id', $game->app_id)->first();
+        $tier = SteamTierEntry::query()->where('user_id', $userId)->where('app_id', $game->app_id)->first();
 
         return Inertia::render('games/show', [
             'game' => SteamPresenter::gameDetails($game),
             'months' => $stats->months($account, 12, $game),
+            'lists' => [
+                'tier' => $tier?->tier->value,
+                'backlog' => $backlog === null ? null : [
+                    'id' => $backlog->id,
+                    'status' => $backlog->status->value,
+                    'added_at' => $backlog->added_at->toIso8601String(),
+                    'completed_at' => $backlog->completed_at?->toIso8601String(),
+                ],
+            ],
             'store' => Inertia::defer(fn () => $store->for($game->app_id), 'store'),
             'progress' => Inertia::defer(function () use ($steam, $sync, $account, $game) {
                 $error = null;

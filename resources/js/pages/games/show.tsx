@@ -1,4 +1,4 @@
-import { Deferred, Head } from '@inertiajs/react';
+import { Deferred, Head, Link, router } from '@inertiajs/react';
 import {
     CalendarDays,
     Clock,
@@ -6,8 +6,10 @@ import {
     Eye,
     Gamepad2,
     Globe,
+    ListTodo,
     Lock,
     Monitor,
+    Play,
     Star,
     Tag,
     ThumbsUp,
@@ -35,8 +37,10 @@ import {
 } from '@/lib/format';
 import {
     completion,
+    formatDay,
     formatPlaytime,
     headerUrl,
+    TIERS,
     formatShare,
     formatStat,
     statLabel,
@@ -44,6 +48,9 @@ import {
 import { cn } from '@/lib/utils';
 import games from '@/routes/games';
 import type {
+    BacklogStatus,
+    GameLists,
+    GameTier,
     SteamAchievement,
     SteamGameDetails,
     SteamGameProgress,
@@ -467,6 +474,149 @@ function Achievements({ progress }: { progress: SteamGameProgress }) {
     );
 }
 
+/** The game's tier and its place on the "para zerar" list. */
+function ListsCard({
+    game,
+    lists,
+}: {
+    game: SteamGameDetails;
+    lists: GameLists;
+}) {
+    const backlog = lists.backlog;
+
+    function setTier(tier: GameTier | null) {
+        router.put(games.tier.url(game.id), { tier }, { preserveScroll: true });
+    }
+
+    function setStatus(status: BacklogStatus) {
+        if (backlog) {
+            router.put(
+                games.backlog.update.url(backlog.id),
+                { status },
+                { preserveScroll: true },
+            );
+        }
+    }
+
+    return (
+        <Card className="py-4">
+            <CardContent className="flex flex-col gap-4 px-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Tier</span>
+                    <div
+                        className="flex flex-wrap gap-1"
+                        role="group"
+                        aria-label="Tier"
+                    >
+                        {TIERS.map(({ tier, className }) => (
+                            <button
+                                key={tier}
+                                type="button"
+                                aria-pressed={lists.tier === tier}
+                                onClick={() =>
+                                    setTier(lists.tier === tier ? null : tier)
+                                }
+                                className={cn(
+                                    'size-8 rounded-md text-sm font-bold transition-opacity',
+                                    className,
+                                    lists.tier === null || lists.tier === tier
+                                        ? 'opacity-100'
+                                        : 'opacity-40 hover:opacity-80',
+                                    lists.tier === tier &&
+                                        'ring-2 ring-foreground ring-offset-1 ring-offset-background',
+                                )}
+                            >
+                                {tier}
+                            </button>
+                        ))}
+                    </div>
+                    <Link
+                        href={games.tiers()}
+                        className="text-xs text-muted-foreground hover:underline"
+                    >
+                        Ver tier list
+                    </Link>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                    {backlog === null ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                router.post(
+                                    games.backlog.store.url(game.id),
+                                    {},
+                                    { preserveScroll: true },
+                                )
+                            }
+                        >
+                            <ListTodo />
+                            Quero zerar
+                        </Button>
+                    ) : (
+                        <>
+                            <Link
+                                href={games.backlog()}
+                                className="text-sm text-muted-foreground hover:underline"
+                            >
+                                {backlog.status === 'completed' &&
+                                backlog.completed_at
+                                    ? `Zerado em ${formatDay(backlog.completed_at)}`
+                                    : backlog.status === 'playing'
+                                      ? 'Jogando para zerar'
+                                      : 'Na fila para zerar'}
+                            </Link>
+                            {backlog.status === 'queued' && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setStatus('playing')}
+                                >
+                                    <Play />
+                                    Comecei
+                                </Button>
+                            )}
+                            {backlog.status === 'playing' && (
+                                <Button
+                                    size="sm"
+                                    onClick={() => setStatus('completed')}
+                                >
+                                    <Trophy />
+                                    Zerei
+                                </Button>
+                            )}
+                            {backlog.status === 'completed' && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setStatus('queued')}
+                                >
+                                    Jogar de novo
+                                </Button>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                    router.delete(
+                                        games.backlog.destroy.url(backlog.id),
+                                        {
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
+                            >
+                                Tirar da lista
+                            </Button>
+                        </>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 /** Placeholder lines while something loads. */
 function Lines({ count, className }: { count: number; className?: string }) {
     return (
@@ -487,11 +637,13 @@ function Lines({ count, className }: { count: number; className?: string }) {
 export default function GameShow({
     game,
     months,
+    lists,
     store,
     progress,
 }: {
     game: SteamGameDetails;
     months: SteamMonth[];
+    lists: GameLists;
     /** Deferred: undefined until loaded, null when the store has nothing. */
     store?: SteamStoreDetails | null;
     /** Deferred. */
@@ -612,6 +764,8 @@ export default function GameShow({
                         </div>
                     </div>
                 </div>
+
+                <ListsCard game={game} lists={lists} />
 
                 <Playtime game={game} months={months} />
 

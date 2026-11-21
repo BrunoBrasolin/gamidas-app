@@ -4,9 +4,11 @@ namespace App\Http\Presenters;
 
 use App\Models\SteamAccount;
 use App\Models\SteamAchievement;
+use App\Models\SteamBacklogEntry;
 use App\Models\SteamGame;
 use App\Models\SteamWishlistItem;
 use App\Services\Steam\SteamClient;
+use App\Services\Steam\SteamListsService;
 use App\Services\Steam\SteamStats;
 use Carbon\CarbonImmutable;
 
@@ -14,6 +16,7 @@ use Carbon\CarbonImmutable;
  * Shapes Steam records for the frontend (resources/js/types/games.ts).
  *
  * @phpstan-import-type LibraryRow from SteamStats
+ * @phpstan-import-type ListGame from SteamListsService
  */
 class SteamPresenter
 {
@@ -144,6 +147,26 @@ class SteamPresenter
             'global_percent_bp' => $achievement->global_percent_bp,
             'achieved' => $achievement->achieved,
             'unlocked_at' => $achievement->unlocked_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param  ListGame  $game
+     * @return array<string, mixed>
+     */
+    public static function backlogEntry(SteamBacklogEntry $entry, array $game, ?string $tier): array
+    {
+        return [
+            ...$game,
+            'id' => $entry->id,
+            'status' => $entry->status->value,
+            'position' => $entry->position,
+            'playtime_at_add' => $entry->playtime_at_add,
+            'playtime_at_completion' => $entry->playtime_at_completion,
+            'added_at' => $entry->added_at->toIso8601String(),
+            'started_at' => $entry->started_at?->toIso8601String(),
+            'completed_at' => $entry->completed_at?->toIso8601String(),
+            'tier' => $tier,
         ];
     }
 }

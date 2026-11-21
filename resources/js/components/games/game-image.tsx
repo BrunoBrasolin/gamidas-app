@@ -23,12 +23,16 @@ export function GameImage({
         return (
             <div
                 className={cn(
-                    'flex flex-col items-center justify-center gap-2 bg-muted p-3 text-center text-muted-foreground',
+                    // overflow-hidden keeps the box at its aspect ratio even
+                    // when the name does not fit (small thumbnails).
+                    'flex flex-col items-center justify-center gap-1 overflow-hidden bg-muted p-1.5 text-center text-muted-foreground',
                     className,
                 )}
             >
-                <Gamepad2 className="size-6 shrink-0" aria-hidden />
-                <span className="line-clamp-3 text-xs font-medium">{name}</span>
+                <Gamepad2 className="size-5 shrink-0" aria-hidden />
+                <span className="line-clamp-3 text-[11px] leading-tight font-medium">
+                    {name}
+                </span>
             </div>
         );
     }

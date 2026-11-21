@@ -16,6 +16,7 @@ import { StatCard } from '@/components/finance/stat-card';
 import { BarChart, MeterRow } from '@/components/games/bar-chart';
 import { GameImage } from '@/components/games/game-image';
 import { GamesTabs } from '@/components/games/games-tabs';
+import { TierBadge } from '@/components/games/tier-badge';
 import {
     SteamAccountCard,
     SteamConnectCard,
@@ -54,6 +55,7 @@ import { weekday } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import games from '@/routes/games';
 import type {
+    GameTier,
     SteamAccount,
     SteamBans,
     SteamDay,
@@ -390,18 +392,26 @@ function TopAndPlatforms({
     );
 }
 
-function GameTile({ game }: { game: SteamGame }) {
+function GameTile({ game, tier }: { game: SteamGame; tier: GameTier | null }) {
     return (
         <Link
             href={games.show(game.id)}
             className="group block space-y-1.5"
             title={game.name}
         >
-            <GameImage
-                urls={[coverUrl(game.app_id), headerUrl(game.app_id)]}
-                name={game.name}
-                className="aspect-[2/3] w-full rounded-lg border transition-transform group-hover:-translate-y-0.5 group-hover:shadow-md"
-            />
+            <div className="relative transition-transform group-hover:-translate-y-0.5">
+                <GameImage
+                    urls={[coverUrl(game.app_id), headerUrl(game.app_id)]}
+                    name={game.name}
+                    className="aspect-[2/3] w-full rounded-lg border group-hover:shadow-md"
+                />
+                {tier && (
+                    <TierBadge
+                        tier={tier}
+                        className="absolute top-1.5 left-1.5"
+                    />
+                )}
+            </div>
             <p className="truncate text-sm font-medium group-hover:underline">
                 {game.name}
             </p>
@@ -414,7 +424,13 @@ function GameTile({ game }: { game: SteamGame }) {
     );
 }
 
-function LibraryGrid({ games: library }: { games: SteamGame[] }) {
+function LibraryGrid({
+    games: library,
+    tiers,
+}: {
+    games: SteamGame[];
+    tiers: Partial<Record<number, GameTier>>;
+}) {
     const [query, setQuery] = useState('');
     const [filter, setFilter] = useState<Filter>('all');
     const [sort, setSort] = useState<Sort>('playtime');
@@ -529,7 +545,10 @@ function LibraryGrid({ games: library }: { games: SteamGame[] }) {
                     <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 2xl:grid-cols-8">
                         {shown.slice(0, visible).map((game) => (
                             <li key={game.id} className="min-w-0">
-                                <GameTile game={game} />
+                                <GameTile
+                                    game={game}
+                                    tier={tiers[game.app_id] ?? null}
+                                />
                             </li>
                         ))}
                     </ul>
@@ -557,6 +576,7 @@ type ConnectedProps = {
     months: SteamMonth[];
     days: SteamDay[];
     history_since: string | null;
+    tiers: Partial<Record<number, GameTier>>;
 };
 
 export default function GamesIndex({
@@ -600,6 +620,7 @@ export default function GamesIndex({
         months = [],
         days = [],
         history_since: historySince = null,
+        tiers = {},
     } = props;
 
     return (
@@ -696,7 +717,7 @@ export default function GamesIndex({
                             <TopAndPlatforms top={top} summary={summary} />
                         )}
 
-                        <LibraryGrid games={library} />
+                        <LibraryGrid games={library} tiers={tiers} />
                     </>
                 )}
 

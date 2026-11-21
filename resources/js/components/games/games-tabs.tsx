@@ -1,11 +1,13 @@
 import { Link } from '@inertiajs/react';
-import { Gift, Library, Users } from 'lucide-react';
+import { Crown, Gift, Library, ListTodo, Users } from 'lucide-react';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn } from '@/lib/utils';
 import games from '@/routes/games';
 
 const TABS = [
     { title: 'Biblioteca', href: games.index(), icon: Library },
+    { title: 'Para zerar', href: games.backlog(), icon: ListTodo },
+    { title: 'Tier list', href: games.tiers(), icon: Crown },
     { title: 'Lista de desejos', href: games.wishlist(), icon: Gift },
     { title: 'Amigos', href: games.friends(), icon: Users },
 ];

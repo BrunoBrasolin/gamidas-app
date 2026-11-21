@@ -481,7 +481,11 @@ function PlayersCard({ players }: { players: AttentionPlayerReport[] }) {
     );
 }
 
-/** Follows the players live; rendered only while the room is open. */
+/**
+ * Follows the players live; rendered only while the room is open. Each refresh
+ * is an authenticated page request (a database connection the hosting plan
+ * counts), so it is slow; the projector screen has the fast, cached numbers.
+ */
 function LiveUpdates() {
     usePoll(30_000, { only: ['game', 'summary', 'types', 'players'] });
 

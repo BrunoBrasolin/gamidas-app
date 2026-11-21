@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Games;
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Games\ConnectSteamRequest;
-use App\Jobs\SyncSteamAchievements;
 use App\Models\SteamAccount;
 use App\Models\User;
 use App\Services\Steam\SteamClient;
@@ -119,8 +118,6 @@ class SteamAccountController extends Controller
             return back();
         }
 
-        SyncSteamAchievements::dispatchAfterResponse($account->id);
-
         $account->sync_error === null
             ? $this->toast('Steam sincronizada.')
             : $this->toast('Perfil atualizado, mas a biblioteca não.', 'warning', $account->sync_error);
@@ -158,10 +155,8 @@ class SteamAccountController extends Controller
             return to_route('games.index');
         }
 
-        SyncSteamAchievements::dispatchAfterResponse($account->id);
-
         $account->sync_error === null
-            ? $this->toast('Steam conectada.', 'success', 'As conquistas dos jogos chegam aos poucos nas próximas sincronizações.')
+            ? $this->toast('Steam conectada.')
             : $this->toast('Steam conectada, mas a biblioteca é privada.', 'warning', $account->sync_error);
 
         return to_route('games.index');

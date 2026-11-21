@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Deferred, Head } from '@inertiajs/react';
 import {
     CalendarDays,
     Clock,
@@ -16,9 +16,9 @@ import {
 import { useState } from 'react';
 import { BarChart, MeterRow } from '@/components/games/bar-chart';
 import { GameImage } from '@/components/games/game-image';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
     Card,
     CardContent,
@@ -36,6 +36,7 @@ import {
 import {
     completion,
     formatPlaytime,
+    headerUrl,
     formatShare,
     formatStat,
     statLabel,
@@ -45,6 +46,7 @@ import games from '@/routes/games';
 import type {
     SteamAchievement,
     SteamGameDetails,
+    SteamGameProgress,
     SteamGameStat,
     SteamMonth,
     SteamStoreDetails,
@@ -354,18 +356,15 @@ function AchievementRow({ achievement }: { achievement: SteamAchievement }) {
     );
 }
 
-function Achievements({
-    game,
-    achievements,
-    error,
-}: {
-    game: SteamGameDetails;
-    achievements: SteamAchievement[];
-    error: string | null;
-}) {
+/**
+ * The achievements, folded into one line with the progress; the list opens
+ * on demand.
+ */
+function Achievements({ progress }: { progress: SteamGameProgress }) {
+    const [open, setOpen] = useState(false);
     const [filter, setFilter] = useState<AchievementFilter>('all');
-    const percent = completion(game);
-    const shown = achievements.filter((achievement) =>
+    const percent = completion(progress);
+    const shown = progress.achievements.filter((achievement) =>
         filter === 'all'
             ? true
             : filter === 'unlocked'
@@ -373,109 +372,130 @@ function Achievements({
               : !achievement.achieved,
     );
 
-    if (achievements.length === 0) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Conquistas</CardTitle>
-                    <CardDescription>
-                        {error ??
-                            (game.achievements_synced_at
-                                ? 'Este jogo não tem conquistas na Steam.'
-                                : 'As conquistas deste jogo ainda não foram buscadas.')}
-                    </CardDescription>
-                </CardHeader>
-            </Card>
-        );
+    if (progress.achievements.length === 0) {
+        return progress.error ? (
+            <p className="text-sm text-muted-foreground">
+                Conquistas: {progress.error}
+            </p>
+        ) : null;
     }
 
     return (
-        <section className="space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="space-y-1.5">
-                    <h2 className="flex items-center gap-2 font-semibold">
-                        <Trophy className="size-4" aria-hidden />
-                        Conquistas
-                        <span className="text-sm font-normal text-muted-foreground">
-                            {game.achievements_unlocked} de{' '}
-                            {game.achievements_total}
+        <Card className="py-4">
+            <CardContent className="space-y-4 px-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <Trophy
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden
+                        />
+                        <span className="text-sm">
+                            Conquistas: {progress.achievements_unlocked} de{' '}
+                            {progress.achievements_total}
                             {percent !== null && ` (${Math.floor(percent)}%)`}
                         </span>
-                    </h2>
-                    {percent !== null && (
-                        <div
-                            className="h-2 w-64 max-w-full overflow-hidden rounded-full bg-muted"
-                            role="progressbar"
-                            aria-label="Conquistas desbloqueadas"
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={Math.floor(percent)}
-                        >
+                        {percent !== null && (
                             <div
-                                className={cn(
-                                    'h-full rounded-full',
-                                    percent >= 100
-                                        ? 'bg-amber-500'
-                                        : 'bg-primary',
-                                )}
-                                style={{ width: `${percent}%` }}
-                            />
-                        </div>
-                    )}
+                                className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-muted sm:block"
+                                role="progressbar"
+                                aria-label="Conquistas desbloqueadas"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.floor(percent)}
+                            >
+                                <div
+                                    className="h-full rounded-full bg-primary"
+                                    style={{ width: `${percent}%` }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setOpen(!open)}
+                        aria-expanded={open}
+                    >
+                        {open ? 'Esconder' : 'Ver conquistas'}
+                    </Button>
                 </div>
-                <ToggleGroup
-                    type="single"
-                    variant="outline"
-                    value={filter}
-                    onValueChange={(value) =>
-                        value && setFilter(value as AchievementFilter)
-                    }
-                    aria-label="Filtrar conquistas"
-                >
-                    <ToggleGroupItem value="all">Todas</ToggleGroupItem>
-                    <ToggleGroupItem value="unlocked">
-                        Desbloqueadas
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="locked">Bloqueadas</ToggleGroupItem>
-                </ToggleGroup>
-            </div>
-            {error && (
-                <Alert>
-                    <AlertDescription>
-                        Mostrando o que foi buscado antes: {error}
-                    </AlertDescription>
-                </Alert>
-            )}
-            {shown.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    Nenhuma conquista aqui.
-                </p>
-            ) : (
-                <ul className="grid gap-2 lg:grid-cols-2">
-                    {shown.map((achievement) => (
-                        <AchievementRow
-                            key={achievement.id}
-                            achievement={achievement}
-                        />
-                    ))}
-                </ul>
-            )}
-        </section>
+
+                {open && (
+                    <>
+                        <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
+                            value={filter}
+                            onValueChange={(value) =>
+                                value && setFilter(value as AchievementFilter)
+                            }
+                            aria-label="Filtrar conquistas"
+                        >
+                            <ToggleGroupItem value="all">Todas</ToggleGroupItem>
+                            <ToggleGroupItem value="unlocked">
+                                Desbloqueadas
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="locked">
+                                Bloqueadas
+                            </ToggleGroupItem>
+                        </ToggleGroup>
+                        {progress.error && (
+                            <p className="text-xs text-muted-foreground">
+                                Mostrando o que foi buscado antes:{' '}
+                                {progress.error}
+                            </p>
+                        )}
+                        {shown.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                Nenhuma conquista aqui.
+                            </p>
+                        ) : (
+                            <ul className="grid gap-2 lg:grid-cols-2">
+                                {shown.map((achievement) => (
+                                    <AchievementRow
+                                        key={achievement.id}
+                                        achievement={achievement}
+                                    />
+                                ))}
+                            </ul>
+                        )}
+                    </>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+/** Placeholder lines while something loads. */
+function Lines({ count, className }: { count: number; className?: string }) {
+    return (
+        <div className={cn('space-y-2', className)} aria-hidden>
+            {Array.from({ length: count }, (_, index) => (
+                <Skeleton
+                    key={index}
+                    className={cn(
+                        'h-4',
+                        index === count - 1 ? 'w-2/3' : 'w-full',
+                    )}
+                />
+            ))}
+        </div>
     );
 }
 
 export default function GameShow({
     game,
-    achievements,
-    achievements_error: achievementsError,
     months,
     store,
+    progress,
 }: {
     game: SteamGameDetails;
-    achievements: SteamAchievement[];
-    achievements_error: string | null;
     months: SteamMonth[];
-    store: SteamStoreDetails | null;
+    /** Deferred: undefined until loaded, null when the store has nothing. */
+    store?: SteamStoreDetails | null;
+    /** Deferred. */
+    progress?: SteamGameProgress;
 }) {
     return (
         <>
@@ -494,15 +514,15 @@ export default function GameShow({
                     )}
                     <div className="relative flex flex-col gap-5 p-4 sm:p-6 lg:flex-row">
                         <GameImage
+                            key={store?.header_url ?? 'cdn'}
                             urls={[
                                 store?.header_url ?? null,
-                                game.header_url,
-                                game.icon_url,
+                                headerUrl(game.app_id),
                             ]}
                             name={game.name}
                             className="aspect-[460/215] w-full shrink-0 self-start rounded-lg border shadow-sm sm:w-96"
                         />
-                        <div className="min-w-0 space-y-3">
+                        <div className="min-w-0 flex-1 space-y-3">
                             <div className="space-y-1">
                                 <p className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                     <Gamepad2
@@ -527,32 +547,37 @@ export default function GameShow({
                                         ? formatPlaytime(game.playtime_minutes)
                                         : 'Nunca jogado'}
                                 </Fact>
-                                {game.achievements_total !== null &&
-                                    game.achievements_total > 0 && (
-                                        <Fact icon={Trophy}>
-                                            {game.achievements_unlocked}/
-                                            {game.achievements_total} conquistas
-                                        </Fact>
-                                    )}
                             </p>
 
-                            {store && store.genres.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    {store.genres.map((genre) => (
-                                        <Badge key={genre} variant="secondary">
-                                            {genre}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            )}
-
-                            {store?.description && (
-                                <p className="max-w-3xl text-sm leading-relaxed">
-                                    {store.description}
-                                </p>
-                            )}
-
-                            {store && <StoreFacts store={store} />}
+                            <Deferred
+                                data="store"
+                                fallback={
+                                    <Lines count={4} className="max-w-xl" />
+                                }
+                            >
+                                {store && (
+                                    <>
+                                        {store.genres.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {store.genres.map((genre) => (
+                                                    <Badge
+                                                        key={genre}
+                                                        variant="secondary"
+                                                    >
+                                                        {genre}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {store.description && (
+                                            <p className="max-w-3xl text-sm leading-relaxed">
+                                                {store.description}
+                                            </p>
+                                        )}
+                                        <StoreFacts store={store} />
+                                    </>
+                                )}
+                            </Deferred>
 
                             <div className="flex flex-wrap gap-2">
                                 <Button variant="outline" size="sm" asChild>
@@ -590,13 +615,19 @@ export default function GameShow({
 
                 <Playtime game={game} months={months} />
 
-                <Achievements
-                    game={game}
-                    achievements={achievements}
-                    error={achievementsError}
-                />
-
-                {game.stats.length > 0 && <GameStats stats={game.stats} />}
+                <Deferred
+                    data="progress"
+                    fallback={<Skeleton className="h-16 w-full rounded-xl" />}
+                >
+                    {progress && (
+                        <>
+                            {progress.stats.length > 0 && (
+                                <GameStats stats={progress.stats} />
+                            )}
+                            <Achievements progress={progress} />
+                        </>
+                    )}
+                </Deferred>
 
                 {store && store.categories.length > 0 && (
                     <section className="space-y-2">

@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Award,
+    CalendarClock,
     Clock,
     Gamepad2,
     Library,
@@ -38,15 +38,14 @@ import {
     formatDate,
     formatDateTime,
     formatMonth,
-    formatPercent,
     formatShortDate,
     formatShortMonth,
 } from '@/lib/format';
 import {
-    completion,
+    coverUrl,
     formatDay,
     formatPlaytime,
-    formatShare,
+    headerUrl,
     normalize,
     personaStatus,
     yearsSince,
@@ -56,7 +55,6 @@ import { cn } from '@/lib/utils';
 import games from '@/routes/games';
 import type {
     SteamAccount,
-    SteamAchievement,
     SteamBans,
     SteamDay,
     SteamGame,
@@ -66,22 +64,19 @@ import type {
 
 const PAGE_SIZE = 48;
 
-type Filter = 'all' | 'played' | 'unplayed' | 'achievements' | 'perfect';
-type Sort = 'playtime' | 'recent' | 'name' | 'completion';
+type Filter = 'all' | 'played' | 'unplayed';
+type Sort = 'playtime' | 'recent' | 'name';
 
 const FILTERS: Record<Filter, string> = {
     all: 'Todos',
     played: 'Jogados',
     unplayed: 'Nunca jogados',
-    achievements: 'Com conquistas',
-    perfect: '100% das conquistas',
 };
 
 const SORTS: Record<Sort, string> = {
     playtime: 'Mais jogados',
     recent: 'Jogados por último',
     name: 'Nome',
-    completion: 'Conquistas (%)',
 };
 
 /** VAC, game, community and trade bans, or that there are none. */
@@ -237,7 +232,7 @@ function RecentlyPlayed({ games: recent }: { games: SteamGame[] }) {
                             className="group block overflow-hidden rounded-xl border bg-card transition-colors hover:border-primary/50"
                         >
                             <GameImage
-                                urls={[game.header_url, game.icon_url]}
+                                urls={[headerUrl(game.app_id)]}
                                 name={game.name}
                                 className="aspect-[460/215] w-full"
                             />
@@ -395,70 +390,7 @@ function TopAndPlatforms({
     );
 }
 
-function RecentAchievements({
-    achievements,
-}: {
-    achievements: SteamAchievement[];
-}) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Conquistas recentes</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <ul className="grid gap-3 md:grid-cols-2">
-                    {achievements.map((achievement) => (
-                        <li
-                            key={achievement.id}
-                            className="flex items-center gap-3"
-                        >
-                            {achievement.icon_url ? (
-                                <img
-                                    src={achievement.icon_url}
-                                    alt=""
-                                    loading="lazy"
-                                    className="size-10 shrink-0 rounded-md border"
-                                />
-                            ) : (
-                                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted">
-                                    <Trophy
-                                        className="size-4 text-muted-foreground"
-                                        aria-hidden
-                                    />
-                                </div>
-                            )}
-                            <div className="min-w-0">
-                                <p className="truncate text-sm font-medium">
-                                    {achievement.name}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                    {achievement.game && (
-                                        <Link
-                                            href={games.show(
-                                                achievement.game.id,
-                                            )}
-                                            className="hover:underline"
-                                        >
-                                            {achievement.game.name}
-                                        </Link>
-                                    )}
-                                    {achievement.unlocked_at &&
-                                        ` · ${formatDateTime(achievement.unlocked_at)}`}
-                                    {achievement.global_percent_bp !== null &&
-                                        ` · ${formatShare(achievement.global_percent_bp)} dos jogadores`}
-                                </p>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            </CardContent>
-        </Card>
-    );
-}
-
 function GameTile({ game }: { game: SteamGame }) {
-    const percent = completion(game);
-
     return (
         <Link
             href={games.show(game.id)}
@@ -466,7 +398,7 @@ function GameTile({ game }: { game: SteamGame }) {
             title={game.name}
         >
             <GameImage
-                urls={[game.cover_url, game.header_url, game.icon_url]}
+                urls={[coverUrl(game.app_id), headerUrl(game.app_id)]}
                 name={game.name}
                 className="aspect-[2/3] w-full rounded-lg border transition-transform group-hover:-translate-y-0.5 group-hover:shadow-md"
             />
@@ -477,20 +409,7 @@ function GameTile({ game }: { game: SteamGame }) {
                 {game.playtime_minutes > 0
                     ? formatPlaytime(game.playtime_minutes)
                     : 'Nunca jogado'}
-                {percent !== null &&
-                    ` · ${game.achievements_unlocked}/${game.achievements_total}`}
             </p>
-            {percent !== null && (
-                <div className="h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                        className={cn(
-                            'h-full rounded-full',
-                            percent >= 100 ? 'bg-amber-500' : 'bg-primary',
-                        )}
-                        style={{ width: `${percent}%` }}
-                    />
-                </div>
-            )}
         </Link>
     );
 }
@@ -513,10 +432,6 @@ function LibraryGrid({ games: library }: { games: SteamGame[] }) {
                     return game.playtime_minutes > 0;
                 case 'unplayed':
                     return game.playtime_minutes === 0;
-                case 'achievements':
-                    return (game.achievements_total ?? 0) > 0;
-                case 'perfect':
-                    return completion(game) === 100;
                 default:
                     return true;
             }
@@ -534,11 +449,6 @@ function LibraryGrid({ games: library }: { games: SteamGame[] }) {
                         (b.last_played_at ?? '').localeCompare(
                             a.last_played_at ?? '',
                         ) || byName(a, b)
-                    );
-                case 'completion':
-                    return (
-                        (completion(b) ?? -1) - (completion(a) ?? -1) ||
-                        byName(a, b)
                     );
                 default:
                     return (
@@ -647,7 +557,6 @@ type ConnectedProps = {
     months: SteamMonth[];
     days: SteamDay[];
     history_since: string | null;
-    recent_achievements: SteamAchievement[];
 };
 
 export default function GamesIndex({
@@ -691,7 +600,6 @@ export default function GamesIndex({
         months = [],
         days = [],
         history_since: historySince = null,
-        recent_achievements: recentAchievements = [],
     } = props;
 
     return (
@@ -736,38 +644,30 @@ export default function GamesIndex({
                         <StatCard
                             title="Jogos"
                             value={summary.games.toLocaleString('pt-BR')}
-                            hint={`${summary.played} jogados · ${summary.never_played} nunca jogados`}
+                            hint={`${summary.never_played} nunca ${summary.never_played === 1 ? 'jogado' : 'jogados'}`}
                             icon={Library}
                         />
                         <StatCard
                             title="Tempo de jogo"
                             value={formatPlaytime(summary.playtime_minutes)}
-                            hint={`${formatPlaytime(summary.playtime_2weeks_minutes)} nas últimas 2 semanas`}
+                            hint={`${summary.played} ${summary.played === 1 ? 'jogo jogado' : 'jogos jogados'}`}
                             icon={Clock}
+                        />
+                        <StatCard
+                            title="Últimas 2 semanas"
+                            value={formatPlaytime(
+                                summary.playtime_2weeks_minutes,
+                            )}
+                            hint={`${summary.recent_games} ${summary.recent_games === 1 ? 'jogo' : 'jogos'}`}
+                            icon={CalendarClock}
                         />
                         <StatCard
                             title="Conquistas"
                             value={summary.achievements_unlocked.toLocaleString(
                                 'pt-BR',
                             )}
-                            hint={`de ${summary.achievements_total.toLocaleString('pt-BR')} · ${summary.perfect_games} ${summary.perfect_games === 1 ? 'jogo' : 'jogos'} 100%`}
+                            hint={`${summary.perfect_games} ${summary.perfect_games === 1 ? 'jogo' : 'jogos'} com todas`}
                             icon={Trophy}
-                        />
-                        <StatCard
-                            title="Conclusão média"
-                            value={
-                                summary.average_completion_bp !== null
-                                    ? formatPercent(
-                                          summary.average_completion_bp,
-                                      )
-                                    : '—'
-                            }
-                            hint={
-                                account.pending_achievements > 0
-                                    ? `Buscando conquistas de ${account.pending_achievements} ${account.pending_achievements === 1 ? 'jogo' : 'jogos'}…`
-                                    : 'Nos jogos com alguma conquista'
-                            }
-                            icon={Award}
                         />
                     </div>
                 )}
@@ -794,12 +694,6 @@ export default function GamesIndex({
 
                         {summary && top.length > 0 && (
                             <TopAndPlatforms top={top} summary={summary} />
-                        )}
-
-                        {recentAchievements.length > 0 && (
-                            <RecentAchievements
-                                achievements={recentAchievements}
-                            />
                         )}
 
                         <LibraryGrid games={library} />

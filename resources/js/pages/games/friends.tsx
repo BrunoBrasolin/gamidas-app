@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Deferred, Head, Link } from '@inertiajs/react';
 import { Gamepad2, Search, User, Users, Wifi } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { EmptyState } from '@/components/finance/empty-state';
@@ -9,11 +9,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatDateTime } from '@/lib/format';
 import { formatDay, normalize, personaStatus } from '@/lib/games';
 import { cn } from '@/lib/utils';
 import games from '@/routes/games';
-import type { SteamFriend } from '@/types';
+import type { SteamFriend, SteamFriendList } from '@/types';
 
 /** Playing first, then online, then offline; by name within each. */
 function rank(friend: SteamFriend): number {
@@ -103,15 +104,9 @@ function FriendRow({ friend }: { friend: SteamFriend }) {
     );
 }
 
-export default function GamesFriends({
-    friends,
-    private: isPrivate,
-    error,
-}: {
-    friends: SteamFriend[];
-    private: boolean;
-    error: string | null;
-}) {
+/** The friends with the totals, or why there are none to show. */
+function FriendsList({ list }: { list: SteamFriendList }) {
+    const { friends, private: isPrivate, error } = list;
     const [query, setQuery] = useState('');
 
     const sorted = useMemo(() => {
@@ -157,6 +152,89 @@ export default function GamesFriends({
 
     return (
         <>
+            {error ? (
+                <Alert variant="destructive">
+                    <AlertDescription>
+                        Não foi possível ler os amigos agora: {error}
+                    </AlertDescription>
+                </Alert>
+            ) : isPrivate ? (
+                <EmptyState
+                    icon={Users}
+                    title="Lista de amigos privada"
+                    description='Na Steam, em Perfil › Editar perfil › Configurações de privacidade, deixe "Lista de amigos" como Pública para vê-la aqui.'
+                />
+            ) : friends.length === 0 ? (
+                <EmptyState
+                    icon={Users}
+                    title="Nenhum amigo na Steam"
+                    description="Os amigos da sua conta Steam aparecem aqui."
+                />
+            ) : (
+                <>
+                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                        <StatCard
+                            title="Amigos"
+                            value={friends.length}
+                            icon={Users}
+                        />
+                        <StatCard
+                            title="Online agora"
+                            value={online}
+                            icon={Wifi}
+                        />
+                        <StatCard
+                            title="Jogando agora"
+                            value={playing}
+                            hint={
+                                topGame && topGame[1] > 1
+                                    ? `${topGame[1]} em ${topGame[0]}`
+                                    : undefined
+                            }
+                            icon={Gamepad2}
+                        />
+                    </div>
+
+                    <section className="space-y-4">
+                        <div className="relative max-w-sm">
+                            <Search
+                                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                                aria-hidden
+                            />
+                            <Input
+                                type="search"
+                                placeholder="Buscar amigo ou jogo"
+                                aria-label="Buscar amigo ou jogo"
+                                className="pl-9"
+                                value={query}
+                                onChange={(event) =>
+                                    setQuery(event.target.value)
+                                }
+                            />
+                        </div>
+                        {sorted.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                Ninguém encontrado.
+                            </p>
+                        ) : (
+                            <ul className="grid gap-2 lg:grid-cols-2">
+                                {sorted.map((friend) => (
+                                    <li key={friend.steam_id}>
+                                        <FriendRow friend={friend} />
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+                </>
+            )}
+        </>
+    );
+}
+
+export default function GamesFriends({ list }: { list?: SteamFriendList }) {
+    return (
+        <>
             <Head title="Amigos na Steam" />
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <PageHeader
@@ -166,82 +244,21 @@ export default function GamesFriends({
 
                 <GamesTabs />
 
-                {error ? (
-                    <Alert variant="destructive">
-                        <AlertDescription>
-                            Não foi possível ler os amigos agora: {error}
-                        </AlertDescription>
-                    </Alert>
-                ) : isPrivate ? (
-                    <EmptyState
-                        icon={Users}
-                        title="Lista de amigos privada"
-                        description='Na Steam, em Perfil › Editar perfil › Configurações de privacidade, deixe "Lista de amigos" como Pública para vê-la aqui.'
-                    />
-                ) : friends.length === 0 ? (
-                    <EmptyState
-                        icon={Users}
-                        title="Nenhum amigo na Steam"
-                        description="Os amigos da sua conta Steam aparecem aqui."
-                    />
-                ) : (
-                    <>
-                        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                            <StatCard
-                                title="Amigos"
-                                value={friends.length}
-                                icon={Users}
-                            />
-                            <StatCard
-                                title="Online agora"
-                                value={online}
-                                icon={Wifi}
-                            />
-                            <StatCard
-                                title="Jogando agora"
-                                value={playing}
-                                hint={
-                                    topGame && topGame[1] > 1
-                                        ? `${topGame[1]} em ${topGame[0]}`
-                                        : undefined
-                                }
-                                icon={Gamepad2}
-                            />
+                <Deferred
+                    data="list"
+                    fallback={
+                        <div className="grid gap-2 lg:grid-cols-2" aria-hidden>
+                            {Array.from({ length: 6 }, (_, index) => (
+                                <Skeleton
+                                    key={index}
+                                    className="h-16 rounded-xl"
+                                />
+                            ))}
                         </div>
-
-                        <section className="space-y-4">
-                            <div className="relative max-w-sm">
-                                <Search
-                                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                                    aria-hidden
-                                />
-                                <Input
-                                    type="search"
-                                    placeholder="Buscar amigo ou jogo"
-                                    aria-label="Buscar amigo ou jogo"
-                                    className="pl-9"
-                                    value={query}
-                                    onChange={(event) =>
-                                        setQuery(event.target.value)
-                                    }
-                                />
-                            </div>
-                            {sorted.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    Ninguém encontrado.
-                                </p>
-                            ) : (
-                                <ul className="grid gap-2 lg:grid-cols-2">
-                                    {sorted.map((friend) => (
-                                        <li key={friend.steam_id}>
-                                            <FriendRow friend={friend} />
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </section>
-                    </>
-                )}
+                    }
+                >
+                    {list && <FriendsList list={list} />}
+                </Deferred>
 
                 <p className="border-t pt-4 text-xs text-muted-foreground">
                     Lido da Steam agora (atualiza a cada 5 minutos).{' '}

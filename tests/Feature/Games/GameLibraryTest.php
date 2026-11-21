@@ -52,7 +52,7 @@ class GameLibraryTest extends TestCase
     public function test_the_page_shows_totals_history_and_every_game(): void
     {
         $portal = $this->game([
-            'app_id' => 620, 'name' => 'Portal 2', 'playtime_minutes' => 600, 'playtime_2weeks_minutes' => 90,
+            'app_id' => 620, 'name' => 'Portal 2', 'playtime_minutes' => 600, 'playtime_2weeks_minutes' => 90, 'last_played_at' => '2026-11-19 21:30:00',
             'playtime_windows_minutes' => 500, 'playtime_linux_minutes' => 100, 'playtime_deck_minutes' => 40,
             'achievements_total' => 4, 'achievements_unlocked' => 4, 'achievements_synced_at' => now(), 'achievements_playtime_minutes' => 600, 'stats' => [],
         ]);
@@ -80,7 +80,6 @@ class GameLibraryTest extends TestCase
                 ->where('configured', true)
                 ->where('account.persona_name', 'brunao')
                 ->where('account.level', 12)
-                ->where('account.pending_achievements', 1)
                 ->where('summary.games', 4)
                 ->where('summary.played', 3)
                 ->where('summary.never_played', 1)
@@ -90,13 +89,12 @@ class GameLibraryTest extends TestCase
                 ->where('summary.achievements_unlocked', 5)
                 ->where('summary.achievements_total', 14)
                 ->where('summary.perfect_games', 1)
-                ->where('summary.average_completion_bp', 5_500)
                 ->where('summary.platforms', ['windows' => 500, 'mac' => 0, 'linux' => 100, 'deck' => 40])
                 ->has('games', 4)
-                ->where('games.0.name', 'Counter-Strike 2')
-                ->where('games.0.header_url', 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/730/header.jpg')
+                ->where('games.0', ['id' => $cs->id, 'app_id' => 730, 'name' => 'Counter-Strike 2', 'playtime_minutes' => 1_200, 'playtime_2weeks_minutes' => 0, 'last_played_at' => null])
                 ->where('games.3.name', 'Portal')
                 ->where('recent.0.name', 'Portal 2')
+                ->where('recent.0.last_played_at', '2026-11-19T21:30:00-03:00')
                 ->has('recent', 1)
                 ->where('top.0.name', 'Counter-Strike 2')
                 ->has('top', 3)
@@ -107,10 +105,7 @@ class GameLibraryTest extends TestCase
                 ->has('days', 30)
                 ->where('days.28', ['date' => '2026-11-19', 'minutes' => 120])
                 ->where('history_since', '2025-10-31')
-                ->has('recent_achievements', 2)
-                ->where('recent_achievements.0.name', 'Nova')
-                ->where('recent_achievements.0.game', ['id' => $cs->id, 'name' => 'Counter-Strike 2'])
-                ->where('recent_achievements.0.global_percent_bp', 520));
+                ->missing('recent_achievements'));
 
         Http::assertNothingSent();
     }
@@ -150,37 +145,48 @@ class GameLibraryTest extends TestCase
         $this->actingAs($this->bruno)
             ->get(route('games.show', $game))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('games/show', false)
-                ->where('game.name', 'Portal 2')
-                ->where('game.achievements_total', 2)
-                ->where('game.achievements_unlocked', 1)
-                ->where('game.platforms.linux', 600)
-                ->where('game.store_url', 'https://store.steampowered.com/app/620/')
-                ->where('achievements_error', null)
-                ->has('achievements', 2)
-                ->where('achievements.0.name', 'Bom Dia')
-                ->where('achievements.0.icon_url', 'https://cdn.example.test/w.jpg')
-                ->where('achievements.1.hidden', true)
-                ->where('achievements.1.icon_url', 'https://cdn.example.test/s_gray.jpg')
-                ->where('months.11', ['month' => '2026-11', 'minutes' => 90])
-                ->where('store.description', 'A "Iniciativa de Testes Perpétuos" foi expandida.')
-                ->where('store.website', 'https://www.thinkwithportals.com/')
-                ->where('store.genres', ['Ação', 'Aventura'])
-                ->where('store.categories', ['Um jogador', 'Cooperativo'])
-                ->where('store.metacritic.score', 95)
-                ->where('store.price', 'R$ 33,99')
-                ->where('store.platforms', ['windows', 'linux'])
-                ->where('store.controller_support', 'full')
-                ->where('store.recommendations', 393_265)
-                ->where('store.release_date', '18/abr./2011')
-                ->where('store.screenshots.0.full_url', 'https://cdn.example.test/1.jpg'));
+            ->assertInertia(function (Assert $page) {
+                // The page shows at once, without asking Steam anything.
+                $page->component('games/show', false)
+                    ->where('game.name', 'Portal 2')
+                    ->where('game.platforms.linux', 600)
+                    ->where('game.store_url', 'https://store.steampowered.com/app/620/')
+                    ->where('months.11', ['month' => '2026-11', 'minutes' => 90])
+                    ->missing('store')
+                    ->missing('progress');
+                Http::assertNothingSent();
+
+                $page->loadDeferredProps(fn (Assert $reload) => $reload
+                    ->where('progress.achievements_total', 2)
+                    ->where('progress.achievements_unlocked', 1)
+                    ->where('progress.fetched', true)
+                    ->where('progress.error', null)
+                    ->where('progress.stats', [])
+                    ->has('progress.achievements', 2)
+                    ->where('progress.achievements.0.name', 'Bom Dia')
+                    ->where('progress.achievements.0.icon_url', 'https://cdn.example.test/w.jpg')
+                    ->where('progress.achievements.1.hidden', true)
+                    ->where('progress.achievements.1.icon_url', 'https://cdn.example.test/s_gray.jpg')
+                    ->where('store.description', 'A "Iniciativa de Testes Perpétuos" foi expandida.')
+                    ->where('store.website', 'https://www.thinkwithportals.com/')
+                    ->where('store.genres', ['Ação', 'Aventura'])
+                    ->where('store.categories', ['Um jogador', 'Cooperativo'])
+                    ->where('store.metacritic.score', 95)
+                    ->where('store.price', 'R$ 33,99')
+                    ->where('store.platforms', ['windows', 'linux'])
+                    ->where('store.controller_support', 'full')
+                    ->where('store.recommendations', 393_265)
+                    ->where('store.release_date', '18/abr./2011')
+                    ->where('store.screenshots.0.full_url', 'https://cdn.example.test/1.jpg'));
+            });
 
         Http::assertSent(fn (Request $request) => str_contains($request->url(), 'appdetails') && $request['l'] === 'brazilian' && $request['cc'] === 'br');
 
         // Nothing played since and the store page cached: no new requests.
         $sent = count(Http::recorded());
-        $this->actingAs($this->bruno)->get(route('games.show', $game))->assertOk();
+        $this->actingAs($this->bruno)
+            ->get(route('games.show', $game))
+            ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload->has('progress')->has('store')));
         $this->assertCount($sent, Http::recorded());
     }
 
@@ -192,10 +198,11 @@ class GameLibraryTest extends TestCase
         $this->actingAs($this->bruno)
             ->get(route('games.show', $game))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
+            ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload
                 ->where('store', null)
-                ->where('achievements', [])
-                ->where('achievements_error', fn (string $error) => str_contains($error, 'erro 500')));
+                ->where('progress.achievements', [])
+                ->where('progress.fetched', false)
+                ->where('progress.error', fn (string $error) => str_contains($error, 'erro 500'))));
     }
 
     public function test_a_game_page_shows_the_game_stats(): void
@@ -208,9 +215,12 @@ class GameLibraryTest extends TestCase
 
         $this->actingAs($this->bruno)
             ->get(route('games.show', $game))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('game.stats.0', ['name' => 'total_kills', 'label' => 'Abates', 'value' => 1_234])
-                ->where('game.stats.1.value', 0.25));
+            ->assertInertia(fn (Assert $page) => $page->loadDeferredProps('progress', fn (Assert $reload) => $reload
+                ->where('progress.stats.0', ['name' => 'total_kills', 'label' => 'Abates', 'value' => 1_234])
+                ->where('progress.stats.1.value', 0.25)
+                ->missing('store')));
+
+        Http::assertNothingSent();
     }
 
     public function test_the_wishlist_page_lists_in_the_users_order_with_totals(): void
@@ -256,7 +266,7 @@ class GameLibraryTest extends TestCase
 
     public function test_the_friends_page_reads_steam_and_caches_it_for_a_few_minutes(): void
     {
-        $hades = $this->game(['app_id' => 1145360, 'name' => 'Hades']);
+        $this->game(['app_id' => 1145360, 'name' => 'Hades']);
         $this->steamFriendLists[self::BRUNO_STEAM_ID] = [
             ['steamid' => self::LETICIA_STEAM_ID, 'relationship' => 'friend', 'friend_since' => 1_600_000_000],
             ['steamid' => '76561198000000003', 'relationship' => 'friend', 'friend_since' => 1_500_000_000],
@@ -269,21 +279,28 @@ class GameLibraryTest extends TestCase
         $this->actingAs($this->bruno)
             ->get(route('games.friends'))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('games/friends', false)
-                ->where('private', false)
-                ->where('error', null)
-                ->has('friends', 2)
-                ->where('friends.0.persona_name', 'leti')
-                ->where('friends.0.playing', ['app_id' => 1_145_360, 'name' => 'Hades'])
-                ->where('friends.0.my_game_id', $hades->id)
-                ->where('friends.0.friend_since', '2020-09-13T09:26:40-03:00')
-                ->where('friends.0.avatar_url', 'https://avatars.steamstatic.com/abc_full.jpg')
-                ->where('friends.1.persona_name', 'carlos')
-                ->where('friends.1.my_game_id', null));
+            ->assertInertia(function (Assert $page) {
+                // The tab shows at once; the list comes from Steam right after.
+                $page->component('games/friends', false)->missing('list');
+                Http::assertNothingSent();
+
+                $page->loadDeferredProps(fn (Assert $reload) => $reload
+                    ->where('list.private', false)
+                    ->where('list.error', null)
+                    ->has('list.friends', 2)
+                    ->where('list.friends.0.persona_name', 'leti')
+                    ->where('list.friends.0.playing', ['app_id' => 1_145_360, 'name' => 'Hades'])
+                    ->where('list.friends.0.my_game_id', $this->account->games()->where('app_id', 1_145_360)->value('id'))
+                    ->where('list.friends.0.friend_since', '2020-09-13T09:26:40-03:00')
+                    ->where('list.friends.0.avatar_url', 'https://avatars.steamstatic.com/abc_full.jpg')
+                    ->where('list.friends.1.persona_name', 'carlos')
+                    ->where('list.friends.1.my_game_id', null));
+            });
 
         $sent = count(Http::recorded());
-        $this->actingAs($this->bruno)->get(route('games.friends'))->assertOk();
+        $this->actingAs($this->bruno)
+            ->get(route('games.friends'))
+            ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload->has('list.friends', 2)));
         $this->assertCount($sent, Http::recorded());
 
         Http::assertSent(fn (Request $request) => str_contains($request->url(), 'GetPlayerSummaries')
@@ -296,9 +313,9 @@ class GameLibraryTest extends TestCase
 
         $this->actingAs($this->bruno)
             ->get(route('games.friends'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('private', true)
-                ->where('friends', []));
+            ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload
+                ->where('list.private', true)
+                ->where('list.friends', [])));
     }
 
     public function test_steam_failing_on_the_friends_page_is_explained_and_not_cached(): void
@@ -307,13 +324,25 @@ class GameLibraryTest extends TestCase
 
         $this->actingAs($this->bruno)
             ->get(route('games.friends'))
-            ->assertInertia(fn (Assert $page) => $page->where('error', fn (string $error) => str_contains($error, 'erro 503')));
+            ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload
+                ->where('list.error', fn (string $error) => str_contains($error, 'erro 503'))));
 
         $this->steamApiStatus = null;
 
         $this->actingAs($this->bruno)
             ->get(route('games.friends'))
-            ->assertInertia(fn (Assert $page) => $page->where('error', null));
+            ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload->where('list.error', null)));
+    }
+
+    public function test_a_refused_key_on_the_friends_page_is_not_mistaken_for_a_private_list(): void
+    {
+        $this->steamApiStatus = 403;
+
+        $this->actingAs($this->bruno)
+            ->get(route('games.friends'))
+            ->assertInertia(fn (Assert $page) => $page->loadDeferredProps(fn (Assert $reload) => $reload
+                ->where('list.private', false)
+                ->where('list.error', fn (string $error) => str_contains($error, 'STEAM_API_KEY'))));
     }
 
     public function test_wishlist_and_friends_need_a_connected_account(): void

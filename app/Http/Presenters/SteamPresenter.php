@@ -7,16 +7,20 @@ use App\Models\SteamAchievement;
 use App\Models\SteamGame;
 use App\Models\SteamWishlistItem;
 use App\Services\Steam\SteamClient;
+use App\Services\Steam\SteamStats;
+use Carbon\CarbonImmutable;
 
 /**
  * Shapes Steam records for the frontend (resources/js/types/games.ts).
+ *
+ * @phpstan-import-type LibraryRow from SteamStats
  */
 class SteamPresenter
 {
     /**
      * @return array<string, mixed>
      */
-    public static function account(SteamAccount $account, int $pendingAchievements): array
+    public static function account(SteamAccount $account): array
     {
         return [
             'steam_id' => $account->steam_id,
@@ -48,39 +52,45 @@ class SteamPresenter
             'checked_at' => $account->checked_at?->toIso8601String(),
             'synced_at' => $account->synced_at?->toIso8601String(),
             'sync_error' => $account->sync_error,
-            'pending_achievements' => $pendingAchievements,
         ];
     }
 
     /**
-     * @return array<string, mixed>
+     * A game of the library list. Images are built from the app id on the
+     * page, which keeps a list of thousands of games small.
+     *
+     * @param  LibraryRow  $row
+     * @return array{id: int, app_id: int, name: string, playtime_minutes: int, playtime_2weeks_minutes: int, last_played_at: string|null}
      */
-    public static function game(SteamGame $game): array
+    public static function libraryGame(array $row): array
     {
         return [
-            'id' => $game->id,
-            'app_id' => $game->app_id,
-            'name' => $game->name,
-            'icon_url' => SteamClient::iconUrl($game->app_id, $game->icon_hash),
-            'header_url' => SteamClient::headerUrl($game->app_id),
-            'cover_url' => SteamClient::coverUrl($game->app_id),
-            'playtime_minutes' => $game->playtime_minutes,
-            'playtime_2weeks_minutes' => $game->playtime_2weeks_minutes,
-            'last_played_at' => $game->last_played_at?->toIso8601String(),
-            'achievements_total' => $game->achievements_total,
-            'achievements_unlocked' => $game->achievements_unlocked,
+            'id' => $row['id'],
+            'app_id' => $row['app_id'],
+            'name' => $row['name'],
+            'playtime_minutes' => $row['playtime_minutes'],
+            'playtime_2weeks_minutes' => $row['playtime_2weeks_minutes'],
+            'last_played_at' => $row['last_played_at'] === null
+                ? null
+                : CarbonImmutable::parse($row['last_played_at'], (string) config('app.timezone'))->toIso8601String(),
         ];
     }
 
     /**
-     * A game with everything its page shows.
+     * A game with what its page shows at once (achievements and stats come
+     * later, from Steam if needed).
      *
      * @return array<string, mixed>
      */
     public static function gameDetails(SteamGame $game): array
     {
         return [
-            ...self::game($game),
+            'id' => $game->id,
+            'app_id' => $game->app_id,
+            'name' => $game->name,
+            'playtime_minutes' => $game->playtime_minutes,
+            'playtime_2weeks_minutes' => $game->playtime_2weeks_minutes,
+            'last_played_at' => $game->last_played_at?->toIso8601String(),
             'store_url' => SteamClient::storeUrl($game->app_id),
             'platforms' => [
                 'windows' => $game->playtime_windows_minutes,
@@ -88,10 +98,7 @@ class SteamPresenter
                 'linux' => $game->playtime_linux_minutes,
                 'deck' => $game->playtime_deck_minutes,
             ],
-            'added_at' => $game->added_at->toIso8601String(),
             'removed_at' => $game->removed_at?->toIso8601String(),
-            'achievements_synced_at' => $game->achievements_synced_at?->toIso8601String(),
-            'stats' => $game->stats ?? [],
         ];
     }
 
@@ -126,7 +133,7 @@ class SteamPresenter
     /**
      * @return array<string, mixed>
      */
-    public static function achievement(SteamAchievement $achievement, bool $withGame = false): array
+    public static function achievement(SteamAchievement $achievement): array
     {
         return [
             'id' => $achievement->id,
@@ -137,10 +144,6 @@ class SteamPresenter
             'global_percent_bp' => $achievement->global_percent_bp,
             'achieved' => $achievement->achieved,
             'unlocked_at' => $achievement->unlocked_at?->toIso8601String(),
-            'game' => $withGame ? [
-                'id' => $achievement->game->id,
-                'name' => $achievement->game->name,
-            ] : null,
         ];
     }
 }

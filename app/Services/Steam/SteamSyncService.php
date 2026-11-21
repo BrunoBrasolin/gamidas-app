@@ -153,14 +153,6 @@ class SteamSyncService
     }
 
     /**
-     * How many games still wait for their achievements to be fetched.
-     */
-    public function pendingAchievements(SteamAccount $account): int
-    {
-        return $this->pendingQuery($account)->count();
-    }
-
-    /**
      * Games played whose achievements and stats were never fetched, or were
      * fetched before the game was played again.
      *

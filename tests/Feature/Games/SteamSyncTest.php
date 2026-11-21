@@ -398,7 +398,7 @@ class SteamSyncTest extends TestCase
         // Achievements fetched before stats existed: fetched again.
         $game->update(['stats' => null]);
         $this->assertTrue($game->refresh()->achievementsStale());
-        $this->assertSame(1, app(SteamSyncService::class)->pendingAchievements($this->account));
+        $this->assertSame(1, app(SteamSyncService::class)->syncAchievements($this->account));
     }
 
     public function test_a_game_steam_fails_for_does_not_block_the_others(): void
@@ -452,6 +452,9 @@ class SteamSyncTest extends TestCase
             ->assertRedirect(route('games.index'));
 
         $this->assertSame(1, $this->account->games()->count());
+        // Achievements are left to steam:sync: the button never waits for them.
+        Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'GetSchemaForGame')
+            || str_contains($request->url(), 'GetPlayerAchievements'));
 
         $this->steamApiStatus = 403;
 

@@ -98,7 +98,8 @@ class SteamClient
     {
         $response = $this->request('ISteamUser/GetFriendList/v1/', ['steamid' => $steamId, 'relationship' => 'friend']);
 
-        if (in_array($response->status(), [401, 403], true)) {
+        // A private list answers 401; 403 is a refused key, reported as such.
+        if ($response->status() === 401) {
             return null;
         }
 

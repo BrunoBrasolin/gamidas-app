@@ -1,4 +1,17 @@
-import type { SteamAccount, SteamGame } from '@/types';
+import type { SteamAccount } from '@/types';
+
+const ASSETS =
+    'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps';
+
+/** The 460×215 store header of a game. */
+export function headerUrl(appId: number): string {
+    return `${ASSETS}/${appId}/header.jpg`;
+}
+
+/** The 600×900 library cover (not every game has one). */
+export function coverUrl(appId: number): string {
+    return `${ASSETS}/${appId}/library_600x900.jpg`;
+}
 
 /**
  * Playtime like Steam shows it: "45 min", "1,5 h", "123 h".
@@ -25,7 +38,10 @@ export function formatShare(basisPoints: number): string {
 /**
  * Share of the game's achievements unlocked, 0–100, or null when unknown.
  */
-export function completion(game: SteamGame): number | null {
+export function completion(game: {
+    achievements_total: number | null;
+    achievements_unlocked: number | null;
+}): number | null {
     if (!game.achievements_total || game.achievements_unlocked === null) {
         return null;
     }

@@ -29,8 +29,6 @@ export type SteamAccount = {
     /** ISO timestamp of the last time the library was read. */
     synced_at: string | null;
     sync_error: string | null;
-    /** Games played whose achievements were not fetched yet. */
-    pending_achievements: number;
 };
 
 export type SteamBans = {
@@ -41,22 +39,14 @@ export type SteamBans = {
     trade: boolean;
 };
 
-/** A game of the library; playtime in minutes. */
+/** A game of the library; playtime in minutes. Images come from its app id. */
 export type SteamGame = {
     id: number;
     app_id: number;
     name: string;
-    icon_url: string | null;
-    /** 460×215 store header. */
-    header_url: string;
-    /** 600×900 library cover; not every game has one. */
-    cover_url: string;
     playtime_minutes: number;
     playtime_2weeks_minutes: number;
     last_played_at: string | null;
-    /** Null until the achievements are fetched. */
-    achievements_total: number | null;
-    achievements_unlocked: number | null;
 };
 
 export type SteamPlatformMinutes = {
@@ -66,15 +56,27 @@ export type SteamPlatformMinutes = {
     deck: number;
 };
 
+/** What a game's page shows at once. */
 export type SteamGameDetails = SteamGame & {
     store_url: string;
     platforms: SteamPlatformMinutes;
-    added_at: string;
     /** When the game left the library (refunded or removed). */
     removed_at: string | null;
-    achievements_synced_at: string | null;
-    /** The game's own stats, as the game names them. */
+};
+
+/**
+ * A game's achievements and stats, loaded after the page (fetched from
+ * Steam when they are out of date).
+ */
+export type SteamGameProgress = {
+    achievements_total: number | null;
+    achievements_unlocked: number | null;
+    /** Whether they were ever fetched. */
+    fetched: boolean;
+    achievements: SteamAchievement[];
     stats: SteamGameStat[];
+    /** Why Steam could not be asked now (what is shown was stored before). */
+    error: string | null;
 };
 
 export type SteamGameStat = {
@@ -148,8 +150,6 @@ export type SteamAchievement = {
     global_percent_bp: number | null;
     achieved: boolean;
     unlocked_at: string | null;
-    /** Only in lists that mix games. */
-    game: { id: number; name: string } | null;
 };
 
 export type SteamSummary = {
@@ -162,8 +162,6 @@ export type SteamSummary = {
     achievements_unlocked: number;
     achievements_total: number;
     perfect_games: number;
-    /** Average completion of games with an achievement unlocked, in basis points. */
-    average_completion_bp: number | null;
     platforms: SteamPlatformMinutes;
 };
 
@@ -198,4 +196,12 @@ export type SteamStoreDetails = {
     recommendations: number | null;
     screenshots: SteamScreenshot[];
     store_url: string;
+};
+
+/** The friends list as Steam gave it. */
+export type SteamFriendList = {
+    friends: SteamFriend[];
+    /** The friends list is private on Steam. */
+    private: boolean;
+    error: string | null;
 };

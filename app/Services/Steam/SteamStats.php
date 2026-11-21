@@ -3,7 +3,6 @@
 namespace App\Services\Steam;
 
 use App\Models\SteamAccount;
-use App\Models\SteamAchievement;
 use App\Models\SteamGame;
 use App\Models\SteamPlaytimeDay;
 use App\Models\SteamWishlistItem;
@@ -13,24 +12,62 @@ use Illuminate\Support\Facades\Date;
 
 /**
  * Totals and history of a Steam library for its page: games played and
- * never played, playtime (total, last two weeks, per platform), achievement
- * completion, and the minutes played per month and day recorded by the
- * syncs.
+ * never played, playtime (total, last two weeks, per platform), achievements
+ * unlocked, the minutes played per month and day recorded by the syncs, and
+ * the wishlist's totals.
  *
- * @phpstan-type Summary array{games: int, played: int, never_played: int, playtime_minutes: int, playtime_2weeks_minutes: int, recent_games: int, achievements_unlocked: int, achievements_total: int, perfect_games: int, average_completion_bp: int|null, platforms: array{windows: int, mac: int, linux: int, deck: int}}
+ * @phpstan-type LibraryRow array{id: int, app_id: int, name: string, playtime_minutes: int, playtime_2weeks_minutes: int, playtime_windows_minutes: int, playtime_mac_minutes: int, playtime_linux_minutes: int, playtime_deck_minutes: int, last_played_at: string|null, achievements_total: int|null, achievements_unlocked: int|null}
+ * @phpstan-type Summary array{games: int, played: int, never_played: int, playtime_minutes: int, playtime_2weeks_minutes: int, recent_games: int, achievements_unlocked: int, achievements_total: int, perfect_games: int, platforms: array{windows: int, mac: int, linux: int, deck: int}}
  */
 class SteamStats
 {
     /**
-     * @param  Collection<int, SteamGame>  $games  The games in the library.
+     * The games in the library, most played first, read as plain rows
+     * (no Eloquent models): a library can have thousands of games.
+     *
+     * @return Collection<int, LibraryRow>
+     */
+    public function library(SteamAccount $account): Collection
+    {
+        $int = fn (mixed $value) => is_numeric($value) ? (int) $value : null;
+
+        return $account->games()->inLibrary()->toBase()
+            ->orderByDesc('playtime_minutes')
+            ->orderBy('name')
+            ->get([
+                'id', 'app_id', 'name', 'playtime_minutes', 'playtime_2weeks_minutes', 'playtime_windows_minutes',
+                'playtime_mac_minutes', 'playtime_linux_minutes', 'playtime_deck_minutes', 'last_played_at',
+                'achievements_total', 'achievements_unlocked',
+            ])
+            ->map(function (object $row) use ($int) {
+                $row = (array) $row;
+
+                return [
+                    'id' => (int) $int($row['id']),
+                    'app_id' => (int) $int($row['app_id']),
+                    'name' => (string) $row['name'],
+                    'playtime_minutes' => (int) $int($row['playtime_minutes']),
+                    'playtime_2weeks_minutes' => (int) $int($row['playtime_2weeks_minutes']),
+                    'playtime_windows_minutes' => (int) $int($row['playtime_windows_minutes']),
+                    'playtime_mac_minutes' => (int) $int($row['playtime_mac_minutes']),
+                    'playtime_linux_minutes' => (int) $int($row['playtime_linux_minutes']),
+                    'playtime_deck_minutes' => (int) $int($row['playtime_deck_minutes']),
+                    'last_played_at' => is_string($row['last_played_at']) ? $row['last_played_at'] : null,
+                    'achievements_total' => $int($row['achievements_total']),
+                    'achievements_unlocked' => $int($row['achievements_unlocked']),
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, LibraryRow>  $games
      * @return Summary
      */
     public function summary(Collection $games): array
     {
-        $played = $games->filter(fn (SteamGame $game) => $game->playtime_minutes > 0)->count();
-        $withAchievements = $games->filter(fn (SteamGame $game) => $game->achievements_total > 0 && $game->achievements_unlocked !== null);
-        // Like Steam's "average completion": over games with at least one achievement unlocked.
-        $started = $withAchievements->filter(fn (SteamGame $game) => $game->achievements_unlocked > 0);
+        $played = $games->filter(fn (array $game) => $game['playtime_minutes'] > 0)->count();
+        $withAchievements = $games->filter(fn (array $game) => $game['achievements_total'] > 0 && $game['achievements_unlocked'] !== null);
 
         return [
             'games' => $games->count(),
@@ -38,13 +75,10 @@ class SteamStats
             'never_played' => $games->count() - $played,
             'playtime_minutes' => (int) $games->sum('playtime_minutes'),
             'playtime_2weeks_minutes' => (int) $games->sum('playtime_2weeks_minutes'),
-            'recent_games' => $games->filter(fn (SteamGame $game) => $game->playtime_2weeks_minutes > 0)->count(),
+            'recent_games' => $games->filter(fn (array $game) => $game['playtime_2weeks_minutes'] > 0)->count(),
             'achievements_unlocked' => (int) $withAchievements->sum('achievements_unlocked'),
             'achievements_total' => (int) $withAchievements->sum('achievements_total'),
-            'perfect_games' => $withAchievements->filter(fn (SteamGame $game) => $game->achievements_unlocked === $game->achievements_total)->count(),
-            'average_completion_bp' => $started->isEmpty()
-                ? null
-                : (int) round($started->avg(fn (SteamGame $game) => intdiv((int) $game->achievements_unlocked * 10_000, (int) $game->achievements_total)) ?? 0),
+            'perfect_games' => $withAchievements->filter(fn (array $game) => $game['achievements_unlocked'] === $game['achievements_total'])->count(),
             'platforms' => [
                 'windows' => (int) $games->sum('playtime_windows_minutes'),
                 'mac' => (int) $games->sum('playtime_mac_minutes'),
@@ -129,34 +163,18 @@ class SteamStats
     }
 
     /**
-     * The achievements unlocked most recently, with their game.
-     *
-     * @return Collection<int, SteamAchievement>
-     */
-    public function recentAchievements(SteamAccount $account, int $limit = 12): Collection
-    {
-        return SteamAchievement::query()
-            ->whereIn('steam_game_id', $account->games()->select('id'))
-            ->where('achieved', true)
-            ->whereNotNull('unlocked_at')
-            ->with('game')
-            ->orderByDesc('unlocked_at')
-            ->orderByDesc('id')
-            ->limit($limit)
-            ->get();
-    }
-
-    /**
      * @return Collection<string, int> minutes by "YYYY-MM-DD"
      */
     private function minutesByDay(SteamAccount $account, CarbonImmutable $from, ?SteamGame $game = null): Collection
     {
         return SteamPlaytimeDay::query()
+            ->toBase()
             ->where('steam_account_id', $account->id)
             ->when($game !== null, fn ($query) => $query->where('steam_game_id', $game?->id))
             ->where('played_on', '>=', $from->toDateString())
             ->get(['played_on', 'minutes'])
-            ->groupBy(fn (SteamPlaytimeDay $day) => $day->played_on->toDateString())
-            ->map(fn (Collection $rows) => (int) $rows->sum('minutes'));
+            ->map(fn (object $day) => (array) $day)
+            ->groupBy(fn (array $day) => substr((string) $day['played_on'], 0, 10))
+            ->map(fn (Collection $rows) => (int) $rows->sum(fn (array $day) => (int) $day['minutes']));
     }
 }

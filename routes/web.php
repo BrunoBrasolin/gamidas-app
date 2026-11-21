@@ -122,6 +122,7 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
             Route::delete('connections/{connection}', [BankConnectionController::class, 'destroy'])->name('connections.destroy');
 
             Route::post('inbox/confirm-all', [BankInboxController::class, 'confirmAll'])->name('inbox.confirm-all');
+            Route::post('inbox/catalog-old', [BankInboxController::class, 'catalogOld'])->name('inbox.catalog-old');
             Route::post('transactions/{transaction}/catalog', [BankInboxController::class, 'catalog'])->name('transactions.catalog');
             Route::post('transactions/{transaction}/confirm', [BankInboxController::class, 'confirm'])->name('transactions.confirm');
             Route::delete('transactions/{transaction}/catalog', [BankInboxController::class, 'reopen'])->name('transactions.reopen');

@@ -5,6 +5,7 @@ import {
     ArrowUpRight,
     Check,
     CheckCheck,
+    History,
     Inbox,
     Landmark,
     Sparkles,
@@ -22,6 +23,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
@@ -84,6 +94,9 @@ export default function BankInbox({
                     title="Caixa de entrada"
                     description="Transações dos seus bancos para catalogar: despesa da casa, pessoal, receita, investimento — ou ignorar. O que você decide vira regra para as próximas."
                 >
+                    {filters.status === 'pending' && counts.pending > 0 && (
+                        <CatalogOldDialog />
+                    )}
                     {filters.status === 'pending' && suggested > 0 && (
                         <ConfirmDialog
                             method="post"
@@ -709,3 +722,86 @@ BankInbox.layout = {
         },
     ],
 };
+
+/** "YYYY-MM" of the current month, in the browser's clock. */
+function currentMonth(): string {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Clears the backlog: everything that counts before the chosen month gets its
+ * suggestion or, without one, a personal entry with the transaction's name.
+ */
+function CatalogOldDialog() {
+    const [open, setOpen] = useState(false);
+    const [before, setBefore] = useState(currentMonth);
+    const [processing, setProcessing] = useState(false);
+
+    function submit() {
+        router.post(
+            bank.inbox.catalogOld.url(),
+            { before },
+            {
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onSuccess: () => setOpen(false),
+                onFinish: () => setProcessing(false),
+            },
+        );
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline">
+                    <History />
+                    Lançar antigas
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogTitle>Lançar as transações antigas?</DialogTitle>
+                <DialogDescription asChild>
+                    <div className="grid gap-2">
+                        <p>
+                            Cada transação pendente que conta antes do mês
+                            escolhido é catalogada de uma vez: com a sugestão,
+                            quando há; senão, com o próprio nome — saída vira
+                            despesa pessoal, entrada vira receita e aplicação
+                            vira investimento (resgates são ignorados). Nenhuma
+                            regra é criada.
+                        </p>
+                        <p>
+                            Compras no cartão contam pelo vencimento da fatura:
+                            uma compra de 25/10 que vence em 10/11 continua na
+                            caixa se você escolher novembro. Até 300 por vez; dá
+                            para desfazer uma a uma.
+                        </p>
+                    </div>
+                </DialogDescription>
+                <div className="grid gap-1.5">
+                    <Label htmlFor="catalog-old-before">Lançar antes de</Label>
+                    <Input
+                        id="catalog-old-before"
+                        type="month"
+                        value={before}
+                        onChange={(event) => setBefore(event.target.value)}
+                    />
+                </div>
+                <DialogFooter className="gap-2">
+                    <DialogClose asChild>
+                        <Button variant="secondary">Cancelar</Button>
+                    </DialogClose>
+                    <Button
+                        disabled={processing || before === ''}
+                        onClick={submit}
+                    >
+                        {processing && <Spinner />}
+                        Lançar antigas
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}

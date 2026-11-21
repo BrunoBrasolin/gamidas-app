@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\BankPresenter;
 use App\Http\Requests\Bank\CatalogBankTransactionRequest;
+use App\Http\Requests\Bank\CatalogOldBankTransactionsRequest;
 use App\Models\BankAccount;
 use App\Models\BankTransaction;
 use App\Services\Bank\BankCatalogService;
@@ -155,6 +156,35 @@ class BankInboxController extends Controller
             1 => '1 transação catalogada.',
             default => "{$count} transações catalogadas.",
         }, $count === 0 ? 'info' : 'success');
+
+        return back();
+    }
+
+    /**
+     * Clear what counts before a month out of the inbox at once: suggestions
+     * are applied, the rest becomes personal entries with their own names.
+     */
+    public function catalogOld(CatalogOldBankTransactionsRequest $request, BankCatalogService $catalog): RedirectResponse
+    {
+        $month = $request->month('before') ?? Month::current();
+        ['catalogued' => $count, 'remaining' => $remaining] = $catalog->catalogBefore($this->user($request), $month);
+
+        $before = $month->format('m/Y');
+
+        if ($count === 0 && $remaining === 0) {
+            $this->toast("Nenhuma transação pendente antes de {$before}.", 'info');
+
+            return back();
+        }
+
+        $this->toast(
+            $count === 1 ? '1 transação lançada.' : "{$count} transações lançadas.",
+            description: match (true) {
+                $remaining === 0 => "A caixa não tem mais pendentes antes de {$before}.",
+                $remaining === 1 => "Ainda falta 1 antes de {$before}: clique de novo para continuar.",
+                default => "Ainda faltam {$remaining} antes de {$before}: clique de novo para continuar.",
+            },
+        );
 
         return back();
     }

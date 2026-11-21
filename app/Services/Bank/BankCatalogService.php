@@ -78,6 +78,12 @@ final class BankCatalogService
      */
     private const SUGGESTION_FILTER_LIMIT = 500;
 
+    /**
+     * How many old transactions one "Lançar antigas" catalogues at most; the
+     * rest is left for the next click.
+     */
+    public const OLD_BATCH_LIMIT = 300;
+
     public function __construct(
         private readonly ExpenseService $expenses,
         private readonly PaymentService $payments,
@@ -293,6 +299,90 @@ final class BankCatalogService
         }
 
         return $count;
+    }
+
+    /**
+     * Clear the inbox of what counts before a month ("Lançar antigas"): each
+     * pending transaction whose reference date (for a card purchase, the due
+     * date of its bill) is before it gets its suggestion or, without one (or
+     * when it can no longer be applied), a personal entry named after the
+     * transaction: money out is a personal expense (an investment when the
+     * bank says it is one) and money in is income (an investment redemption
+     * is ignored, it is not income). No rule is learned. Oldest first, at
+     * most OLD_BATCH_LIMIT per call.
+     *
+     * @return array{catalogued: int, remaining: int}
+     */
+    public function catalogBefore(User $actor, CarbonImmutable $month): array
+    {
+        // A card purchase never counts before its own date, so the date
+        // narrows the query down and the reference date decides.
+        $transactions = $this->pendingOf($actor)
+            ->where('date', '<', $month->toDateString())
+            ->with(['account', 'bill', 'user'])
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (BankTransaction $transaction) => $this->referenceDate($transaction)->lt($month))
+            ->values();
+
+        if ($transactions->isEmpty()) {
+            return ['catalogued' => 0, 'remaining' => 0];
+        }
+
+        $batch = $transactions->take(self::OLD_BATCH_LIMIT);
+        $rules = $this->rules->rulesOf($actor->id);
+        $candidates = $this->candidates($batch, $actor);
+        $count = 0;
+
+        foreach ($batch as $transaction) {
+            $suggestion = $this->suggest($transaction, $rules, $candidates[$transaction->id] ?? []);
+
+            if ($suggestion !== null) {
+                try {
+                    DB::transaction(function () use ($transaction, $actor, $suggestion) {
+                        $this->catalog($transaction, $actor, $suggestion->choice);
+
+                        if ($suggestion->rule !== null) {
+                            $this->rules->used($suggestion->rule);
+                        }
+                    });
+                    $count++;
+
+                    continue;
+                } catch (ValidationException) {
+                    // Taken in the meantime (an expense linked to an earlier
+                    // one, the other side of an offset): use its own name.
+                }
+            }
+
+            try {
+                $this->catalog($transaction, $actor, $this->ownNameChoice($transaction));
+                $count++;
+            } catch (ValidationException) {
+                // Already catalogued along with another one (an offset pair).
+            }
+        }
+
+        $remaining = $this->pendingOf($actor)
+            ->whereIntegerInRaw('id', $transactions->pluck('id')->all())
+            ->count();
+
+        return ['catalogued' => $count, 'remaining' => $remaining];
+    }
+
+    /**
+     * A new personal entry named after the transaction, for "Lançar antigas".
+     */
+    private function ownNameChoice(BankTransaction $transaction): CatalogChoice
+    {
+        $action = match (true) {
+            $transaction->amount_cents === 0 => 'ignore',
+            $transaction->channel === BankChannel::Investment => $transaction->isOutgoing() ? 'investment' : 'ignore',
+            default => $transaction->isOutgoing() ? 'personal' : 'income',
+        };
+
+        return new CatalogChoice($action, remember: false);
     }
 
     /**

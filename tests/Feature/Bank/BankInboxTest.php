@@ -375,6 +375,69 @@ class BankInboxTest extends TestCase
         $this->assertTrue($other->fresh()->isPending());
     }
 
+    public function test_catalog_old_clears_what_counts_before_the_month(): void
+    {
+        BankRule::create(['user_id' => $this->bruno->id, 'pattern' => 'fulano de tal', 'label' => 'Fulano de Tal', 'action' => BankRuleAction::Personal, 'title' => 'Aluguel do Fulano']);
+        $suggested = $this->pix(date: '2026-10-05');
+        $bakery = $this->createBankTransaction($this->checking, ['description' => 'Padaria do Zé', 'amount' => -25, 'date' => '2026-10-10T00:00:00.000Z']);
+        $salary = $this->createBankTransaction($this->checking, ['description' => 'Salário', 'amount' => 3000, 'type' => 'CREDIT', 'date' => '2026-10-06T00:00:00.000Z']);
+        $applied = $this->createBankTransaction($this->checking, ['description' => 'Aplicação RDB', 'amount' => -400, 'date' => '2026-10-07T00:00:00.000Z']);
+        $redeemed = $this->createBankTransaction($this->checking, ['description' => 'Resgate RDB', 'amount' => 150, 'type' => 'CREDIT', 'date' => '2026-10-08T00:00:00.000Z']);
+
+        // Card purchases count on their bill: the one closing on 03/11 is due in November.
+        $this->card->bills()->create(['pluggy_id' => 'bill-nov', 'closing_date' => '2026-11-03', 'due_date' => '2026-11-10', 'total_cents' => 100]);
+        $octoberBill = $this->createBankTransaction($this->card, ['description' => 'Livraria', 'amount' => 80, 'date' => '2026-10-01T00:00:00.000Z']);
+        $novemberBill = $this->createBankTransaction($this->card, ['description' => 'Farmácia', 'amount' => 40, 'date' => '2026-10-28T00:00:00.000Z']);
+        $november = $this->createBankTransaction($this->checking, ['description' => 'Mercado', 'amount' => -90, 'date' => '2026-11-02T00:00:00.000Z']);
+
+        $leticiaAccount = $this->createBankAccount($this->createBankConnection($this->leticia, 'item-leticia'));
+        $hers = $this->createBankTransaction($leticiaAccount, ['description' => 'Da Letícia', 'amount' => -10, 'date' => '2026-10-02T00:00:00.000Z']);
+
+        $this->actingAs($this->bruno)
+            ->post(route('bank.inbox.catalog-old'), ['before' => '2026-11'])
+            ->assertSessionHasNoErrors()
+            ->assertInertiaFlash('toast.message', '6 transações lançadas.');
+
+        // The suggestion wins; the rest is named after the transaction.
+        $this->assertSame('Aluguel do Fulano', $suggested->fresh()->personalTransaction->title);
+        $this->assertSame(TransactionType::Expense, $bakery->fresh()->personalTransaction->type);
+        $this->assertSame('Padaria do Zé', $bakery->fresh()->personalTransaction->title);
+        $this->assertSame(TransactionType::Income, $salary->fresh()->personalTransaction->type);
+        $this->assertSame(TransactionType::Investment, $applied->fresh()->personalTransaction->type);
+        $this->assertSame(BankReviewStatus::Ignored, $redeemed->fresh()->review_status);
+        $this->assertSame('2026-10-10', $octoberBill->fresh()->personalTransaction->transaction_date->toDateString());
+
+        // What counts from November on stays, and so does the other member's inbox.
+        $this->assertTrue($novemberBill->fresh()->isPending());
+        $this->assertTrue($november->fresh()->isPending());
+        $this->assertTrue($hers->fresh()->isPending());
+
+        // Nothing was learned.
+        $this->assertSame(1, BankRule::query()->count());
+    }
+
+    public function test_catalog_old_works_in_batches(): void
+    {
+        $this->createBankTransaction($this->checking, ['description' => 'Padaria', 'amount' => -25, 'date' => '2026-10-10T00:00:00.000Z']);
+        $this->createBankTransaction($this->checking, ['description' => 'Mercado', 'amount' => -90, 'date' => '2026-10-11T00:00:00.000Z']);
+
+        $catalog = app(BankCatalogService::class);
+
+        $this->assertSame(['catalogued' => 2, 'remaining' => 0], $catalog->catalogBefore($this->bruno, Month::parse('2026-11')));
+        $this->assertSame(['catalogued' => 0, 'remaining' => 0], $catalog->catalogBefore($this->bruno, Month::parse('2026-11')));
+    }
+
+    public function test_catalog_old_requires_a_month(): void
+    {
+        $this->actingAs($this->bruno)
+            ->post(route('bank.inbox.catalog-old'), ['before' => 'novembro'])
+            ->assertSessionHasErrors('before');
+
+        $this->actingAs($this->bruno)
+            ->post(route('bank.inbox.catalog-old'))
+            ->assertSessionHasErrors('before');
+    }
+
     public function test_the_inbox_filters_pending_transactions_by_suggestion(): void
     {
         BankRule::create(['user_id' => $this->bruno->id, 'pattern' => 'fulano de tal', 'label' => 'Fulano de Tal', 'action' => BankRuleAction::Personal]);

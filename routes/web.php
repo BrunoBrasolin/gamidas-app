@@ -197,11 +197,14 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
         });
     });
 
-    // Each user's Steam library: profile, playtime, achievements and the
-    // store page of each game. Everything belongs to the user who connected
-    // the account; the scheduled steam:sync keeps it fresh.
+    // Each user's Steam library: profile, playtime, achievements, stats and
+    // the store page of each game, the wishlist and the friends list.
+    // Everything belongs to the user who connected the account; the
+    // scheduled steam:sync keeps it fresh.
     Route::prefix('games')->name('games.')->group(function () {
         Route::get('/', [GameLibraryController::class, 'index'])->name('index');
+        Route::get('wishlist', [GameLibraryController::class, 'wishlist'])->name('wishlist');
+        Route::get('friends', [GameLibraryController::class, 'friends'])->name('friends');
         Route::get('steam/callback', [SteamAccountController::class, 'callback'])->name('steam.callback');
         Route::get('{game}', [GameLibraryController::class, 'show'])->whereNumber('game')->name('show');
 

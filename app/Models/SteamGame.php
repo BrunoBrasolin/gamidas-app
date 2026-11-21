@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $achievements_unlocked
  * @property CarbonImmutable|null $achievements_synced_at
  * @property int|null $achievements_playtime_minutes Playtime when the achievements were synced.
+ * @property list<array{name: string, label: string|null, value: int|float}>|null $stats The game's own stats, null until fetched.
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read SteamAccount $account
@@ -43,7 +44,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'steam_account_id', 'app_id', 'name', 'icon_hash', 'playtime_minutes', 'playtime_2weeks_minutes',
     'playtime_windows_minutes', 'playtime_mac_minutes', 'playtime_linux_minutes', 'playtime_deck_minutes',
     'last_played_at', 'added_at', 'removed_at', 'achievements_total', 'achievements_unlocked',
-    'achievements_synced_at', 'achievements_playtime_minutes',
+    'achievements_synced_at', 'achievements_playtime_minutes', 'stats',
 ])]
 class SteamGame extends Model
 {
@@ -70,6 +71,7 @@ class SteamGame extends Model
             'achievements_unlocked' => 'integer',
             'achievements_synced_at' => 'datetime',
             'achievements_playtime_minutes' => 'integer',
+            'stats' => 'array',
         ];
     }
 
@@ -108,12 +110,13 @@ class SteamGame extends Model
     }
 
     /**
-     * Whether the achievements must be fetched again: never fetched, or the
-     * game was played since.
+     * Whether the achievements and stats must be fetched again: never
+     * fetched, or the game was played since.
      */
     public function achievementsStale(): bool
     {
         return $this->achievements_synced_at === null
+            || $this->stats === null
             || $this->achievements_playtime_minutes !== $this->playtime_minutes;
     }
 }

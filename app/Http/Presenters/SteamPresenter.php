@@ -5,6 +5,7 @@ namespace App\Http\Presenters;
 use App\Models\SteamAccount;
 use App\Models\SteamAchievement;
 use App\Models\SteamGame;
+use App\Models\SteamWishlistItem;
 use App\Services\Steam\SteamClient;
 
 /**
@@ -37,6 +38,13 @@ class SteamPresenter
             'xp_level_start' => $account->xp_level_start,
             'xp_to_next_level' => $account->xp_to_next_level,
             'badges_count' => $account->badges_count,
+            'bans' => $account->vac_bans === null ? null : [
+                'vac' => $account->vac_bans,
+                'game' => (int) $account->game_bans,
+                'days_since_last' => $account->days_since_last_ban,
+                'community' => (bool) $account->community_banned,
+                'trade' => (bool) $account->trade_banned,
+            ],
             'checked_at' => $account->checked_at?->toIso8601String(),
             'synced_at' => $account->synced_at?->toIso8601String(),
             'sync_error' => $account->sync_error,
@@ -83,6 +91,35 @@ class SteamPresenter
             'added_at' => $game->added_at->toIso8601String(),
             'removed_at' => $game->removed_at?->toIso8601String(),
             'achievements_synced_at' => $game->achievements_synced_at?->toIso8601String(),
+            'stats' => $game->stats ?? [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function wishlistItem(SteamWishlistItem $item, ?int $ownedGameId): array
+    {
+        return [
+            'id' => $item->id,
+            'app_id' => $item->app_id,
+            'name' => $item->name,
+            'priority' => $item->priority,
+            'added_at' => $item->added_at?->toIso8601String(),
+            'price_cents' => $item->price_cents,
+            'original_price_cents' => $item->original_price_cents,
+            'discount_percent' => $item->discount_percent,
+            'price_formatted' => $item->price_formatted,
+            'original_price_formatted' => $item->original_price_formatted,
+            'is_free' => $item->is_free,
+            'release_at' => $item->release_at?->toIso8601String(),
+            'coming_soon' => $item->coming_soon,
+            'review_label' => $item->review_label,
+            'review_percent' => $item->review_percent,
+            'review_count' => $item->review_count,
+            'header_url' => $item->header_url ?? SteamClient::headerUrl($item->app_id),
+            'store_url' => SteamClient::storeUrl($item->app_id),
+            'owned_game_id' => $ownedGameId,
         ];
     }
 

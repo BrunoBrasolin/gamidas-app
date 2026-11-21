@@ -6,6 +6,7 @@ use App\Models\SteamAccount;
 use App\Models\SteamAchievement;
 use App\Models\SteamGame;
 use App\Models\SteamPlaytimeDay;
+use App\Models\SteamWishlistItem;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
@@ -50,6 +51,30 @@ class SteamStats
                 'linux' => (int) $games->sum('playtime_linux_minutes'),
                 'deck' => (int) $games->sum('playtime_deck_minutes'),
             ],
+        ];
+    }
+
+    /**
+     * Totals of the wishlist. Prices are summed only when they are in reais
+     * (the store country is Brazil); otherwise the totals are null.
+     *
+     * @param  Collection<int, SteamWishlistItem>  $items
+     * @return array{items: int, on_sale: int, coming_soon: int, free: int, total_cents: int|null, savings_cents: int|null}
+     */
+    public function wishlistSummary(Collection $items): array
+    {
+        $brl = strtolower((string) config('services.steam.country')) === 'br';
+        $priced = $items->filter(fn (SteamWishlistItem $item) => ! $item->is_free && $item->price_cents !== null);
+
+        return [
+            'items' => $items->count(),
+            'on_sale' => $items->filter(fn (SteamWishlistItem $item) => $item->discount_percent > 0)->count(),
+            'coming_soon' => $items->filter(fn (SteamWishlistItem $item) => $item->coming_soon)->count(),
+            'free' => $items->filter(fn (SteamWishlistItem $item) => $item->is_free)->count(),
+            'total_cents' => $brl ? (int) $priced->sum('price_cents') : null,
+            'savings_cents' => $brl
+                ? (int) $priced->sum(fn (SteamWishlistItem $item) => max(0, ($item->original_price_cents ?? $item->price_cents) - $item->price_cents))
+                : null,
         ];
     }
 

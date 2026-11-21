@@ -6,6 +6,7 @@ use App\Models\SteamAccount;
 use App\Models\SteamAchievement;
 use App\Models\SteamGame;
 use App\Models\SteamPlaytimeDay;
+use App\Models\SteamWishlistItem;
 use App\Services\Steam\SteamException;
 use App\Services\Steam\SteamSyncService;
 use Carbon\CarbonImmutable;
@@ -283,6 +284,134 @@ class SteamSyncTest extends TestCase
         $this->expectExceptionMessage('privado');
 
         app(SteamSyncService::class)->syncAchievements($this->account);
+    }
+
+    public function test_sync_reads_the_bans(): void
+    {
+        $this->steamBans[self::BRUNO_STEAM_ID] = ['VACBanned' => true, 'NumberOfVACBans' => 1, 'DaysSinceLastBan' => 400, 'EconomyBan' => 'probation'];
+
+        $this->sync();
+
+        $this->account->refresh();
+        $this->assertSame(1, $this->account->vac_bans);
+        $this->assertSame(0, $this->account->game_bans);
+        $this->assertSame(400, $this->account->days_since_last_ban);
+        $this->assertFalse($this->account->community_banned);
+        $this->assertTrue($this->account->trade_banned);
+    }
+
+    public function test_sync_reads_the_wishlist_with_store_prices(): void
+    {
+        $this->steamWishlists[self::BRUNO_STEAM_ID] = [
+            ['appid' => 1245620, 'priority' => 1, 'date_added' => self::at('2026-10-01 20:00')],
+            ['appid' => 1091500, 'priority' => 2, 'date_added' => self::at('2026-09-01 20:00')],
+            ['appid' => 9999990, 'priority' => 0, 'date_added' => self::at('2026-08-01 20:00')],
+        ];
+        $this->steamStoreItems[1245620] = [
+            'name' => 'ELDEN RING',
+            'assets' => ['asset_url_format' => 'steam/apps/1245620/${FILENAME}?t=1', 'header' => 'abc123/header.jpg'],
+            'release' => ['steam_release_date' => self::at('2022-02-24 12:00')],
+            'reviews' => ['summary_filtered' => ['review_count' => 900_000, 'percent_positive' => 93, 'review_score_label' => 'Muito positivas']],
+            'best_purchase_option' => [
+                'final_price_in_cents' => '13725', 'formatted_final_price' => 'R$137,25',
+                'original_price_in_cents' => '27450', 'formatted_original_price' => 'R$274,50', 'discount_pct' => 50,
+            ],
+        ];
+        $this->steamStoreItems[1091500] = [
+            'name' => 'Jogo Futuro',
+            'release' => ['steam_release_date' => self::at('2027-03-01 12:00'), 'is_coming_soon' => true],
+        ];
+
+        $this->sync();
+
+        $items = $this->account->wishlistItems()->orderBy('priority')->get()->keyBy('app_id');
+        $this->assertCount(3, $items);
+
+        $elden = $items[1245620];
+        $this->assertSame('ELDEN RING', $elden->name);
+        $this->assertSame(1, $elden->priority);
+        $this->assertSame('2026-10-01 20:00:00', $elden->added_at?->toDateTimeString());
+        $this->assertSame(13_725, $elden->price_cents);
+        $this->assertSame(27_450, $elden->original_price_cents);
+        $this->assertSame(50, $elden->discount_percent);
+        $this->assertSame('R$137,25', $elden->price_formatted);
+        $this->assertSame('R$274,50', $elden->original_price_formatted);
+        $this->assertFalse($elden->coming_soon);
+        $this->assertSame('Muito positivas', $elden->review_label);
+        $this->assertSame(93, $elden->review_percent);
+        $this->assertSame(900_000, $elden->review_count);
+        $this->assertSame('https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1245620/abc123/header.jpg?t=1', $elden->header_url);
+
+        $this->assertTrue($items[1091500]->coming_soon);
+        $this->assertNull($items[1091500]->price_cents);
+
+        // Not shown by the store: kept with a placeholder name.
+        $this->assertSame('App 9999990', $items[9999990]->name);
+        $this->assertSame('https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/9999990/header.jpg', $items[9999990]->header_url);
+
+        // Bought one, removed another; the store is asked only for what is left.
+        $this->steamWishlists[self::BRUNO_STEAM_ID] = [['appid' => 1091500, 'priority' => 1, 'date_added' => self::at('2026-09-01 20:00')]];
+        $this->sync();
+
+        $this->assertSame([1091500], $this->account->wishlistItems()->pluck('app_id')->all());
+        $this->assertSame(1, $this->account->wishlistItems()->sole()->priority);
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'IStoreBrowseService/GetItems')
+            && json_decode((string) $request['input_json'], true)['context'] === ['language' => 'brazilian', 'country_code' => 'BR']);
+    }
+
+    public function test_a_private_library_keeps_the_wishlist(): void
+    {
+        SteamWishlistItem::query()->create(['steam_account_id' => $this->account->id, 'app_id' => 1245620, 'name' => 'ELDEN RING']);
+        $this->steamLibraries[self::BRUNO_STEAM_ID] = null;
+
+        $this->sync();
+
+        $this->assertSame(1, $this->account->wishlistItems()->count());
+        Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'GetWishlist'));
+    }
+
+    public function test_game_stats_are_stored_with_the_names_the_game_gives(): void
+    {
+        $game = SteamGame::factory()->for($this->account, 'account')->create(['app_id' => 730, 'playtime_minutes' => 600]);
+        $this->steamStatSchemas[730] = [
+            ['name' => 'total_kills', 'defaultvalue' => 0, 'displayName' => 'Abates'],
+            ['name' => 'total_wins', 'defaultvalue' => 0, 'displayName' => ''],
+            ['name' => 'never_played_stat', 'defaultvalue' => 0, 'displayName' => 'Nunca'],
+        ];
+        $this->steamStats[self::BRUNO_STEAM_ID.':730'] = [
+            ['name' => 'total_wins', 'value' => 42],
+            ['name' => 'total_kills', 'value' => 1_234],
+            ['name' => 'accuracy', 'value' => 0.25],
+        ];
+
+        app(SteamSyncService::class)->syncAchievements($this->account);
+
+        $game->refresh();
+        $this->assertSame([
+            ['name' => 'total_kills', 'label' => 'Abates', 'value' => 1_234],
+            ['name' => 'total_wins', 'label' => null, 'value' => 42],
+            ['name' => 'accuracy', 'label' => null, 'value' => 0.25],
+        ], $game->stats);
+        $this->assertSame(0, $game->achievements_total);
+        $this->assertFalse($game->achievementsStale());
+
+        // Achievements fetched before stats existed: fetched again.
+        $game->update(['stats' => null]);
+        $this->assertTrue($game->refresh()->achievementsStale());
+        $this->assertSame(1, app(SteamSyncService::class)->pendingAchievements($this->account));
+    }
+
+    public function test_a_game_steam_fails_for_does_not_block_the_others(): void
+    {
+        $broken = SteamGame::factory()->for($this->account, 'account')->create(['app_id' => 666, 'playtime_minutes' => 60, 'last_played_at' => now()]);
+        $fine = SteamGame::factory()->for($this->account, 'account')->create(['app_id' => 620, 'playtime_minutes' => 60, 'last_played_at' => now()->subDay()]);
+        $this->steamFailingApps = [666];
+
+        $synced = app(SteamSyncService::class)->syncAchievements($this->account);
+
+        $this->assertSame(1, $synced);
+        $this->assertNull($broken->refresh()->achievements_synced_at);
+        $this->assertNotNull($fine->refresh()->achievements_synced_at);
     }
 
     public function test_the_command_syncs_stale_accounts_and_pending_achievements(): void

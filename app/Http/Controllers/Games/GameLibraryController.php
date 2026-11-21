@@ -7,11 +7,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Presenters\SteamPresenter;
 use App\Models\SteamAchievement;
 use App\Models\SteamGame;
+use App\Models\SteamWishlistItem;
 use App\Services\Steam\SteamClient;
 use App\Services\Steam\SteamException;
+use App\Services\Steam\SteamFriends;
 use App\Services\Steam\SteamStats;
 use App\Services\Steam\SteamStoreDetails;
 use App\Services\Steam\SteamSyncService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -19,8 +22,8 @@ use Inertia\Response;
 
 /**
  * The signed-in user's Steam library: profile, totals, playtime history,
- * recent achievements and every game, and each game's page. Private to the
- * user who connected the account.
+ * recent achievements and every game; each game's page; the wishlist and
+ * the friends list. Private to the user who connected the account.
  */
 class GameLibraryController extends Controller
 {
@@ -60,6 +63,58 @@ class GameLibraryController extends Controller
             'recent_achievements' => $stats->recentAchievements($account)
                 ->map(fn (SteamAchievement $achievement) => SteamPresenter::achievement($achievement, withGame: true))
                 ->values(),
+        ]);
+    }
+
+    /**
+     * The wishlist in the user's order on Steam (unranked games last, newest
+     * first), with prices and discounts as of the last sync.
+     */
+    public function wishlist(Request $request, SteamSyncService $sync, SteamStats $stats): Response|RedirectResponse
+    {
+        $account = $this->user($request)->steamAccount;
+
+        if ($account === null) {
+            return to_route('games.index');
+        }
+
+        $items = $account->wishlistItems()->get()->sort(fn (SteamWishlistItem $a, SteamWishlistItem $b) => [$a->priority === 0, $a->priority, -($a->added_at?->getTimestamp() ?? 0)]
+            <=> [$b->priority === 0, $b->priority, -($b->added_at?->getTimestamp() ?? 0)])->values();
+        $owned = $account->games()->inLibrary()->whereIn('app_id', $items->pluck('app_id')->all())->pluck('id', 'app_id');
+
+        return Inertia::render('games/wishlist', [
+            'account' => SteamPresenter::account($account, $sync->pendingAchievements($account)),
+            'summary' => $stats->wishlistSummary($items),
+            'items' => $items->map(fn (SteamWishlistItem $item) => SteamPresenter::wishlistItem($item, $owned->get($item->app_id)))->values(),
+        ]);
+    }
+
+    /**
+     * The friends with what they are playing now, read from Steam (cached for
+     * a few minutes). A friend playing a game of the user's library links to
+     * its page.
+     */
+    public function friends(Request $request, SteamFriends $friends, SteamSyncService $sync): Response|RedirectResponse
+    {
+        $account = $this->user($request)->steamAccount;
+
+        if ($account === null) {
+            return to_route('games.index');
+        }
+
+        $list = $friends->of($account);
+        $owned = $account->games()->inLibrary()->pluck('id', 'app_id');
+
+        return Inertia::render('games/friends', [
+            'account' => SteamPresenter::account($account, $sync->pendingAchievements($account)),
+            'friends' => array_map(fn (array $friend) => [
+                ...$friend,
+                'my_game_id' => $friend['playing'] !== null && $friend['playing']['app_id'] !== null
+                    ? $owned->get($friend['playing']['app_id'])
+                    : null,
+            ], $list['friends']),
+            'private' => $list['private'],
+            'error' => $list['error'],
         ]);
     }
 

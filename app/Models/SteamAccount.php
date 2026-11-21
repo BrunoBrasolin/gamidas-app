@@ -33,6 +33,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $xp_level_start
  * @property int|null $xp_to_next_level
  * @property int|null $badges_count
+ * @property int|null $vac_bans
+ * @property int|null $game_bans
+ * @property int|null $days_since_last_ban
+ * @property bool|null $community_banned
+ * @property bool|null $trade_banned
  * @property CarbonImmutable|null $checked_at Last sync attempt.
  * @property CarbonImmutable|null $synced_at Last time the library's playtime was read.
  * @property string|null $sync_error
@@ -43,7 +48,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'user_id', 'steam_id', 'persona_name', 'profile_url', 'avatar_url', 'country_code', 'public_profile',
     'public_games', 'persona_state', 'playing_app_id', 'playing_name', 'account_created_at', 'last_logoff_at',
-    'level', 'xp', 'xp_level_start', 'xp_to_next_level', 'badges_count', 'checked_at', 'synced_at', 'sync_error',
+    'level', 'xp', 'xp_level_start', 'xp_to_next_level', 'badges_count', 'vac_bans', 'game_bans', 'days_since_last_ban',
+    'community_banned', 'trade_banned', 'checked_at', 'synced_at', 'sync_error',
 ])]
 class SteamAccount extends Model
 {
@@ -67,6 +73,11 @@ class SteamAccount extends Model
             'xp_level_start' => 'integer',
             'xp_to_next_level' => 'integer',
             'badges_count' => 'integer',
+            'vac_bans' => 'integer',
+            'game_bans' => 'integer',
+            'days_since_last_ban' => 'integer',
+            'community_banned' => 'boolean',
+            'trade_banned' => 'boolean',
             'checked_at' => 'datetime',
             'synced_at' => 'datetime',
         ];
@@ -89,6 +100,14 @@ class SteamAccount extends Model
     public function games(): HasMany
     {
         return $this->hasMany(SteamGame::class);
+    }
+
+    /**
+     * @return HasMany<SteamWishlistItem, $this>
+     */
+    public function wishlistItems(): HasMany
+    {
+        return $this->hasMany(SteamWishlistItem::class);
     }
 
     /**

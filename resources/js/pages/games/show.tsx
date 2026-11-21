@@ -33,12 +33,19 @@ import {
     formatMonth,
     formatShortMonth,
 } from '@/lib/format';
-import { completion, formatPlaytime, formatShare } from '@/lib/games';
+import {
+    completion,
+    formatPlaytime,
+    formatShare,
+    formatStat,
+    statLabel,
+} from '@/lib/games';
 import { cn } from '@/lib/utils';
 import games from '@/routes/games';
 import type {
     SteamAchievement,
     SteamGameDetails,
+    SteamGameStat,
     SteamMonth,
     SteamStoreDetails,
 } from '@/types';
@@ -212,6 +219,57 @@ function Playtime({
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+/** Shown before "Mostrar todas". */
+const STATS_PREVIEW = 12;
+
+function GameStats({ stats }: { stats: SteamGameStat[] }) {
+    const [all, setAll] = useState(false);
+    const shown = all ? stats : stats.slice(0, STATS_PREVIEW);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Estatísticas do jogo</CardTitle>
+                <CardDescription>
+                    Contadores que o próprio jogo guarda na Steam; os nomes são
+                    os do jogo.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {shown.map((stat) => (
+                        <div
+                            key={stat.name}
+                            className="flex items-baseline justify-between gap-3 border-b py-1 text-sm"
+                        >
+                            <dt
+                                className="truncate text-muted-foreground"
+                                title={stat.name}
+                            >
+                                {statLabel(stat)}
+                            </dt>
+                            <dd className="shrink-0 font-medium tabular-nums">
+                                {formatStat(stat.value)}
+                            </dd>
+                        </div>
+                    ))}
+                </dl>
+                {stats.length > STATS_PREVIEW && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAll(!all)}
+                    >
+                        {all
+                            ? 'Mostrar menos'
+                            : `Mostrar todas (${stats.length})`}
+                    </Button>
+                )}
+            </CardContent>
+        </Card>
     );
 }
 
@@ -537,6 +595,8 @@ export default function GameShow({
                     achievements={achievements}
                     error={achievementsError}
                 />
+
+                {game.stats.length > 0 && <GameStats stats={game.stats} />}
 
                 {store && store.categories.length > 0 && (
                     <section className="space-y-2">

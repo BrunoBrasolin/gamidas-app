@@ -44,15 +44,44 @@ const PERSONA_STATES = [
 ];
 
 /**
- * The account's status at the last sync: what it was playing, or its
- * persona state.
+ * What an account (or friend) is doing: what it is playing, or its persona
+ * state.
  */
-export function personaStatus(account: SteamAccount): string {
+export function personaStatus(
+    account: Pick<SteamAccount, 'playing' | 'persona_state'>,
+): string {
     if (account.playing) {
         return `Jogando ${account.playing.name}`;
     }
 
     return PERSONA_STATES[account.persona_state] ?? 'Offline';
+}
+
+/**
+ * A stat value in pt-BR, with at most two decimals.
+ */
+export function formatStat(value: number): string {
+    return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+}
+
+/**
+ * A readable name for a stat without one: "total_kills_ak47" → "Total kills ak47".
+ */
+export function statLabel(stat: {
+    name: string;
+    label: string | null;
+}): string {
+    if (stat.label) {
+        return stat.label;
+    }
+
+    const words = stat.name
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/[_.-]+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /**

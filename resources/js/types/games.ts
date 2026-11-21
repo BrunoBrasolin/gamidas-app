@@ -22,6 +22,8 @@ export type SteamAccount = {
     /** XP still needed for the next level. */
     xp_to_next_level: number | null;
     badges_count: number | null;
+    /** Null until the bans are read. */
+    bans: SteamBans | null;
     /** ISO timestamp of the last sync attempt. */
     checked_at: string | null;
     /** ISO timestamp of the last time the library was read. */
@@ -29,6 +31,14 @@ export type SteamAccount = {
     sync_error: string | null;
     /** Games played whose achievements were not fetched yet. */
     pending_achievements: number;
+};
+
+export type SteamBans = {
+    vac: number;
+    game: number;
+    days_since_last: number | null;
+    community: boolean;
+    trade: boolean;
 };
 
 /** A game of the library; playtime in minutes. */
@@ -63,6 +73,68 @@ export type SteamGameDetails = SteamGame & {
     /** When the game left the library (refunded or removed). */
     removed_at: string | null;
     achievements_synced_at: string | null;
+    /** The game's own stats, as the game names them. */
+    stats: SteamGameStat[];
+};
+
+export type SteamGameStat = {
+    /** Api name, e.g. "total_kills". */
+    name: string;
+    /** The game's display name, when it gives one. */
+    label: string | null;
+    value: number;
+};
+
+/** A game on the wishlist, with the store's data at the last sync. */
+export type SteamWishlistItem = {
+    id: number;
+    app_id: number;
+    name: string;
+    /** The user's rank on Steam; 0 when unranked. */
+    priority: number;
+    added_at: string | null;
+    /** Integer cents in the store's currency. */
+    price_cents: number | null;
+    original_price_cents: number | null;
+    discount_percent: number;
+    price_formatted: string | null;
+    original_price_formatted: string | null;
+    is_free: boolean;
+    release_at: string | null;
+    coming_soon: boolean;
+    review_label: string | null;
+    review_percent: number | null;
+    review_count: number | null;
+    header_url: string;
+    store_url: string;
+    /** The game's page when it is already in the library. */
+    owned_game_id: number | null;
+};
+
+export type SteamWishlistSummary = {
+    items: number;
+    on_sale: number;
+    coming_soon: number;
+    free: number;
+    /** Sum of current prices in cents (BRL); null outside Brazil's store. */
+    total_cents: number | null;
+    /** What the current discounts save, in cents (BRL). */
+    savings_cents: number | null;
+};
+
+/** A friend, as Steam shows them now. */
+export type SteamFriend = {
+    steam_id: string;
+    persona_name: string;
+    avatar_url: string | null;
+    profile_url: string;
+    persona_state: number;
+    playing: { app_id: number | null; name: string } | null;
+    friend_since: string | null;
+    last_logoff_at: string | null;
+    country_code: string | null;
+    /** The game's page when the friend plays a game of the user's library. */
+    my_game_id: number | null;
 };
 
 export type SteamAchievement = {

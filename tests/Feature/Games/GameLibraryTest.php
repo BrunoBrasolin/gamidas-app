@@ -6,6 +6,7 @@ use App\Models\SteamAccount;
 use App\Models\SteamAchievement;
 use App\Models\SteamGame;
 use App\Models\SteamPlaytimeDay;
+use App\Models\SteamWishlistItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Date;
@@ -53,11 +54,11 @@ class GameLibraryTest extends TestCase
         $portal = $this->game([
             'app_id' => 620, 'name' => 'Portal 2', 'playtime_minutes' => 600, 'playtime_2weeks_minutes' => 90,
             'playtime_windows_minutes' => 500, 'playtime_linux_minutes' => 100, 'playtime_deck_minutes' => 40,
-            'achievements_total' => 4, 'achievements_unlocked' => 4, 'achievements_synced_at' => now(), 'achievements_playtime_minutes' => 600,
+            'achievements_total' => 4, 'achievements_unlocked' => 4, 'achievements_synced_at' => now(), 'achievements_playtime_minutes' => 600, 'stats' => [],
         ]);
         $cs = $this->game([
             'app_id' => 730, 'name' => 'Counter-Strike 2', 'playtime_minutes' => 1_200,
-            'achievements_total' => 10, 'achievements_unlocked' => 1, 'achievements_synced_at' => now(), 'achievements_playtime_minutes' => 1_200,
+            'achievements_total' => 10, 'achievements_unlocked' => 1, 'achievements_synced_at' => now(), 'achievements_playtime_minutes' => 1_200, 'stats' => [],
         ]);
         $this->game(['app_id' => 400, 'name' => 'Portal', 'playtime_minutes' => 0]);
         $this->game(['app_id' => 220, 'name' => 'Half-Life 2', 'playtime_minutes' => 30]); // achievements still to fetch
@@ -195,6 +196,132 @@ class GameLibraryTest extends TestCase
                 ->where('store', null)
                 ->where('achievements', [])
                 ->where('achievements_error', fn (string $error) => str_contains($error, 'erro 500')));
+    }
+
+    public function test_a_game_page_shows_the_game_stats(): void
+    {
+        $game = $this->game([
+            'app_id' => 730, 'name' => 'Counter-Strike 2', 'playtime_minutes' => 60,
+            'achievements_total' => 0, 'achievements_unlocked' => 0, 'achievements_synced_at' => now(), 'achievements_playtime_minutes' => 60,
+            'stats' => [['name' => 'total_kills', 'label' => 'Abates', 'value' => 1_234], ['name' => 'accuracy', 'label' => null, 'value' => 0.25]],
+        ]);
+
+        $this->actingAs($this->bruno)
+            ->get(route('games.show', $game))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('game.stats.0', ['name' => 'total_kills', 'label' => 'Abates', 'value' => 1_234])
+                ->where('game.stats.1.value', 0.25));
+    }
+
+    public function test_the_wishlist_page_lists_in_the_users_order_with_totals(): void
+    {
+        $owned = $this->game(['app_id' => 620, 'name' => 'Portal 2']);
+        $item = fn (array $attributes) => SteamWishlistItem::query()->create(['steam_account_id' => $this->account->id, ...$attributes]);
+        $item(['app_id' => 1, 'name' => 'Sem ordem antigo', 'priority' => 0, 'added_at' => '2026-01-01 10:00:00', 'price_cents' => 1_000]);
+        $item(['app_id' => 2, 'name' => 'Segundo', 'priority' => 2, 'price_cents' => 5_000, 'original_price_cents' => 10_000, 'discount_percent' => 50, 'price_formatted' => 'R$50,00']);
+        $item(['app_id' => 3, 'name' => 'Sem ordem novo', 'priority' => 0, 'added_at' => '2026-11-01 10:00:00', 'is_free' => true, 'price_cents' => null]);
+        $item(['app_id' => 620, 'name' => 'Portal 2', 'priority' => 1, 'price_cents' => 3_399]);
+        $item(['app_id' => 4, 'name' => 'Futuro', 'priority' => 3, 'coming_soon' => true]);
+
+        $this->actingAs($this->bruno)
+            ->get(route('games.wishlist'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('games/wishlist', false)
+                ->where('account.persona_name', 'brunao')
+                ->where('items', fn ($items) => collect($items)->pluck('name')->all() === ['Portal 2', 'Segundo', 'Futuro', 'Sem ordem novo', 'Sem ordem antigo'])
+                ->where('items.0.owned_game_id', $owned->id)
+                ->where('items.1.owned_game_id', null)
+                ->where('items.1.discount_percent', 50)
+                ->where('items.1.store_url', 'https://store.steampowered.com/app/2/')
+                ->where('summary', [
+                    'items' => 5, 'on_sale' => 1, 'coming_soon' => 1, 'free' => 1,
+                    'total_cents' => 9_399, 'savings_cents' => 5_000,
+                ]));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_wishlist_totals_need_prices_in_reais(): void
+    {
+        config(['services.steam.country' => 'us']);
+        SteamWishlistItem::query()->create(['steam_account_id' => $this->account->id, 'app_id' => 1, 'name' => 'Jogo', 'price_cents' => 1_999]);
+
+        $this->actingAs($this->bruno)
+            ->get(route('games.wishlist'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('summary.total_cents', null)
+                ->where('summary.savings_cents', null));
+    }
+
+    public function test_the_friends_page_reads_steam_and_caches_it_for_a_few_minutes(): void
+    {
+        $hades = $this->game(['app_id' => 1145360, 'name' => 'Hades']);
+        $this->steamFriendLists[self::BRUNO_STEAM_ID] = [
+            ['steamid' => self::LETICIA_STEAM_ID, 'relationship' => 'friend', 'friend_since' => 1_600_000_000],
+            ['steamid' => '76561198000000003', 'relationship' => 'friend', 'friend_since' => 1_500_000_000],
+            ['steamid' => '76561198000000004', 'relationship' => 'friend', 'friend_since' => 1_400_000_000],
+        ];
+        $this->addSteamPlayer(self::LETICIA_STEAM_ID, ['personaname' => 'leti', 'gameid' => '1145360', 'gameextrainfo' => 'Hades']);
+        $this->addSteamPlayer('76561198000000003', ['personaname' => 'carlos', 'personastate' => 0, 'gameid' => '99', 'gameextrainfo' => 'Outro jogo']);
+        // 76561198000000004 deleted their account: left out.
+
+        $this->actingAs($this->bruno)
+            ->get(route('games.friends'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('games/friends', false)
+                ->where('private', false)
+                ->where('error', null)
+                ->has('friends', 2)
+                ->where('friends.0.persona_name', 'leti')
+                ->where('friends.0.playing', ['app_id' => 1_145_360, 'name' => 'Hades'])
+                ->where('friends.0.my_game_id', $hades->id)
+                ->where('friends.0.friend_since', '2020-09-13T09:26:40-03:00')
+                ->where('friends.0.avatar_url', 'https://avatars.steamstatic.com/abc_full.jpg')
+                ->where('friends.1.persona_name', 'carlos')
+                ->where('friends.1.my_game_id', null));
+
+        $sent = count(Http::recorded());
+        $this->actingAs($this->bruno)->get(route('games.friends'))->assertOk();
+        $this->assertCount($sent, Http::recorded());
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'GetPlayerSummaries')
+            && $request['steamids'] === self::LETICIA_STEAM_ID.',76561198000000003,76561198000000004');
+    }
+
+    public function test_a_private_friends_list_is_explained(): void
+    {
+        $this->steamFriendLists[self::BRUNO_STEAM_ID] = null;
+
+        $this->actingAs($this->bruno)
+            ->get(route('games.friends'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('private', true)
+                ->where('friends', []));
+    }
+
+    public function test_steam_failing_on_the_friends_page_is_explained_and_not_cached(): void
+    {
+        $this->steamApiStatus = 503;
+
+        $this->actingAs($this->bruno)
+            ->get(route('games.friends'))
+            ->assertInertia(fn (Assert $page) => $page->where('error', fn (string $error) => str_contains($error, 'erro 503')));
+
+        $this->steamApiStatus = null;
+
+        $this->actingAs($this->bruno)
+            ->get(route('games.friends'))
+            ->assertInertia(fn (Assert $page) => $page->where('error', null));
+    }
+
+    public function test_wishlist_and_friends_need_a_connected_account(): void
+    {
+        $this->actingAs($this->leticia)->get(route('games.wishlist'))->assertRedirect(route('games.index'));
+        $this->actingAs($this->leticia)->get(route('games.friends'))->assertRedirect(route('games.index'));
+
+        Http::assertNothingSent();
     }
 
     public function test_games_of_another_user_are_not_found(): void

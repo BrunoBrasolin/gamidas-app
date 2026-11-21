@@ -52,6 +52,36 @@ trait FakesSteam
     protected array $steamUnlocks = [];
 
     /**
+     * @var array<int, list<array<string, mixed>>> Stat schemas by app id.
+     */
+    protected array $steamStatSchemas = [];
+
+    /**
+     * @var array<string, list<array{name: string, value: int|float}>> Player stats by "steamid:appid".
+     */
+    protected array $steamStats = [];
+
+    /**
+     * @var array<string, array<string, mixed>> GetPlayerBans entries by SteamID64.
+     */
+    protected array $steamBans = [];
+
+    /**
+     * @var array<string, list<array<string, mixed>>> Wishlists by SteamID64.
+     */
+    protected array $steamWishlists = [];
+
+    /**
+     * @var array<int, array<string, mixed>> IStoreBrowseService items by app id.
+     */
+    protected array $steamStoreItems = [];
+
+    /**
+     * @var array<string, list<array<string, mixed>>|null> Friend lists by SteamID64; null = private.
+     */
+    protected array $steamFriendLists = [];
+
+    /**
      * @var array<int, list<array{name: string, percent: string}>> Global percentages by app id.
      */
     protected array $steamPercentages = [];
@@ -63,6 +93,11 @@ trait FakesSteam
 
     /** Whether the OpenID check_authentication answers is_valid:true. */
     protected bool $steamOpenIdValid = true;
+
+    /**
+     * @var list<int> Apps whose schema request fails with a 500.
+     */
+    protected array $steamFailingApps = [];
 
     /** HTTP status every Web API call answers with instead, when set. */
     protected ?int $steamApiStatus = null;
@@ -202,10 +237,26 @@ trait FakesSteam
         $steamId = (string) ($query['steamid'] ?? $query['steamids'] ?? '');
         $appId = (int) ($query['appid'] ?? 0);
 
+        if (in_array($appId, $this->steamFailingApps, true)) {
+            return Http::response('<html>Error</html>', 500);
+        }
+
         return match (true) {
             str_contains($path, 'GetPlayerSummaries') => Http::response(['response' => [
-                'players' => isset($this->steamPlayers[$steamId]) ? [$this->steamPlayers[$steamId]] : [],
+                'players' => array_values(array_filter(array_map(fn (string $id) => $this->steamPlayers[$id] ?? null, explode(',', $steamId)))),
             ]]),
+            str_contains($path, 'GetPlayerBans') => Http::response(['players' => [[
+                'SteamId' => $steamId, 'CommunityBanned' => false, 'VACBanned' => false, 'NumberOfVACBans' => 0,
+                'DaysSinceLastBan' => 0, 'NumberOfGameBans' => 0, 'EconomyBan' => 'none', ...$this->steamBans[$steamId] ?? [],
+            ]]]),
+            str_contains($path, 'GetFriendList') => array_key_exists($steamId, $this->steamFriendLists) && $this->steamFriendLists[$steamId] === null
+                ? Http::response('<html>Unauthorized</html>', 401)
+                : Http::response(['friendslist' => ['friends' => $this->steamFriendLists[$steamId] ?? []]]),
+            str_contains($path, 'GetWishlist') => Http::response(['response' => isset($this->steamWishlists[$steamId]) ? ['items' => $this->steamWishlists[$steamId]] : (object) []]),
+            str_contains($path, 'IStoreBrowseService/GetItems') => $this->steamStoreItemsResponse((string) ($query['input_json'] ?? '')),
+            str_contains($path, 'GetUserStatsForGame') => isset($this->steamStats["{$steamId}:{$appId}"])
+                ? Http::response(['playerstats' => ['steamID' => $steamId, 'gameName' => "App {$appId}", 'stats' => $this->steamStats["{$steamId}:{$appId}"]]])
+                : Http::response(['playerstats' => ['error' => 'Requested app has no stats', 'success' => false]], 400),
             str_contains($path, 'GetBadges') => Http::response(['response' => $this->steamBadges[$steamId] ?? (object) []]),
             str_contains($path, 'GetOwnedGames') => Http::response(['response' => ($this->steamLibraries[$steamId] ?? null) === null
                 ? (object) []
@@ -213,12 +264,30 @@ trait FakesSteam
             str_contains($path, 'ResolveVanityURL') => Http::response(['response' => isset($this->steamVanity[(string) ($query['vanityurl'] ?? '')])
                 ? ['steamid' => $this->steamVanity[(string) $query['vanityurl']], 'success' => 1]
                 : ['success' => 42, 'message' => 'No match']]),
-            str_contains($path, 'GetSchemaForGame') => Http::response(['game' => isset($this->steamSchemas[$appId])
-                ? ['gameName' => "App {$appId}", 'availableGameStats' => ['achievements' => $this->steamSchemas[$appId]]]
+            str_contains($path, 'GetSchemaForGame') => Http::response(['game' => isset($this->steamSchemas[$appId]) || isset($this->steamStatSchemas[$appId])
+                ? ['gameName' => "App {$appId}", 'availableGameStats' => array_filter([
+                    'achievements' => $this->steamSchemas[$appId] ?? null,
+                    'stats' => $this->steamStatSchemas[$appId] ?? null,
+                ])]
                 : (object) []]),
             str_contains($path, 'GetPlayerAchievements') => $this->steamPlayerAchievements($steamId, $appId),
             default => Http::response('Not found', 404),
         };
+    }
+
+    private function steamStoreItemsResponse(string $input): PromiseInterface
+    {
+        $request = json_decode($input, true);
+        $items = [];
+
+        foreach (is_array($request) && is_array($request['ids'] ?? null) ? $request['ids'] : [] as $id) {
+            $appId = (int) ($id['appid'] ?? 0);
+            $items[] = isset($this->steamStoreItems[$appId])
+                ? ['item_type' => 0, 'id' => $appId, 'success' => 1, 'visible' => true, 'appid' => $appId, ...$this->steamStoreItems[$appId]]
+                : ['item_type' => 0, 'id' => $appId, 'success' => 15, 'visible' => false, 'name' => '', 'appid' => 0];
+        }
+
+        return Http::response(['response' => ['store_items' => $items]]);
     }
 
     private function steamPlayerAchievements(string $steamId, int $appId): PromiseInterface

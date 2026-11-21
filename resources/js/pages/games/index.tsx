@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/finance/page-header';
 import { StatCard } from '@/components/finance/stat-card';
 import { BarChart, MeterRow } from '@/components/games/bar-chart';
 import { GameImage } from '@/components/games/game-image';
+import { GamesTabs } from '@/components/games/games-tabs';
 import {
     SteamAccountCard,
     SteamConnectCard,
@@ -56,6 +57,7 @@ import games from '@/routes/games';
 import type {
     SteamAccount,
     SteamAchievement,
+    SteamBans,
     SteamDay,
     SteamGame,
     SteamMonth,
@@ -81,6 +83,31 @@ const SORTS: Record<Sort, string> = {
     name: 'Nome',
     completion: 'Conquistas (%)',
 };
+
+/** VAC, game, community and trade bans, or that there are none. */
+function BansNote({ bans }: { bans: SteamBans }) {
+    const parts = [
+        bans.vac > 0 &&
+            `${bans.vac} ${bans.vac === 1 ? 'banimento VAC' : 'banimentos VAC'}`,
+        bans.game > 0 &&
+            `${bans.game} ${bans.game === 1 ? 'banimento em jogo' : 'banimentos em jogos'}`,
+        bans.community && 'banido da comunidade',
+        bans.trade && 'bloqueado para trocas',
+    ].filter(Boolean);
+
+    if (parts.length === 0) {
+        return <span>Sem banimentos</span>;
+    }
+
+    return (
+        <span className="text-destructive">
+            {capitalize(parts.join(', '))}
+            {bans.days_since_last !== null &&
+                (bans.vac > 0 || bans.game > 0) &&
+                ` (o último há ${bans.days_since_last} ${bans.days_since_last === 1 ? 'dia' : 'dias'})`}
+        </span>
+    );
+}
 
 function Profile({ account }: { account: SteamAccount }) {
     const online = account.persona_state > 0 || account.playing !== null;
@@ -162,6 +189,7 @@ function Profile({ account }: { account: SteamAccount }) {
                         {account.country_code && (
                             <span>{account.country_code}</span>
                         )}
+                        {account.bans && <BansNote bans={account.bans} />}
                     </p>
                     {levelProgress !== null && toNext !== null && (
                         <div className="max-w-sm space-y-1">
@@ -684,6 +712,8 @@ export default function GamesIndex({
                         Steam
                     </Button>
                 </PageHeader>
+
+                <GamesTabs />
 
                 {showSettings && <SteamAccountCard account={account} />}
 

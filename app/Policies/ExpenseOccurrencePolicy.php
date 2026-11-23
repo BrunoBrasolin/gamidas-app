@@ -11,13 +11,11 @@ use Illuminate\Auth\Access\Response;
 class ExpenseOccurrencePolicy
 {
     /**
-     * Household expenses are visible to every member of the household;
-     * personal expenses only to their owner.
+     * Household expenses are visible to every member of the household.
      */
     public function view(User $user, ExpenseOccurrence $occurrence): bool
     {
-        return $occurrence->household_id === $user->householdId()
-            && ($occurrence->isHousehold() || $occurrence->owner_user_id === $user->id);
+        return $occurrence->household_id === $user->householdId();
     }
 
     public function update(User $user, ExpenseOccurrence $occurrence): Response
@@ -38,10 +36,11 @@ class ExpenseOccurrencePolicy
 
     /**
      * Any member can take a pending household expense into their own personal
-     * finances (it then counts in full for them and leaves the split). Never
-     * into someone else's: personal records are only written by their owner.
-     * An expense backed by another member's bank transaction stays with
-     * them, so their inbox never points at someone else's private expense.
+     * finances (it becomes one of their expense entries and leaves the
+     * split). Never into someone else's: personal records are only written by
+     * their owner. An expense backed by another member's bank transaction
+     * stays with them, so their inbox never points at someone else's private
+     * entry. It needs an amount: an entry cannot be empty.
      */
     public function moveToPersonal(User $user, ExpenseOccurrence $occurrence): Response
     {
@@ -49,12 +48,12 @@ class ExpenseOccurrencePolicy
             return Response::denyAsNotFound();
         }
 
-        if (! $occurrence->isHousehold()) {
-            return Response::deny('Esta despesa já é pessoal.');
-        }
-
         if ($occurrence->isPaid()) {
             return Response::deny('Despesas pagas não podem ser movidas. Reabra o pagamento primeiro.');
+        }
+
+        if ($occurrence->awaitsAmount()) {
+            return Response::deny('Informe o valor deste mês antes de movê-la para as suas finanças pessoais.');
         }
 
         $transactions = $occurrence->relationLoaded('bankTransactions')
@@ -80,7 +79,7 @@ class ExpenseOccurrencePolicy
     /**
      * A household expense must be confirmed as paid by a member other than
      * its creator ("Pago pelo Bruno" for an expense created by Letícia, and
-     * vice versa). Personal expenses are confirmed by their owner.
+     * vice versa).
      */
     public function confirmPayment(User $user, ExpenseOccurrence $occurrence): Response
     {
@@ -96,7 +95,7 @@ class ExpenseOccurrencePolicy
             return Response::deny('Informe o valor deste mês antes de confirmar o pagamento.');
         }
 
-        if ($occurrence->isHousehold() && $occurrence->created_by_user_id === $user->id) {
+        if ($occurrence->created_by_user_id === $user->id) {
             return Response::deny('O pagamento de uma despesa da casa deve ser confirmado pelo outro membro da residência.');
         }
 
@@ -117,10 +116,6 @@ class ExpenseOccurrencePolicy
             return Response::denyAsNotFound();
         }
 
-        if (! $occurrence->isHousehold()) {
-            return Response::deny('Só despesas da casa entram no acerto.');
-        }
-
         if ($occurrence->isPaid()) {
             return Response::deny("“{$occurrence->title}” já foi paga.");
         }
@@ -133,8 +128,8 @@ class ExpenseOccurrencePolicy
     }
 
     /**
-     * Only the member who confirmed a household payment can reopen it.
-     * Personal expenses are reopened by their owner. An expense paid by a
+     * Only the member who confirmed a household payment can reopen it. An
+     * expense paid by a
      * house settlement is reopened by undoing the settlement in the inbox.
      */
     public function reopenPayment(User $user, ExpenseOccurrence $occurrence): Response
@@ -151,7 +146,7 @@ class ExpenseOccurrencePolicy
             return Response::deny('Esta despesa foi paga num acerto da casa. Para reabri-la, desfaça o acerto na caixa de entrada do banco.');
         }
 
-        if ($occurrence->isHousehold() && $occurrence->paid_by_user_id !== $user->id) {
+        if ($occurrence->paid_by_user_id !== $user->id) {
             return Response::deny('Somente quem confirmou o pagamento pode reabri-lo.');
         }
 

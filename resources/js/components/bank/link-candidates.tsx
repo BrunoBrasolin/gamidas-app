@@ -330,9 +330,6 @@ function CandidateOption({
                 <span className="block font-medium">{candidate.title}</span>
                 <span className="mt-0.5 flex flex-wrap gap-1">
                     <Badge variant="outline">
-                        {candidate.scope === 'household' ? 'Casa' : 'Pessoal'}
-                    </Badge>
-                    <Badge variant="outline">
                         {formatMonth(candidate.billing_month)}
                     </Badge>
                     {candidate.installment_number && (

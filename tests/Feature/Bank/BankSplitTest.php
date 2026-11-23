@@ -4,7 +4,6 @@ namespace Tests\Feature\Bank;
 
 use App\Enums\BankAccountType;
 use App\Enums\BankCatalogType;
-use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceStatus;
 use App\Enums\RecurringKind;
 use App\Enums\TransactionType;
@@ -72,7 +71,6 @@ class BankSplitTest extends TestCase
     private function installment(int $cents = 17_000): ExpenseOccurrence
     {
         return app(ExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household,
             'title' => 'Instalação alarme',
             'notes' => null,
             'amount_cents' => $cents,
@@ -344,7 +342,6 @@ class BankSplitTest extends TestCase
     public function test_an_expense_backed_by_a_part_moves_to_personal_only_with_the_banks_owner(): void
     {
         $template = app(RecurringExpenseService::class)->create($this->household, $this->bruno, [
-            'scope' => ExpenseScope::Household,
             'kind' => RecurringKind::Fixed,
             'title' => 'Internet',
             'notes' => null,
@@ -373,15 +370,25 @@ class BankSplitTest extends TestCase
         $this->actingAs($this->bruno)->post(route('expenses.move-to-personal', $month))->assertSessionHasNoErrors();
         $this->actingAs($this->bruno)->post(route('expenses.move-to-personal', $created))->assertSessionHasNoErrors();
 
-        // The recurring month left the series: the part follows the new expense.
-        $moved = ExpenseOccurrence::query()->where('scope', ExpenseScope::Personal)->where('title', 'Internet')->sole();
-        $this->assertSame([$moved->id, $created->id], $transaction->splitItems()->pluck('expense_occurrence_id')->all());
+        // Both parts follow their expenses into Bruno's personal entries.
+        $this->assertSoftDeleted($month);
+        $this->assertSoftDeleted($created);
+        $internet = PersonalTransaction::query()->where('title', 'Internet')->sole();
+        $cable = PersonalTransaction::query()->where('title', 'Cabo de rede')->sole();
+        $parts = $transaction->splitItems()->orderBy('id')->get();
+        $this->assertSame([BankCatalogType::Personal, BankCatalogType::Personal], $parts->pluck('type')->all());
+        $this->assertSame([$internet->id, $cable->id], $parts->pluck('personal_transaction_id')->all());
+        $this->assertSame([null, null], $parts->pluck('expense_occurrence_id')->all());
 
         $this->actingAs($this->bruno)
             ->get(route('bank.inbox', ['status' => 'catalogued']))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('transactions.data.0.split.0.expense.id', $moved->id)
-                ->where('transactions.data.0.split.0.expense.scope', 'personal')
-                ->where('transactions.data.0.split.1.label', 'Conta pessoal'));
+                ->where('transactions.data.0.split.0.label', 'Despesa pessoal')
+                ->where('transactions.data.0.split.0.entry.id', $internet->id)
+                ->where('transactions.data.0.split.1.entry.id', $cable->id));
+
+        // Undoing the split removes the entries.
+        $this->actingAs($this->bruno)->delete(route('bank.transactions.reopen', $transaction))->assertSessionHasNoErrors();
+        $this->assertSame(0, PersonalTransaction::query()->count());
     }
 }

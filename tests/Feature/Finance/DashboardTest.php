@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Enums\RecurringKind;
+use App\Enums\TransactionType;
 use App\Services\ExpenseService;
 use App\Services\PaymentService;
 use App\Services\RecurringExpenseService;
@@ -37,22 +37,24 @@ class DashboardTest extends TestCase
     private function seedMonth(): void
     {
         app(RecurringExpenseService::class)->create($this->household, $this->bruno, [
-            'scope' => ExpenseScope::Household, 'kind' => RecurringKind::Fixed, 'title' => 'Internet', 'notes' => null,
+            'kind' => RecurringKind::Fixed, 'title' => 'Internet', 'notes' => null,
             'amount_cents' => 10_000, 'due_day' => 25,
             'start_month' => Month::parse('2026-10'), 'end_month' => null, 'total_months' => null,
         ]);
         app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household, 'kind' => RecurringKind::Temporary, 'title' => 'Sofá', 'notes' => null,
+            'kind' => RecurringKind::Temporary, 'title' => 'Sofá', 'notes' => null,
             'amount_cents' => 30_000, 'due_day' => 5,
             'start_month' => Month::parse('2026-10'), 'end_month' => null, 'total_months' => 4,
         ]);
         app(ExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household, 'title' => 'Notebook', 'notes' => null,
+            'title' => 'Notebook', 'notes' => null,
             'amount_cents' => 20_000, 'due_date' => CarbonImmutable::parse('2026-10-15'),
         ], 6);
         $paid = $this->createExpense($this->leticia, 50_000, Month::parse('2026-10'));
         app(PaymentService::class)->confirm($paid, $this->bruno);
-        $this->createExpense($this->bruno, 7_700, Month::parse('2026-10'), ExpenseScope::Personal);
+        $this->bruno->personalTransactions()->create([
+            'type' => TransactionType::Expense, 'title' => 'Academia', 'amount_cents' => 7_700, 'transaction_date' => '2026-10-10',
+        ]);
     }
 
     public function test_the_dashboard_totals_come_from_persisted_occurrences(): void
@@ -68,7 +70,7 @@ class DashboardTest extends TestCase
                 ->where('combinedSalaryCents', 1_000_000)
                 ->where('proportions.'.$this->bruno->id, 8_000)
                 ->where('proportions.'.$this->leticia->id, 2_000)
-                // 100 (internet) + 300 (extra) + 200 (notebook installment) + 500 (one-off); personal bills excluded.
+                // 100 (internet) + 300 (extra) + 200 (notebook installment) + 500 (one-off); personal entries excluded.
                 ->where('household.total_cents', 110_000)
                 ->where('household.paid_cents', 50_000)
                 ->where('household.pending_cents', 60_000)
@@ -77,13 +79,13 @@ class DashboardTest extends TestCase
                 ->where('household.by_source.one_off', 70_000)
                 ->where('household.by_member.0.total_cents', 88_000)
                 ->where('household.by_member.1.total_cents', 22_000)
-                ->where('personal.personal_bills_cents', 7_700)
+                ->where('personal.ledger_expense_cents', 7_700)
                 ->where('personal.household_share_cents', 88_000)
                 // Pending and due by 05/11: two overdue (extra and installment in October),
-                // Internet on 25/10, Bruno's personal bill and November's extra on 05/11.
-                ->has('upcoming', 5)
+                // Internet on 25/10 and November's extra on 05/11.
+                ->has('upcoming', 4)
                 ->where('upcoming.0.due_date', '2026-10-05')
-                ->where('upcoming.4.due_date', '2026-11-05')
+                ->where('upcoming.3.due_date', '2026-11-05')
             );
     }
 

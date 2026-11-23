@@ -66,10 +66,10 @@ class BankRuleRequest extends FinanceRequest
 
             $recurring = $this->nullableInt('recurring_expense_id');
 
-            // A personal recurring expense of the other member is not visible.
+            // Only the recurring expenses of the user's household.
             if ($recurring !== null && $this->action() === BankRuleAction::Recurring
                 && ! RecurringExpense::query()->visibleTo($this->user())->whereKey($recurring)->exists()) {
-                $validator->errors()->add('recurring_expense_id', 'Escolha uma despesa recorrente da casa ou sua.');
+                $validator->errors()->add('recurring_expense_id', 'Escolha uma despesa recorrente da casa.');
             }
         }];
     }

@@ -4,11 +4,9 @@ namespace Tests\Feature\Bank;
 
 use App\Enums\BankRuleAction;
 use App\Enums\BankRuleMatch;
-use App\Enums\ExpenseScope;
 use App\Enums\RecurringKind;
 use App\Models\BankRule;
 use App\Models\RecurringExpense;
-use App\Models\User;
 use App\Services\RecurringExpenseService;
 use App\Support\Month;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,12 +25,11 @@ class BankRuleTest extends TestCase
         $this->createHousehold();
     }
 
-    private function recurring(ExpenseScope $scope = ExpenseScope::Household, ?User $actor = null): RecurringExpense
+    private function recurring(): RecurringExpense
     {
-        return app(RecurringExpenseService::class)->create($this->household, $actor ?? $this->leticia, [
-            'scope' => $scope,
+        return app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
             'kind' => RecurringKind::Fixed,
-            'title' => $scope === ExpenseScope::Household ? 'Aluguel' : 'Academia',
+            'title' => 'Aluguel',
             'notes' => null,
             'amount_cents' => 180_000,
             'due_day' => 5,
@@ -80,14 +77,8 @@ class BankRuleTest extends TestCase
         $this->assertTrue($rule->auto_apply);
     }
 
-    public function test_recurring_expenses_must_be_visible_to_the_member(): void
+    public function test_recurring_expenses_must_be_of_the_members_household(): void
     {
-        $private = $this->recurring(ExpenseScope::Personal, $this->leticia);
-
-        $this->actingAs($this->bruno)
-            ->post(route('bank.rules.store'), ['label' => 'Academia', 'match_mode' => 'equals', 'action' => 'recurring', 'recurring_expense_id' => $private->id])
-            ->assertSessionHasErrors('recurring_expense_id');
-
         $outsider = $this->createOutsider();
 
         $this->actingAs($outsider)

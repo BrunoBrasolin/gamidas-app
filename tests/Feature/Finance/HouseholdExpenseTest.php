@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Finance;
 
+use App\Enums\ExpenseScope;
 use App\Models\AuditLog;
 use App\Models\ExpenseOccurrence;
 use App\Support\Month;
@@ -34,7 +35,6 @@ class HouseholdExpenseTest extends TestCase
     {
         $this->actingAs($this->leticia)
             ->post(route('expenses.store'), [
-                'scope' => 'household',
                 'title' => 'Mercado do mês',
                 'amount' => '1234.56',
                 'due_date' => '2026-10-30',
@@ -47,7 +47,6 @@ class HouseholdExpenseTest extends TestCase
         $this->assertSame(123_456, $expense->amount_cents);
         $this->assertSame($this->leticia->id, $expense->created_by_user_id);
         $this->assertNotNull($expense->created_at);
-        $this->assertNull($expense->owner_user_id);
         $this->assertSame([$this->bruno->id => 98_765, $this->leticia->id => 24_691], $this->sharesOf($expense));
         $this->assertSame(123_456, array_sum($this->sharesOf($expense)));
         $this->assertDatabaseHas('audit_logs', ['action' => 'expense.created', 'user_id' => $this->leticia->id]);
@@ -82,7 +81,7 @@ class HouseholdExpenseTest extends TestCase
         $this->assertSame($this->bruno->id, AuditLog::query()->where('action', 'expense.deleted')->sole()->user_id);
     }
 
-    public function test_personal_expenses_belong_to_their_creator_and_are_hidden_from_others(): void
+    public function test_every_new_expense_is_a_household_one_even_if_an_old_page_asks_for_personal(): void
     {
         $this->actingAs($this->bruno)
             ->post(route('expenses.store'), [
@@ -94,20 +93,12 @@ class HouseholdExpenseTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $expense = ExpenseOccurrence::query()->sole();
-        $this->assertSame($this->bruno->id, $expense->owner_user_id);
-        $this->assertSame([], $this->sharesOf($expense));
+        $this->assertSame(ExpenseScope::Household, $expense->scope);
+        $this->assertNotSame([], $this->sharesOf($expense));
 
         $this->actingAs($this->leticia)
-            ->get(route('personal.bills'))
-            ->assertInertia(fn (Assert $page) => $page->has('occurrences.data', 0));
-        $this->actingAs($this->leticia)
-            ->get(route('expenses.index'))
-            ->assertInertia(fn (Assert $page) => $page->has('occurrences.data', 0));
-        $this->actingAs($this->bruno)
-            ->get(route('personal.bills'))
-            ->assertInertia(fn (Assert $page) => $page->has('occurrences.data', 1));
-
-        $this->actingAs($this->leticia)->put(route('expenses.update', $expense), ['title' => 'x'])->assertNotFound();
+            ->get(route('expenses.index', ['month' => '2026-10']))
+            ->assertInertia(fn (Assert $page) => $page->where('occurrences.data.0.id', $expense->id));
     }
 
     public function test_the_monthly_table_filters_and_totals(): void
@@ -174,29 +165,28 @@ class HouseholdExpenseTest extends TestCase
     {
         $this->actingAs($this->bruno)
             ->post(route('expenses.store'), [
-                'scope' => 'everyone',
                 'title' => str_repeat('x', 121),
                 'amount' => '0.00',
                 'installments' => '0',
                 'due_date' => '2026-02-29',
             ])
-            ->assertSessionHasErrors(['scope', 'title', 'amount', 'installments', 'due_date']);
+            ->assertSessionHasErrors(['title', 'amount', 'installments', 'due_date']);
 
         $this->actingAs($this->bruno)
             ->post(route('expenses.store'), [
-                'scope' => 'household', 'title' => 'Muitas parcelas', 'amount' => '10.00', 'installments' => '121', 'due_date' => '2026-10-10',
+                'title' => 'Muitas parcelas', 'amount' => '10.00', 'installments' => '121', 'due_date' => '2026-10-10',
             ])
             ->assertSessionHasErrors('installments');
 
         $this->actingAs($this->bruno)
             ->post(route('expenses.store'), [
-                'scope' => 'household', 'title' => 'Teto', 'amount' => '10000000.00', 'due_date' => '2026-10-10',
+                'title' => 'Teto', 'amount' => '10000000.00', 'due_date' => '2026-10-10',
             ])
             ->assertSessionHasErrors('amount');
 
         $this->actingAs($this->bruno)
             ->post(route('expenses.store'), [
-                'scope' => 'household', 'title' => 'Um centavo', 'amount' => '0.01', 'due_date' => '2026-10-31',
+                'title' => 'Um centavo', 'amount' => '0.01', 'due_date' => '2026-10-31',
             ])
             ->assertSessionHasNoErrors();
 
@@ -208,7 +198,6 @@ class HouseholdExpenseTest extends TestCase
     {
         $this->actingAs($this->bruno)
             ->post(route('expenses.store'), [
-                'scope' => 'household',
                 'title' => 'IPTU',
                 'amount' => '300.00',
                 'billing_month' => '2026-01',
@@ -234,7 +223,6 @@ class HouseholdExpenseTest extends TestCase
     {
         $this->actingAs($this->leticia)
             ->post(route('expenses.store'), [
-                'scope' => 'household',
                 'title' => 'Geladeira',
                 'amount' => '250.00',
                 'installments' => '4',
@@ -270,7 +258,7 @@ class HouseholdExpenseTest extends TestCase
     {
         $this->actingAs($this->bruno)
             ->post(route('expenses.store'), [
-                'scope' => 'household', 'title' => 'Mercado', 'amount' => '80.00', 'installments' => '1', 'due_date' => '2026-10-15',
+                'title' => 'Mercado', 'amount' => '80.00', 'installments' => '1', 'due_date' => '2026-10-15',
             ])
             ->assertSessionHasNoErrors();
 

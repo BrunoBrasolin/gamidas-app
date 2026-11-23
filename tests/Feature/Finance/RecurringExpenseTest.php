@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceSource;
 use App\Enums\RecurringKind;
 use App\Models\ExpenseOccurrence;
@@ -45,7 +44,6 @@ class RecurringExpenseTest extends TestCase
     private function createTemplate(array $overrides = []): RecurringExpense
     {
         return app(RecurringExpenseService::class)->create($this->household, $this->bruno, [
-            'scope' => ExpenseScope::Household,
             'kind' => RecurringKind::Fixed,
             'title' => 'Internet',
             'notes' => null,
@@ -117,7 +115,6 @@ class RecurringExpenseTest extends TestCase
 
         ExpenseOccurrence::create([
             'household_id' => $this->household->id,
-            'scope' => ExpenseScope::Household,
             'source' => OccurrenceSource::Recurring,
             'recurring_expense_id' => $template->id,
             'title' => 'Internet',
@@ -325,7 +322,6 @@ class RecurringExpenseTest extends TestCase
         $this->actingAs($this->leticia)
             ->post(route('recurring-expenses.store'), [
                 'kind' => 'temporary',
-                'scope' => 'household',
                 'title' => 'Geladeira',
                 'amount' => '300.00',
                 'due_day' => 31,
@@ -350,7 +346,6 @@ class RecurringExpenseTest extends TestCase
         $this->actingAs($this->leticia)
             ->post(route('recurring-expenses.store'), [
                 'kind' => 'fixed',
-                'scope' => 'household',
                 'title' => 'Luz',
                 'is_variable' => '1',
                 'due_day' => 15,
@@ -408,7 +403,6 @@ class RecurringExpenseTest extends TestCase
         $this->actingAs($this->leticia)
             ->post(route('recurring-expenses.store'), [
                 'kind' => 'fixed',
-                'scope' => 'household',
                 'title' => 'Internet',
                 'is_variable' => '0',
                 'due_day' => 10,

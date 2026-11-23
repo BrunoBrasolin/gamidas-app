@@ -1,18 +1,15 @@
 import { Link } from '@inertiajs/react';
-import { expensesPage, recurringPage } from '@/lib/expense-pages';
 import { cn } from '@/lib/utils';
-import type { Scope } from '@/types';
+import expenses from '@/routes/expenses';
 
 /**
- * Switches between the monthly expenses of a scope and the recurring ones
+ * Switches between the household's monthly expenses and the recurring ones
  * that generate them.
  */
 export function ExpenseTabs({
-    scope,
     current,
     month,
 }: {
-    scope: Scope;
     current: 'month' | 'recurring';
     month?: string;
 }) {
@@ -20,9 +17,9 @@ export function ExpenseTabs({
         {
             key: 'month',
             label: 'Mês a mês',
-            href: expensesPage(scope, { month }),
+            href: expenses.index({ query: { month } }),
         },
-        { key: 'recurring', label: 'Recorrentes', href: recurringPage(scope) },
+        { key: 'recurring', label: 'Recorrentes', href: expenses.recurring() },
     ] as const;
 
     return (

@@ -58,7 +58,6 @@ final class ExpensePresenter
             'id' => $occurrence->id,
             'title' => $occurrence->title,
             'notes' => $occurrence->notes,
-            'scope' => $occurrence->scope->value,
             'source' => $occurrence->source->value,
             'source_label' => $this->sourceLabel($occurrence),
             'recurring_expense_id' => $occurrence->recurring_expense_id,
@@ -209,10 +208,6 @@ final class ExpensePresenter
      */
     private function confirmLabel(ExpenseOccurrence $occurrence): string
     {
-        if (! $occurrence->isHousehold()) {
-            return 'Marcar como pago';
-        }
-
         $others = $this->members->reject(fn (HouseholdMember $member) => $member->user_id === $occurrence->created_by_user_id);
 
         if ($others->count() === 1) {
@@ -232,10 +227,6 @@ final class ExpensePresenter
     {
         if (! $occurrence->isPaid()) {
             return null;
-        }
-
-        if (! $occurrence->isHousehold()) {
-            return 'Pago';
         }
 
         $payer = $this->members->get((int) $occurrence->paid_by_user_id);

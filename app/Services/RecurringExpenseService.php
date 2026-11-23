@@ -36,7 +36,7 @@ final class RecurringExpenseService
      * bill) store no amount; their months are generated at zero and wait for
      * the month's amount to be filled in.
      *
-     * @param  array{scope: ExpenseScope, kind: RecurringKind, title: string, notes: ?string, amount_cents: int, is_variable?: bool, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}  $data
+     * @param  array{kind: RecurringKind, title: string, notes: ?string, amount_cents: int, is_variable?: bool, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}  $data
      */
     public function create(Household $household, User $actor, array $data): RecurringExpense
     {
@@ -46,7 +46,7 @@ final class RecurringExpenseService
                 ...$this->amount($data),
                 ...$this->period($data['kind'], $data['start_month'], $data['end_month'], $data['total_months']),
                 'household_id' => $household->id,
-                'owner_user_id' => $data['scope'] === ExpenseScope::Personal ? $actor->id : null,
+                'scope' => ExpenseScope::Household,
                 'created_by_user_id' => $actor->id,
             ]);
 

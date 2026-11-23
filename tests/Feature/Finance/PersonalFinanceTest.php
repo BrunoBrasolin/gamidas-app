@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Enums\TransactionType;
 use App\Models\PersonalTransaction;
 use App\Models\User;
@@ -105,23 +104,20 @@ class PersonalFinanceTest extends TestCase
         $this->transaction($this->bruno, TransactionType::Expense, 12_000, '2026-10-08');
         $this->transaction($this->bruno, TransactionType::Investment, 100_000, '2026-10-15');
         $this->createExpense($this->leticia, 300_000, Month::parse('2026-10'));
-        $this->createExpense($this->bruno, 9_900, Month::parse('2026-10'), ExpenseScope::Personal);
-        $this->createExpense($this->leticia, 5_000, Month::parse('2026-10'), ExpenseScope::Personal);
 
         $summary = app(PersonalSummary::class)->month($this->bruno, Month::parse('2026-10'));
 
         $this->assertSame(850_000, $summary['income_cents']);
         $this->assertSame(12_000, $summary['ledger_expense_cents']);
-        $this->assertSame(9_900, $summary['personal_bills_cents']);
         $this->assertSame(240_000, $summary['household_share_cents'], '80% of R$ 3.000,00');
-        $this->assertSame(12_000 + 9_900 + 240_000, $summary['expense_cents']);
+        $this->assertSame(12_000 + 240_000, $summary['expense_cents']);
+        $this->assertArrayNotHasKey('personal_bills_cents', $summary);
         $this->assertSame(100_000, $summary['investment_cents'], 'Investments are not expenses.');
-        $this->assertSame(850_000 - 261_900 - 100_000, $summary['net_cents']);
+        $this->assertSame(850_000 - 252_000 - 100_000, $summary['net_cents']);
         $this->assertSame($summary['net_cents'], $summary['balance_cents']);
 
         $leticia = app(PersonalSummary::class)->month($this->leticia, Month::parse('2026-10'));
         $this->assertSame(60_000, $leticia['household_share_cents']);
-        $this->assertSame(5_000, $leticia['personal_bills_cents']);
     }
 
     public function test_the_available_balance_accumulates_across_months_and_years(): void

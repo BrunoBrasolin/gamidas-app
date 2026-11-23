@@ -18,7 +18,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { formatMoney } from '@/lib/format';
 import expenses from '@/routes/expenses';
-import type { Occurrence, Scope } from '@/types';
+import type { Occurrence } from '@/types';
 
 const MAX_INSTALLMENTS = 120;
 
@@ -30,12 +30,10 @@ const MAX_INSTALLMENTS = 120;
 export function ExpenseFormDialog({
     trigger,
     month,
-    scope = 'household',
     occurrence,
 }: {
     trigger: ReactNode;
     month: string;
-    scope?: Scope;
     occurrence?: Occurrence;
 }) {
     const [open, setOpen] = useState(false);
@@ -97,14 +95,6 @@ export function ExpenseFormDialog({
                 >
                     {({ errors, processing }) => (
                         <>
-                            {!editing && (
-                                <input
-                                    type="hidden"
-                                    name="scope"
-                                    value={scope}
-                                />
-                            )}
-
                             <FormField
                                 id="expense-title"
                                 label="Título"

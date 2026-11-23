@@ -31,12 +31,6 @@ final class ShareCalculator
      */
     public function sync(ExpenseOccurrence $occurrence, ?array $salaries = null): void
     {
-        if ($occurrence->scope !== ExpenseScope::Household) {
-            $occurrence->shares()->delete();
-
-            return;
-        }
-
         if ($occurrence->status === OccurrenceStatus::Paid) {
             throw new LogicException('Shares of a paid occurrence are historical and cannot be recalculated.');
         }

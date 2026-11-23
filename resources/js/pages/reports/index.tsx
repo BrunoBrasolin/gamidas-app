@@ -265,10 +265,6 @@ export default function ReportsIndex({
                                         personal.totals.ledger_expense_cents,
                                     ],
                                     [
-                                        'Contas pessoais',
-                                        personal.totals.personal_bills_cents,
-                                    ],
-                                    [
                                         'Sua parte da casa',
                                         personal.totals.household_share_cents,
                                     ],

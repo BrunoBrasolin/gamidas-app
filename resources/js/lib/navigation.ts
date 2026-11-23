@@ -88,12 +88,6 @@ export const navGroups: NavGroup[] = [
                         title: 'Despesas',
                         href: personal.transactions.index('expenses'),
                     },
-                    {
-                        // Bills with due date and payment status, and the
-                        // recurring ones.
-                        title: 'Contas',
-                        href: personal.bills(),
-                    },
                 ],
             },
             {

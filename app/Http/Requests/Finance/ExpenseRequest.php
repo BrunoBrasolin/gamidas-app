@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Rules\MoneyAmount;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\Rule;
@@ -17,7 +16,6 @@ class ExpenseRequest extends FinanceRequest
     public function rules(): array
     {
         return [
-            'scope' => [Rule::requiredIf($this->isMethod('POST')), Rule::enum(ExpenseScope::class)],
             'title' => ['required', 'string', 'max:120'],
             'amount' => ['required', new MoneyAmount],
             'installments' => [Rule::excludeIf(! $this->isMethod('POST')), 'nullable', 'integer', 'min:1', 'max:'.self::MAX_INSTALLMENTS],

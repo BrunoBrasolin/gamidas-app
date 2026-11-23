@@ -76,7 +76,6 @@ final class OccurrenceGenerator
                         ...self::attributesFor($template, $month),
                         'household_id' => $template->household_id,
                         'scope' => $template->scope,
-                        'owner_user_id' => $template->owner_user_id,
                         'source' => OccurrenceSource::Recurring,
                         'recurring_expense_id' => $template->id,
                         'billing_month' => $month,

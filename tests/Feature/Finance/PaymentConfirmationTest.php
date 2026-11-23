@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Enums\PaymentEventType;
 use App\Models\AuditLog;
 use App\Models\PaymentEvent;
@@ -158,21 +157,6 @@ class PaymentConfirmationTest extends TestCase
         $this->assertSame([$this->bruno->id => 50_000, $this->leticia->id => 50_000], $this->sharesOf($expense));
     }
 
-    public function test_personal_expenses_are_paid_by_their_owner_only(): void
-    {
-        $expense = $this->createExpense($this->bruno, 9_900, scope: ExpenseScope::Personal);
-
-        $this->actingAs($this->leticia)->post(route('expenses.payment.store', $expense))->assertNotFound();
-        $this->actingAs($this->bruno)->post(route('expenses.payment.store', $expense))->assertRedirect();
-        $this->assertTrue($expense->fresh()->isPaid());
-
-        $this->actingAs($this->bruno)
-            ->delete(route('expenses.payment.destroy', $expense), ['reason' => 'Marquei errado'])
-            ->assertSessionHasNoErrors();
-
-        $this->assertFalse($expense->fresh()->isPaid());
-    }
-
     public function test_members_of_other_households_cannot_touch_payments(): void
     {
         $outsider = $this->createOutsider();
@@ -189,7 +173,6 @@ class PaymentConfirmationTest extends TestCase
         $alsoByLeticia = $this->createExpense($this->leticia, 2_550, $october);
         $byBruno = $this->createExpense($this->bruno, 40_000, $october);
         $nextMonth = $this->createExpense($this->leticia, 70_000, Month::parse('2026-11'));
-        $personal = $this->createExpense($this->bruno, 9_900, $october, ExpenseScope::Personal);
         $alreadyPaid = $this->createExpense($this->leticia, 1_000, $october);
         $this->actingAs($this->bruno)->post(route('expenses.payment.store', $alreadyPaid));
 
@@ -201,7 +184,7 @@ class PaymentConfirmationTest extends TestCase
             );
 
         $this->actingAs($this->bruno)
-            ->post(route('expenses.pay-all', ['month' => '2026-10', 'scope' => 'household']))
+            ->post(route('expenses.pay-all', ['month' => '2026-10']))
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
@@ -211,42 +194,37 @@ class PaymentConfirmationTest extends TestCase
             $this->assertSame($this->bruno->id, $expense->paid_by_user_id);
         }
 
-        // Bruno's own expense still waits for Letícia; other months and
-        // personal expenses are untouched.
+        // Bruno's own expense still waits for Letícia; other months are
+        // untouched.
         $this->assertFalse($byBruno->fresh()->isPaid());
         $this->assertFalse($nextMonth->fresh()->isPaid());
-        $this->assertFalse($personal->fresh()->isPaid());
 
         $this->assertSame(3, PaymentEvent::query()->where('type', PaymentEventType::Paid)->count());
         $this->assertSame(3, AuditLog::query()->where('action', 'payment.confirmed')->count());
 
         $this->actingAs($this->leticia)
-            ->post(route('expenses.pay-all', ['month' => '2026-10', 'scope' => 'household']))
+            ->post(route('expenses.pay-all', ['month' => '2026-10']))
             ->assertRedirect();
 
         $this->assertTrue($byBruno->fresh()->isPaid());
         $this->assertSame($this->leticia->id, $byBruno->fresh()->paid_by_user_id);
     }
 
-    public function test_pay_all_honors_the_filters_and_the_personal_scope(): void
+    public function test_pay_all_honors_the_filters(): void
     {
         $october = Month::parse('2026-10');
         $household = $this->createExpense($this->leticia, 10_000, $october);
-        $personal = $this->createExpense($this->bruno, 9_900, $october, ExpenseScope::Personal);
-        $leticiasPersonal = $this->createExpense($this->leticia, 5_000, $october, ExpenseScope::Personal);
 
         $this->actingAs($this->bruno)
-            ->post(route('expenses.pay-all', ['month' => '2026-10', 'scope' => 'household', 'source' => 'fixed']))
+            ->post(route('expenses.pay-all', ['month' => '2026-10', 'source' => 'fixed']))
             ->assertRedirect();
 
         $this->assertFalse($household->fresh()->isPaid());
 
         $this->actingAs($this->bruno)
-            ->post(route('expenses.pay-all', ['month' => '2026-10', 'scope' => 'personal']))
+            ->post(route('expenses.pay-all', ['month' => '2026-10', 'source' => 'one_off']))
             ->assertRedirect();
 
-        $this->assertTrue($personal->fresh()->isPaid());
-        $this->assertFalse($household->fresh()->isPaid());
-        $this->assertFalse($leticiasPersonal->fresh()->isPaid());
+        $this->assertTrue($household->fresh()->isPaid());
     }
 }

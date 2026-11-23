@@ -79,7 +79,7 @@ const COPY: Record<
         title: 'Despesas pessoais',
         empty: 'Registre uma despesa para acompanhar seu fluxo de caixa.',
         description: 'Gastos pessoais como academia e educação.',
-        note: 'Não lance sua contribuição para as despesas da casa: sua parte proporcional já é somada automaticamente ao resumo pessoal. Contas com vencimento e pagamento podem ser cadastradas em Despesas da casa › Pessoais.',
+        note: 'Não lance sua contribuição para as despesas da casa: sua parte proporcional já é somada automaticamente ao resumo pessoal.',
     },
     investment: {
         title: 'Investimentos',

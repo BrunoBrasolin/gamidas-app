@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Models\Household;
 use App\Support\Money;
 use App\Support\Month;
@@ -97,10 +96,5 @@ abstract class FinanceRequest extends FormRequest
         $value = trim((string) $this->validated($key));
 
         return $value === '' ? null : $value;
-    }
-
-    public function scope(): ExpenseScope
-    {
-        return ExpenseScope::from((string) $this->validated('scope'));
     }
 }

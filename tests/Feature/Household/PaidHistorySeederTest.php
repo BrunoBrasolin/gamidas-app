@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Household;
 
-use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceSource;
 use App\Enums\OccurrenceStatus;
 use App\Enums\RecurringKind;
@@ -104,7 +103,6 @@ class PaidHistorySeederTest extends TestCase
     private function createTemplate(string $title, int $amountCents, int $dueDay): RecurringExpense
     {
         return app(RecurringExpenseService::class)->create($this->household, $this->bruno, [
-            'scope' => ExpenseScope::Household,
             'kind' => RecurringKind::Fixed,
             'title' => $title,
             'notes' => null,

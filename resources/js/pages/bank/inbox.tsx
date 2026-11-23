@@ -42,7 +42,6 @@ import {
     formatMonth,
     formatShortDate,
 } from '@/lib/format';
-import { expensesPage } from '@/lib/expense-pages';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
@@ -644,8 +643,8 @@ function ExpenseDestination({ expense }: { expense: BankDestinationExpense }) {
         <>
             {' · '}
             <Link
-                href={expensesPage(expense.scope, {
-                    month: expense.billing_month,
+                href={expenses.index({
+                    query: { month: expense.billing_month },
                 })}
                 className="font-medium underline underline-offset-4"
             >

@@ -71,8 +71,9 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
     // The recurring expenses used to have a page of their own.
     Route::redirect('recurring-expenses', '/expenses/recurring')->name('recurring-expenses.index');
     Route::get('personal', PersonalFinanceController::class)->name('personal.index');
-    Route::get('personal/bills', [HouseholdExpenseController::class, 'personal'])->name('personal.bills');
-    Route::get('personal/bills/recurring', [RecurringExpenseController::class, 'personal'])->name('personal.bills.recurring');
+    // Personal bills were merged into the personal expense entries.
+    Route::redirect('personal/bills', '/personal/expenses');
+    Route::redirect('personal/bills/recurring', '/personal/expenses');
     Route::get('personal/{type}', [PersonalTransactionController::class, 'index'])
         ->whereIn('type', ['income', 'expenses', 'investments'])
         ->name('personal.transactions.index');

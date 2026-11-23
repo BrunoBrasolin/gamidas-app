@@ -23,7 +23,6 @@ import { PaymentActions } from '@/components/finance/payment-actions';
 import { StatCard } from '@/components/finance/stat-card';
 import { StatusBadge } from '@/components/finance/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -309,12 +308,6 @@ export default function Dashboard({
                                                     <span className="truncate font-medium">
                                                         {occurrence.title}
                                                     </span>
-                                                    {occurrence.scope ===
-                                                        'personal' && (
-                                                        <Badge variant="secondary">
-                                                            Pessoal
-                                                        </Badge>
-                                                    )}
                                                     <StatusBadge
                                                         status={
                                                             occurrence.status

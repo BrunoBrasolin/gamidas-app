@@ -23,7 +23,6 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $household_id
  * @property ExpenseScope $scope
- * @property int|null $owner_user_id
  * @property RecurringKind $kind
  * @property string $title
  * @property string|null $notes
@@ -39,12 +38,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Household $household
- * @property-read User|null $owner
  * @property-read User $creator
  * @property-read User|null $editor
  */
 #[Fillable([
-    'household_id', 'scope', 'owner_user_id', 'kind', 'title', 'notes',
+    'household_id', 'scope', 'kind', 'title', 'notes',
     'amount_cents', 'is_variable', 'due_day', 'start_month', 'end_month', 'total_months', 'ended_at',
     'created_by_user_id', 'updated_by_user_id',
 ])]
@@ -52,6 +50,13 @@ class RecurringExpense extends Model
 {
     /** @use HasFactory<RecurringExpenseFactory> */
     use HasFactory;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'scope' => 'household',
+    ];
 
     /**
      * @return array<string, string>
@@ -72,17 +77,13 @@ class RecurringExpense extends Model
     }
 
     /**
-     * Templates visible to the user: household-scoped ones of their household
-     * and personal ones they own.
+     * Templates visible to the user: the ones of their household.
      *
      * @param  Builder<self>  $query
      */
     public function scopeVisibleTo(Builder $query, User $user): void
     {
-        $query->where($query->qualifyColumn('household_id'), $user->householdId())
-            ->where(fn (Builder $query) => $query
-                ->where($query->qualifyColumn('scope'), ExpenseScope::Household)
-                ->orWhere($query->qualifyColumn('owner_user_id'), $user->id));
+        $query->where($query->qualifyColumn('household_id'), $user->householdId());
     }
 
     /**
@@ -105,14 +106,6 @@ class RecurringExpense extends Model
     public function household(): BelongsTo
     {
         return $this->belongsTo(Household::class);
-    }
-
-    /**
-     * @return BelongsTo<User, $this>
-     */
-    public function owner(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'owner_user_id');
     }
 
     /**

@@ -71,7 +71,6 @@ export type BankDestinationExpense =
           missing: false;
           id: number;
           title: string;
-          scope: 'household' | 'personal';
           billing_month: string;
           status: 'pending' | 'paid';
       };
@@ -128,7 +127,6 @@ export type BankSettlementCandidate = {
 export type BankCandidate = {
     id: number;
     title: string;
-    scope: 'household' | 'personal';
     amount_cents: number;
     due_date: string;
     billing_month: string;

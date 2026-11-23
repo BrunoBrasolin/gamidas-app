@@ -42,7 +42,6 @@ import {
     formatMonth,
     formatShortDate,
 } from '@/lib/format';
-import { expensesPage } from '@/lib/expense-pages';
 import { cn } from '@/lib/utils';
 import bank from '@/routes/bank';
 import expenses from '@/routes/expenses';
@@ -51,12 +50,10 @@ import type {
     Member,
     Occurrence,
     Paginated,
-    Scope,
 } from '@/types';
 
 type Filters = {
     month: string;
-    scope: Scope;
     creator: number | null;
     status: 'paid' | 'pending' | 'overdue' | 'awaiting_amount' | null;
     source: 'one_off' | 'fixed' | 'temporary' | null;
@@ -86,12 +83,7 @@ export default function ExpensesIndex({
     members,
     bankInboxCount,
 }: Props) {
-    // The scope comes from the page itself (/expenses or /personal/bills).
-    const apply = useQueryFilters(expensesPage(filters.scope).url, {
-        ...filters,
-        scope: null,
-    });
-    const isHousehold = filters.scope === 'household';
+    const apply = useQueryFilters(expenses.index().url, filters);
     const hasFilters =
         filters.creator !== null ||
         filters.status !== null ||
@@ -99,17 +91,11 @@ export default function ExpensesIndex({
 
     return (
         <>
-            <Head
-                title={isHousehold ? 'Despesas da casa' : 'Contas pessoais'}
-            />
+            <Head title="Despesas da casa" />
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <PageHeader
-                    title={isHousehold ? 'Despesas da casa' : 'Contas pessoais'}
-                    description={
-                        isHousehold
-                            ? 'Contas compartilhadas, divididas pela proporção dos salários.'
-                            : 'Contas só suas, com vencimento e situação de pagamento (inclusive as recorrentes). Gastos do dia a dia ficam em Finanças pessoais › Despesas.'
-                    }
+                    title="Despesas da casa"
+                    description="Contas compartilhadas, divididas pela proporção dos salários."
                 >
                     <MonthNavigator
                         month={filters.month}
@@ -126,7 +112,6 @@ export default function ExpensesIndex({
                     </Button>
                     <ExpenseFormDialog
                         month={filters.month}
-                        scope={filters.scope}
                         trigger={
                             <Button variant="outline">
                                 <Plus />
@@ -160,33 +145,27 @@ export default function ExpensesIndex({
                     </Alert>
                 )}
 
-                <ExpenseTabs
-                    scope={filters.scope}
-                    current="month"
-                    month={filters.month}
-                />
+                <ExpenseTabs current="month" month={filters.month} />
 
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    {isHousehold && (
-                        <FilterSelect
-                            id="filter-creator"
-                            label="Criado por"
-                            value={filters.creator ?? ''}
-                            onChange={(value) =>
-                                apply({ creator: value ? Number(value) : null })
-                            }
-                            options={[
-                                ['', 'Todos'],
-                                ...members.map(
-                                    (member) =>
-                                        [
-                                            String(member.user_id),
-                                            member.first_name,
-                                        ] as [string, string],
-                                ),
-                            ]}
-                        />
-                    )}
+                    <FilterSelect
+                        id="filter-creator"
+                        label="Criado por"
+                        value={filters.creator ?? ''}
+                        onChange={(value) =>
+                            apply({ creator: value ? Number(value) : null })
+                        }
+                        options={[
+                            ['', 'Todos'],
+                            ...members.map(
+                                (member) =>
+                                    [
+                                        String(member.user_id),
+                                        member.first_name,
+                                    ] as [string, string],
+                            ),
+                        ]}
+                    />
                     <FilterSelect
                         id="filter-status"
                         label="Situação"
@@ -238,15 +217,13 @@ export default function ExpensesIndex({
                     )}
                 </div>
 
-                {isHousehold && (
-                    <p className="text-xs text-muted-foreground">
-                        <strong>Total</strong> é o valor da conta;{' '}
-                        <strong>Parte de cada um</strong> é a responsabilidade
-                        proporcional ao salário; <strong>Pagamento</strong>{' '}
-                        mostra quem confirmou — sempre o membro que não
-                        cadastrou a despesa.
-                    </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                    <strong>Total</strong> é o valor da conta;{' '}
+                    <strong>Parte de cada um</strong> é a responsabilidade
+                    proporcional ao salário; <strong>Pagamento</strong> mostra
+                    quem confirmou — sempre o membro que não cadastrou a
+                    despesa.
+                </p>
 
                 {occurrences.data.length === 0 ? (
                     <EmptyState
@@ -271,16 +248,14 @@ export default function ExpensesIndex({
                                             <TableHead className="text-right">
                                                 Total
                                             </TableHead>
-                                            {isHousehold &&
-                                                members.map((member) => (
-                                                    <TableHead
-                                                        key={member.user_id}
-                                                        className="text-right"
-                                                    >
-                                                        Parte de{' '}
-                                                        {member.first_name}
-                                                    </TableHead>
-                                                ))}
+                                            {members.map((member) => (
+                                                <TableHead
+                                                    key={member.user_id}
+                                                    className="text-right"
+                                                >
+                                                    Parte de {member.first_name}
+                                                </TableHead>
+                                            ))}
                                             <TableHead>Pagamento</TableHead>
                                             <TableHead>Situação</TableHead>
                                             <TableHead className="pr-4 text-right">
@@ -303,27 +278,24 @@ export default function ExpensesIndex({
                                                         occurrence={occurrence}
                                                     />
                                                 </TableCell>
-                                                {isHousehold &&
-                                                    members.map((member) => (
-                                                        <TableCell
-                                                            key={member.user_id}
-                                                            className="text-right"
-                                                        >
-                                                            <Money
-                                                                cents={
-                                                                    occurrence.shares.find(
-                                                                        (
-                                                                            share,
-                                                                        ) =>
-                                                                            share.user_id ===
-                                                                            member.user_id,
-                                                                    )
-                                                                        ?.amount_cents ??
-                                                                    0
-                                                                }
-                                                            />
-                                                        </TableCell>
-                                                    ))}
+                                                {members.map((member) => (
+                                                    <TableCell
+                                                        key={member.user_id}
+                                                        className="text-right"
+                                                    >
+                                                        <Money
+                                                            cents={
+                                                                occurrence.shares.find(
+                                                                    (share) =>
+                                                                        share.user_id ===
+                                                                        member.user_id,
+                                                                )
+                                                                    ?.amount_cents ??
+                                                                0
+                                                            }
+                                                        />
+                                                    </TableCell>
+                                                ))}
                                                 <TableCell>
                                                     <PaymentActions
                                                         occurrence={occurrence}
@@ -374,22 +346,20 @@ export default function ExpensesIndex({
                                                     cents={totals.total_cents}
                                                 />
                                             </TableCell>
-                                            {isHousehold &&
-                                                members.map((member) => (
-                                                    <TableCell
-                                                        key={member.user_id}
-                                                        className="text-right"
-                                                    >
-                                                        <Money
-                                                            cents={
-                                                                totals.members[
-                                                                    member
-                                                                        .user_id
-                                                                ] ?? 0
-                                                            }
-                                                        />
-                                                    </TableCell>
-                                                ))}
+                                            {members.map((member) => (
+                                                <TableCell
+                                                    key={member.user_id}
+                                                    className="text-right"
+                                                >
+                                                    <Money
+                                                        cents={
+                                                            totals.members[
+                                                                member.user_id
+                                                            ] ?? 0
+                                                        }
+                                                    />
+                                                </TableCell>
+                                            ))}
                                             <TableCell colSpan={3}>
                                                 <PayAllButton
                                                     filters={filters}
@@ -424,20 +394,19 @@ export default function ExpensesIndex({
                                                     occurrence={occurrence}
                                                 />
                                             </dd>
-                                            {isHousehold &&
-                                                members.map((member) => (
-                                                    <ShareRow
-                                                        key={member.user_id}
-                                                        label={`Parte de ${member.first_name}`}
-                                                        cents={
-                                                            occurrence.shares.find(
-                                                                (share) =>
-                                                                    share.user_id ===
-                                                                    member.user_id,
-                                                            )?.amount_cents ?? 0
-                                                        }
-                                                    />
-                                                ))}
+                                            {members.map((member) => (
+                                                <ShareRow
+                                                    key={member.user_id}
+                                                    label={`Parte de ${member.first_name}`}
+                                                    cents={
+                                                        occurrence.shares.find(
+                                                            (share) =>
+                                                                share.user_id ===
+                                                                member.user_id,
+                                                        )?.amount_cents ?? 0
+                                                    }
+                                                />
+                                            ))}
                                             <dt className="text-muted-foreground">
                                                 Vencimento
                                             </dt>
@@ -527,9 +496,8 @@ function PayAllButton({
                         : `${totals.payable_count} despesas pendentes`}{' '}
                     de {formatMonth(filters.month)}, somando{' '}
                     <Money cents={totals.payable_cents} />, serão marcadas como
-                    pagas por você.
-                    {filters.scope === 'household' &&
-                        ' Despesas que você cadastrou continuam aguardando a confirmação do outro membro.'}
+                    pagas por você. Despesas que você cadastrou continuam
+                    aguardando a confirmação do outro membro.
                     {skipped > 0 &&
                         ` ${skipped === 1 ? '1 conta sem valor definido fica' : `${skipped} contas sem valor definido ficam`} de fora.`}
                 </>
@@ -680,14 +648,11 @@ function RowActions({
 
 /**
  * What moving a household expense to the viewer's personal finances does:
- * it leaves the split and counts in full for them. Only this month of a
- * recurring expense, and only this installment, change.
+ * it leaves the split and becomes one of their expense entries, in full.
+ * Only this month of a recurring expense, and only this installment, change.
  */
 function moveToPersonalDescription(occurrence: Occurrence): string {
-    const amount = occurrence.awaits_amount
-        ? 'com o valor ainda a definir'
-        : `com o valor inteiro (${formatMoney(occurrence.amount_cents)})`;
-    const description = `“${occurrence.title}” sai da divisão da casa e vira uma despesa pessoal sua, ${amount}. Só você vai vê-la e marcar o pagamento.`;
+    const description = `“${occurrence.title}” sai da divisão da casa e vira um lançamento em Finanças pessoais › Despesas, com o valor inteiro (${formatMoney(occurrence.amount_cents)}). Só você vai vê-lo.`;
 
     if (occurrence.source === 'recurring') {
         return `${description} Só este mês muda: nos outros meses a recorrência continua na casa.`;

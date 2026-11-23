@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Enums\RecurringKind;
 use App\Models\RecurringExpense;
 use App\Rules\MoneyAmount;
@@ -29,7 +28,6 @@ class RecurringExpenseRequest extends FinanceRequest
 
         return [
             'kind' => [Rule::requiredIf($this->isCreating()), Rule::enum(RecurringKind::class)],
-            'scope' => [Rule::requiredIf($this->isCreating()), Rule::enum(ExpenseScope::class)],
             'title' => ['required', 'string', 'max:120'],
             'is_variable' => ['nullable', 'boolean'],
             'amount' => [Rule::excludeIf($this->boolean('is_variable')), 'required', new MoneyAmount],
@@ -85,13 +83,12 @@ class RecurringExpenseRequest extends FinanceRequest
     }
 
     /**
-     * @return array{scope: ExpenseScope, kind: RecurringKind, title: string, notes: ?string, amount_cents: int, is_variable: bool, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}
+     * @return array{kind: RecurringKind, title: string, notes: ?string, amount_cents: int, is_variable: bool, due_day: int, start_month: CarbonImmutable, end_month: ?CarbonImmutable, total_months: ?int}
      */
     public function toCreateData(): array
     {
         return [
             ...$this->toData(),
-            'scope' => $this->scope(),
             'kind' => RecurringKind::from((string) $this->validated('kind')),
             'start_month' => $this->month('start_month') ?? throw new \LogicException('Missing start month.'),
         ];

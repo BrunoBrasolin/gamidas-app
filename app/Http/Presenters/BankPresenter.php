@@ -4,7 +4,6 @@ namespace App\Http\Presenters;
 
 use App\Enums\BankCatalogType;
 use App\Enums\BankRuleAction;
-use App\Enums\ExpenseScope;
 use App\Models\BankAccount;
 use App\Models\BankBill;
 use App\Models\BankConnection;
@@ -139,7 +138,7 @@ final class BankPresenter
             ],
             'review_status' => $transaction->review_status->value,
             'catalog_type' => $transaction->catalog_type?->value,
-            'catalog_label' => $this->catalogLabel($transaction->catalog_type, $transaction->expenseOccurrence),
+            'catalog_label' => $transaction->catalog_type?->label(),
             'ignore_reason' => $transaction->ignore_reason,
             'removed' => $transaction->removed_at !== null,
             'expense' => $transaction->expense_occurrence_id === null ? null : $this->destinationExpense($transaction->expenseOccurrence),
@@ -149,7 +148,7 @@ final class BankPresenter
             'split' => $transaction->catalog_type === BankCatalogType::Split && $transaction->relationLoaded('splitItems')
                 ? $transaction->splitItems->map(fn (BankSplitItem $item) => [
                     'type' => $item->type->value,
-                    'label' => $this->catalogLabel($item->type, $item->occurrence),
+                    'label' => $item->type->label(),
                     'amount_cents' => $item->amount_cents,
                     'expense' => $item->type === BankCatalogType::Household || $item->type === BankCatalogType::Linked
                         ? $this->destinationExpense($item->occurrence)
@@ -209,18 +208,6 @@ final class BankPresenter
     }
 
     /**
-     * What a transaction (or a part of it) became. A household expense
-     * created here may have been moved to the owner's personal finances
-     * later.
-     */
-    private function catalogLabel(?BankCatalogType $type, ?ExpenseOccurrence $occurrence): ?string
-    {
-        return $type === BankCatalogType::Household && $occurrence?->scope === ExpenseScope::Personal
-            ? 'Conta pessoal'
-            : $type?->label();
-    }
-
-    /**
      * The expense a transaction (or a part of it) became, or a note that it
      * was removed since.
      *
@@ -232,7 +219,6 @@ final class BankPresenter
             'missing' => false,
             'id' => $occurrence->id,
             'title' => $occurrence->title,
-            'scope' => $occurrence->scope->value,
             'billing_month' => $occurrence->billing_month->format('Y-m'),
             'status' => $occurrence->status->value,
         ];
@@ -328,7 +314,6 @@ final class BankPresenter
         return [
             'id' => $occurrence->id,
             'title' => $occurrence->title,
-            'scope' => $occurrence->scope->value,
             'amount_cents' => $occurrence->amount_cents,
             'due_date' => $occurrence->due_date->toDateString(),
             'billing_month' => $occurrence->billing_month->format('Y-m'),

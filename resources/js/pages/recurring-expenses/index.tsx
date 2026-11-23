@@ -50,17 +50,15 @@ import {
     shiftMonth,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { recurringPage } from '@/lib/expense-pages';
 import expenses from '@/routes/expenses';
 import recurringExpenses from '@/routes/recurring-expenses';
-import type { OccurrenceStatus, Paginated, Scope } from '@/types';
+import type { OccurrenceStatus, Paginated } from '@/types';
 
 type Kind = 'fixed' | 'temporary';
 
 type Template = {
     id: number;
     kind: Kind;
-    scope: Scope;
     title: string;
     notes: string | null;
     amount_cents: number;
@@ -87,14 +85,12 @@ type Template = {
 };
 
 type Props = {
-    scope: Scope;
     filters: { kind: Kind | null; status: 'active' | 'ended' };
     currentMonth: string;
     templates: Paginated<Template>;
 };
 
 export default function RecurringExpensesIndex({
-    scope,
     filters,
     currentMonth,
     templates,
@@ -107,25 +103,14 @@ export default function RecurringExpensesIndex({
 
     return (
         <>
-            <Head
-                title={
-                    scope === 'household'
-                        ? 'Despesas recorrentes da casa'
-                        : 'Contas pessoais recorrentes'
-                }
-            />
+            <Head title="Despesas recorrentes da casa" />
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <PageHeader
-                    title={
-                        scope === 'household'
-                            ? 'Despesas da casa'
-                            : 'Contas pessoais'
-                    }
+                    title="Despesas da casa"
                     description="Contas que se repetem: cadastre uma vez e o sistema gera cada mês com valor e pagamento independentes."
                 >
                     <RecurringFormDialog
                         kind="fixed"
-                        scope={scope}
                         currentMonth={currentMonth}
                         trigger={
                             <Button>
@@ -136,7 +121,6 @@ export default function RecurringExpensesIndex({
                     />
                     <RecurringFormDialog
                         kind="temporary"
-                        scope={scope}
                         currentMonth={currentMonth}
                         trigger={
                             <Button variant="outline">
@@ -147,7 +131,7 @@ export default function RecurringExpensesIndex({
                     />
                 </PageHeader>
 
-                <ExpenseTabs scope={scope} current="recurring" />
+                <ExpenseTabs current="recurring" />
 
                 <Alert>
                     <Info />
@@ -171,9 +155,11 @@ export default function RecurringExpensesIndex({
                         {tabs.map((tab) => (
                             <Link
                                 key={tab.label}
-                                href={recurringPage(scope, {
-                                    kind: tab.kind,
-                                    status: filters.status,
+                                href={expenses.recurring({
+                                    query: {
+                                        kind: tab.kind,
+                                        status: filters.status,
+                                    },
                                 })}
                                 preserveScroll
                                 aria-current={
@@ -204,9 +190,8 @@ export default function RecurringExpensesIndex({
                         ).map(([status, label]) => (
                             <Link
                                 key={status}
-                                href={recurringPage(scope, {
-                                    kind: filters.kind,
-                                    status,
+                                href={expenses.recurring({
+                                    query: { kind: filters.kind, status },
                                 })}
                                 preserveScroll
                                 aria-current={
@@ -421,13 +406,11 @@ function periodLabel(template: Template): string {
 
 function RecurringFormDialog({
     kind,
-    scope = 'household',
     template,
     currentMonth,
     trigger,
 }: {
     kind: Kind;
-    scope?: Scope;
     template?: Template;
     currentMonth: string;
     trigger: ReactNode;
@@ -477,18 +460,7 @@ function RecurringFormDialog({
                     {({ errors, processing }) => (
                         <>
                             {!editing && (
-                                <>
-                                    <input
-                                        type="hidden"
-                                        name="kind"
-                                        value={kind}
-                                    />
-                                    <input
-                                        type="hidden"
-                                        name="scope"
-                                        value={scope}
-                                    />
-                                </>
+                                <input type="hidden" name="kind" value={kind} />
                             )}
 
                             <FormField

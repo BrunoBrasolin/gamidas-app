@@ -7,7 +7,6 @@ use App\Enums\BankCatalogType;
 use App\Enums\BankChannel;
 use App\Enums\BankReviewStatus;
 use App\Enums\BankRuleAction;
-use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceSource;
 use App\Enums\OccurrenceStatus;
 use App\Enums\TransactionType;
@@ -668,8 +667,8 @@ final class BankCatalogService
 
     /**
      * Every expense the user may pick by hand when the suggestions miss (a
-     * PIX to a person that pays a household bill) — household ones and their
-     * own personal ones, not linked to another transaction: pending ones from
+     * PIX to a person that pays a household bill) — the household's, not
+     * linked to another transaction: pending ones from
      * a year back to three months ahead, and ones already paid due within
      * PAID_LINK_MONTHS of the given transactions (history imported after the
      * bills were paid by hand).
@@ -798,7 +797,7 @@ final class BankCatalogService
         $occurrence = $occurrenceId === null ? null : ExpenseOccurrence::query()->visibleTo($actor)->find($occurrenceId);
 
         if ($occurrence === null) {
-            throw ValidationException::withMessages([$field => 'Escolha uma despesa da casa ou sua.']);
+            throw ValidationException::withMessages([$field => 'Escolha uma despesa da casa.']);
         }
 
         $taken = ExpenseOccurrence::query()->whereKey($occurrence->id)->withoutBankLink($transaction->id)->doesntExist();
@@ -1069,7 +1068,6 @@ final class BankCatalogService
     private function createHouseholdExpense(BankTransaction $transaction, User $actor, string $title, ?string $notes, int $amountCents, CarbonImmutable $date): ExpenseOccurrence
     {
         return $this->expenses->create($actor->household(), $actor, [
-            'scope' => ExpenseScope::Household,
             'title' => $title,
             'notes' => $notes,
             'amount_cents' => $amountCents,

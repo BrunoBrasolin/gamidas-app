@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
-use App\Models\ExpenseOccurrence;
 use App\Services\PersonalSummary;
 use App\Support\Month;
 use Illuminate\Http\Request;
@@ -27,28 +26,12 @@ class PersonalFinanceController extends Controller
             $this->ensureGenerated($this->household($request), $month);
         }
 
-        $bills = $view === 'month'
-            ? ExpenseOccurrence::query()
-                ->personalOf($user)
-                ->forMonth($month)
-                ->orderBy('due_date')
-                ->get()
-                ->map(fn (ExpenseOccurrence $occurrence) => [
-                    'id' => $occurrence->id,
-                    'title' => $occurrence->title,
-                    'due_date' => $occurrence->due_date->toDateString(),
-                    'amount_cents' => $occurrence->amount_cents,
-                    'status' => $occurrence->status->value,
-                ])
-            : [];
-
         return Inertia::render('personal/index', [
             'view' => $view,
             'month' => Month::key($month),
             'year' => $year,
             'summary' => $view === 'month' ? $summary->month($user, $month) : null,
             'yearly' => $view === 'year' ? $summary->year($user, $year) : null,
-            'bills' => $bills,
         ]);
     }
 }

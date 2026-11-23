@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\BankCatalogType;
 use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceSource;
+use App\Enums\TransactionType;
 use App\Models\ExpenseOccurrence;
 use App\Models\Household;
+use App\Models\PersonalTransaction;
 use App\Models\User;
 use App\Support\Month;
 use Carbon\CarbonImmutable;
@@ -34,7 +37,7 @@ final class ExpenseService
      * A single expense may carry its own installment number ("Parcela 2/3"),
      * as card installments imported from the bank do.
      *
-     * @param  array{scope: ExpenseScope, title: string, notes: ?string, amount_cents: int, due_date: CarbonImmutable, installment_number?: ?int, installment_count?: ?int}  $data
+     * @param  array{title: string, notes: ?string, amount_cents: int, due_date: CarbonImmutable, installment_number?: ?int, installment_count?: ?int}  $data
      */
     public function create(Household $household, User $actor, array $data, int $installments = 1): ExpenseOccurrence
     {
@@ -52,7 +55,7 @@ final class ExpenseService
                 $occurrence = ExpenseOccurrence::create([
                     ...$data,
                     'household_id' => $household->id,
-                    'owner_user_id' => $data['scope'] === ExpenseScope::Personal ? $actor->id : null,
+                    'scope' => ExpenseScope::Household,
                     'source' => OccurrenceSource::OneOff,
                     'installment_number' => $installments > 1 ? $number : ($data['installment_number'] ?? null),
                     'installment_count' => $installments > 1 ? $installments : ($data['installment_count'] ?? null),
@@ -136,68 +139,61 @@ final class ExpenseService
 
     /**
      * Move a pending household expense to the actor's personal finances: it
-     * leaves the split and counts in full as one of their personal bills.
+     * leaves the split and becomes one of their expense entries (Finanças
+     * pessoais › Despesas) with the same title, notes and amount, dated on
+     * its due date (in the month it was billed), so it counts in full for
+     * them.
      *
-     * A one-off expense (or one installment) changes in place. A month of a
-     * recurring expense leaves the series instead: the household month is
-     * removed (soft deleted, so it is not generated again, as when a month
-     * is removed by hand) and becomes a one-off personal bill with the same
-     * title, notes, amount and due date. Bank transactions catalogued as (or
-     * linked to) the expense follow it, as do the parts of split ones.
-     * Returns the personal expense.
+     * The household expense is removed: a month of a recurring expense leaves
+     * the series (soft deleted, so it is not generated again, as when a month
+     * is removed by hand), and the other months stay in the house. Bank
+     * transactions catalogued as (or linked to) the expense follow it as a
+     * "Despesa pessoal", as do the parts of split ones. Returns the entry.
      */
-    public function moveToPersonal(ExpenseOccurrence $occurrence, User $actor): ExpenseOccurrence
+    public function moveToPersonal(ExpenseOccurrence $occurrence, User $actor): PersonalTransaction
     {
         return DB::transaction(function () use ($occurrence, $actor) {
             $occurrence = ExpenseOccurrence::query()->lockForUpdate()->findOrFail($occurrence->id);
             $this->ensurePending($occurrence);
 
-            if (! $occurrence->isHousehold()) {
+            if ($occurrence->awaitsAmount()) {
                 throw ValidationException::withMessages([
-                    'expense' => 'Esta despesa já é pessoal.',
+                    'expense' => 'Informe o valor deste mês antes de movê-la para as suas finanças pessoais.',
                 ]);
             }
 
             $old = $this->snapshot($occurrence);
 
-            if ($occurrence->source === OccurrenceSource::Recurring) {
-                $personal = ExpenseOccurrence::create([
-                    'household_id' => $occurrence->household_id,
-                    'scope' => ExpenseScope::Personal,
-                    'owner_user_id' => $actor->id,
-                    'source' => OccurrenceSource::OneOff,
-                    'title' => $occurrence->title,
-                    'notes' => $occurrence->notes,
-                    'billing_month' => $occurrence->billing_month,
-                    'due_date' => $occurrence->due_date,
-                    'amount_cents' => $occurrence->amount_cents,
-                    'created_by_user_id' => $occurrence->created_by_user_id,
-                    'updated_by_user_id' => $actor->id,
-                ]);
-
-                $occurrence->bankTransactions()->update(['expense_occurrence_id' => $personal->id]);
-                $occurrence->bankSplitItems()->update(['expense_occurrence_id' => $personal->id]);
-                $occurrence->update(['updated_by_user_id' => $actor->id]);
-                $occurrence->delete();
-            } else {
-                $occurrence->update([
-                    'scope' => ExpenseScope::Personal,
-                    'owner_user_id' => $actor->id,
-                    'updated_by_user_id' => $actor->id,
-                ]);
-
-                $personal = $occurrence;
-            }
-
-            $this->shares->sync($personal);
-
-            $this->audit->record('expense.moved_to_personal', $occurrence, $actor, $occurrence->household_id, $old, [
-                ...$this->snapshot($personal),
-                'owner_user_id' => $actor->id,
-                'personal_occurrence_id' => $personal->id,
+            $entry = $actor->personalTransactions()->create([
+                'type' => TransactionType::Expense,
+                'title' => $occurrence->title,
+                'amount_cents' => $occurrence->amount_cents,
+                'transaction_date' => Month::key($occurrence->due_date) === Month::key($occurrence->billing_month)
+                    ? $occurrence->due_date
+                    : $occurrence->billing_month,
+                'notes' => $occurrence->notes,
             ]);
 
-            return $personal;
+            $occurrence->bankTransactions()->update([
+                'expense_occurrence_id' => null,
+                'personal_transaction_id' => $entry->id,
+                'catalog_type' => BankCatalogType::Personal,
+            ]);
+            $occurrence->bankSplitItems()->update([
+                'type' => BankCatalogType::Personal,
+                'expense_occurrence_id' => null,
+                'personal_transaction_id' => $entry->id,
+            ]);
+
+            $occurrence->update(['updated_by_user_id' => $actor->id]);
+            $occurrence->delete();
+
+            $this->audit->record('expense.moved_to_personal', $occurrence, $actor, $occurrence->household_id, $old, [
+                'personal_transaction_id' => $entry->id,
+                'user_id' => $actor->id,
+            ]);
+
+            return $entry;
         });
     }
 

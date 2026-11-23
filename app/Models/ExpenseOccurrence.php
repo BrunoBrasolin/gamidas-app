@@ -27,7 +27,6 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $household_id
  * @property ExpenseScope $scope
- * @property int|null $owner_user_id
  * @property OccurrenceSource $source
  * @property int|null $recurring_expense_id
  * @property int|null $installment_number
@@ -47,7 +46,6 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  * @property-read Household $household
- * @property-read User|null $owner
  * @property-read RecurringExpense|null $recurringExpense
  * @property-read User $creator
  * @property-read User|null $editor
@@ -57,7 +55,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, BankSplitItem> $bankSplitItems
  */
 #[Fillable([
-    'household_id', 'scope', 'owner_user_id', 'source', 'recurring_expense_id',
+    'household_id', 'scope', 'source', 'recurring_expense_id',
     'installment_number', 'installment_count', 'title', 'notes', 'billing_month',
     'due_date', 'amount_cents', 'status', 'paid_at', 'paid_by_user_id', 'is_customized',
     'created_by_user_id', 'updated_by_user_id',
@@ -71,6 +69,7 @@ class ExpenseOccurrence extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'scope' => 'household',
         'status' => 'pending',
         'is_customized' => false,
     ];
@@ -129,11 +128,6 @@ class ExpenseOccurrence extends Model
             : $this->settlementItems()->exists();
     }
 
-    public function isHousehold(): bool
-    {
-        return $this->scope === ExpenseScope::Household;
-    }
-
     /**
      * @param  Builder<self>  $query
      */
@@ -160,27 +154,13 @@ class ExpenseOccurrence extends Model
     }
 
     /**
-     * @param  Builder<self>  $query
-     */
-    public function scopePersonalOf(Builder $query, User $user): void
-    {
-        $query->where($query->qualifyColumn('household_id'), $user->householdId())
-            ->where($query->qualifyColumn('scope'), ExpenseScope::Personal)
-            ->where($query->qualifyColumn('owner_user_id'), $user->id);
-    }
-
-    /**
-     * Occurrences visible to the user: household-scoped ones of their
-     * household and personal ones they own.
+     * Occurrences visible to the user: the expenses of their household.
      *
      * @param  Builder<self>  $query
      */
     public function scopeVisibleTo(Builder $query, User $user): void
     {
-        $query->where($query->qualifyColumn('household_id'), $user->householdId())
-            ->where(fn (Builder $query) => $query
-                ->where($query->qualifyColumn('scope'), ExpenseScope::Household)
-                ->orWhere($query->qualifyColumn('owner_user_id'), $user->id));
+        $query->household((int) $user->householdId());
     }
 
     /**
@@ -219,14 +199,6 @@ class ExpenseOccurrence extends Model
     public function household(): BelongsTo
     {
         return $this->belongsTo(Household::class);
-    }
-
-    /**
-     * @return BelongsTo<User, $this>
-     */
-    public function owner(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'owner_user_id');
     }
 
     /**

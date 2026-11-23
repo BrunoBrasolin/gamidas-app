@@ -6,7 +6,6 @@ use App\Enums\BankAccountType;
 use App\Enums\BankCatalogType;
 use App\Enums\BankReviewStatus;
 use App\Enums\BankRuleAction;
-use App\Enums\ExpenseScope;
 use App\Enums\RecurringKind;
 use App\Models\BankAccount;
 use App\Models\BankRule;
@@ -121,7 +120,6 @@ class BankAutoRuleTest extends TestCase
     public function test_a_recurring_rule_links_each_payment_to_its_month_and_leaves_the_rest(): void
     {
         $rent = app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household,
             'kind' => RecurringKind::Fixed,
             'title' => 'Aluguel',
             'notes' => null,

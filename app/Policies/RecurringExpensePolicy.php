@@ -2,7 +2,6 @@
 
 namespace App\Policies;
 
-use App\Enums\ExpenseScope;
 use App\Models\RecurringExpense;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
@@ -11,8 +10,7 @@ class RecurringExpensePolicy
 {
     public function view(User $user, RecurringExpense $recurringExpense): bool
     {
-        return $recurringExpense->household_id === $user->householdId()
-            && ($recurringExpense->scope === ExpenseScope::Household || $recurringExpense->owner_user_id === $user->id);
+        return $recurringExpense->household_id === $user->householdId();
     }
 
     public function update(User $user, RecurringExpense $recurringExpense): Response

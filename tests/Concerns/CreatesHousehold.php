@@ -2,7 +2,6 @@
 
 namespace Tests\Concerns;
 
-use App\Enums\ExpenseScope;
 use App\Models\ExpenseOccurrence;
 use App\Models\Household;
 use App\Models\User;
@@ -43,12 +42,11 @@ trait CreatesHousehold
         return $service->addMember($other, 'Carlos Outro', 'carlos@example.test', 'password', 'pelo', 300_000)->user;
     }
 
-    protected function createExpense(User $creator, int $amountCents, ?CarbonImmutable $month = null, ExpenseScope $scope = ExpenseScope::Household): ExpenseOccurrence
+    protected function createExpense(User $creator, int $amountCents, ?CarbonImmutable $month = null): ExpenseOccurrence
     {
         $month ??= Month::current();
 
         return app(ExpenseService::class)->create($this->household, $creator, [
-            'scope' => $scope,
             'title' => 'Conta de luz',
             'notes' => null,
             'amount_cents' => $amountCents,

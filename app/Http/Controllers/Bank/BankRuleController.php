@@ -44,8 +44,8 @@ class BankRuleController extends Controller
             'recurringExpenses' => RecurringExpense::query()
                 ->visibleTo($user)
                 ->orderBy('title')
-                ->get(['id', 'title', 'scope'])
-                ->map(fn (RecurringExpense $expense) => ['id' => $expense->id, 'title' => $expense->title, 'scope' => $expense->scope->value])
+                ->get(['id', 'title'])
+                ->map(fn (RecurringExpense $expense) => ['id' => $expense->id, 'title' => $expense->title])
                 ->all(),
         ]);
     }

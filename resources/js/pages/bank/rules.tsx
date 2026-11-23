@@ -34,7 +34,7 @@ type Props = {
     rules: BankRule[];
     actions: Option[];
     matchModes: Option[];
-    recurringExpenses: { id: number; title: string; scope: string }[];
+    recurringExpenses: { id: number; title: string }[];
 };
 
 export default function BankRules({
@@ -347,9 +347,6 @@ function RuleDialog({
                                                 value={expense.id}
                                             >
                                                 {expense.title}
-                                                {expense.scope === 'personal'
-                                                    ? ' (pessoal)'
-                                                    : ''}
                                             </option>
                                         ))}
                                     </NativeSelect>

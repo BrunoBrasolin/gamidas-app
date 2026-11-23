@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceSource;
 use App\Enums\OccurrenceStatus;
 use App\Enums\RecurringKind;
@@ -21,7 +20,6 @@ use App\Support\Month;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -31,36 +29,23 @@ class HouseholdExpenseController extends Controller
     use InteractsWithHousehold;
 
     /**
-     * Despesas da casa. Personal bills live in Finanças pessoais
-     * (personal.bills); links from before the move still land there.
+     * Despesas da casa. Personal bills were merged into the personal expense
+     * entries; links to them (/expenses?scope=personal, /personal/bills)
+     * land in Finanças pessoais › Despesas.
      */
     public function index(Request $request, HouseholdSummary $summary, BankCatalogService $catalog): Response|RedirectResponse
     {
-        if ($request->query('scope') === ExpenseScope::Personal->value) {
-            return to_route('personal.bills', Arr::except($request->query(), ['scope']));
+        if ($request->query('scope') === 'personal') {
+            return to_route('personal.transactions.index', 'expenses');
         }
 
-        return $this->listing($request, ExpenseScope::Household, $summary, $catalog);
-    }
-
-    /**
-     * The member's personal bills (with due date and payment status), in
-     * Finanças pessoais.
-     */
-    public function personal(Request $request, HouseholdSummary $summary, BankCatalogService $catalog): Response
-    {
-        return $this->listing($request, ExpenseScope::Personal, $summary, $catalog);
-    }
-
-    private function listing(Request $request, ExpenseScope $scope, HouseholdSummary $summary, BankCatalogService $catalog): Response
-    {
         $user = $this->user($request);
         $household = $this->household($request);
         $month = Month::fromInput($request->query('month'));
 
         $this->ensureGenerated($household, $month);
 
-        $filters = $this->filters($request, $scope);
+        $filters = $this->filters($request);
         $query = $this->filteredQuery($user, $filters);
 
         $occurrences = (clone $query)
@@ -88,7 +73,7 @@ class HouseholdExpenseController extends Controller
             'payable_cents' => (int) (clone $payable)->sum('amount_cents'),
         ];
 
-        return Inertia::render($scope === ExpenseScope::Personal ? 'personal/bills' : 'expenses/index', [
+        return Inertia::render('expenses/index', [
             'filters' => $filters,
             'occurrences' => $occurrences->through(fn (ExpenseOccurrence $occurrence) => [
                 ...$presenter->occurrence($occurrence),
@@ -110,10 +95,7 @@ class HouseholdExpenseController extends Controller
 
     public function store(ExpenseRequest $request, ExpenseService $expenses): RedirectResponse
     {
-        $expenses->create($request->household(), $this->user($request), [
-            ...$request->toData(),
-            'scope' => $request->scope(),
-        ], $request->installments());
+        $expenses->create($request->household(), $this->user($request), $request->toData(), $request->installments());
 
         $this->toast($request->installments() > 1 ? 'Despesa parcelada cadastrada.' : 'Despesa cadastrada.');
 
@@ -149,11 +131,11 @@ class HouseholdExpenseController extends Controller
     {
         Gate::authorize('moveToPersonal', $occurrence);
 
-        $personal = $expenses->moveToPersonal($occurrence, $this->user($request));
+        $entry = $expenses->moveToPersonal($occurrence, $this->user($request));
 
         $this->toast(
-            "“{$personal->title}” agora é uma despesa pessoal sua.",
-            description: 'Ela saiu da divisão da casa e está na aba “Pessoais”.',
+            "“{$entry->title}” agora é uma despesa pessoal sua.",
+            description: 'Ela saiu da divisão da casa e está em Finanças pessoais › Despesas.',
         );
 
         return back();
@@ -192,17 +174,15 @@ class HouseholdExpenseController extends Controller
     /**
      * The listing filters, read from the query string or the request body.
      *
-     * @return array{month: string, scope: string, creator: ?int, status: ?string, source: ?string}
+     * @return array{month: string, creator: ?int, status: ?string, source: ?string}
      */
-    private function filters(Request $request, ?ExpenseScope $scope = null): array
+    private function filters(Request $request): array
     {
         $status = $request->input('status');
         $source = $request->input('source');
-        $scope ??= $request->input('scope') === ExpenseScope::Personal->value ? ExpenseScope::Personal : ExpenseScope::Household;
 
         return [
             'month' => Month::key(Month::fromInput($request->input('month'))),
-            'scope' => $scope->value,
             'creator' => $request->integer('creator') ?: null,
             'status' => in_array($status, ['paid', 'pending', 'overdue', 'awaiting_amount'], true) ? $status : null,
             'source' => in_array($source, ['one_off', 'fixed', 'temporary'], true) ? $source : null,
@@ -210,8 +190,8 @@ class HouseholdExpenseController extends Controller
     }
 
     /**
-     * Pending expenses of the query the user can confirm: with an amount and,
-     * for household expenses, created by someone else.
+     * Pending expenses of the query the user can confirm: with an amount and
+     * created by someone else.
      *
      * @param  Builder<ExpenseOccurrence>  $query
      * @return Builder<ExpenseOccurrence>
@@ -221,24 +201,18 @@ class HouseholdExpenseController extends Controller
         return (clone $query)
             ->where('status', OccurrenceStatus::Pending)
             ->where('amount_cents', '>', 0)
-            ->where(fn (Builder $query) => $query
-                ->where('scope', ExpenseScope::Personal)
-                ->orWhere('created_by_user_id', '!=', $user->id));
+            ->where('created_by_user_id', '!=', $user->id);
     }
 
     /**
-     * @param  array{month: string, scope: string, creator: ?int, status: ?string, source: ?string}  $filters
+     * @param  array{month: string, creator: ?int, status: ?string, source: ?string}  $filters
      * @return Builder<ExpenseOccurrence>
      */
     private function filteredQuery(User $user, array $filters): Builder
     {
-        $query = ExpenseOccurrence::query()->forMonth(Month::parse($filters['month']));
-
-        if ($filters['scope'] === ExpenseScope::Personal->value) {
-            $query->personalOf($user);
-        } else {
-            $query->household((int) $user->householdId());
-        }
+        $query = ExpenseOccurrence::query()
+            ->forMonth(Month::parse($filters['month']))
+            ->household((int) $user->householdId());
 
         $query->when($filters['creator'], fn (Builder $query, int $creator) => $query->where('created_by_user_id', $creator));
 

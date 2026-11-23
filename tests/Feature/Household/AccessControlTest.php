@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Household;
 
-use App\Enums\ExpenseScope;
 use App\Enums\RecurringKind;
 use App\Models\User;
 use App\Services\RecurringExpenseService;
@@ -54,8 +53,6 @@ class AccessControlTest extends TestCase
         yield 'dashboard' => ['/dashboard'];
         yield 'expenses' => ['/expenses'];
         yield 'recurring expenses' => ['/expenses/recurring'];
-        yield 'personal bills' => ['/personal/bills'];
-        yield 'personal recurring bills' => ['/personal/bills/recurring'];
         yield 'personal summary' => ['/personal'];
         yield 'personal income' => ['/personal/income'];
         yield 'personal expenses' => ['/personal/expenses'];
@@ -100,7 +97,7 @@ class AccessControlTest extends TestCase
         $outsider = $this->createOutsider();
         $expense = $this->createExpense($this->bruno, 10_000);
         $template = app(RecurringExpenseService::class)->create($this->household, $this->bruno, [
-            'scope' => ExpenseScope::Household, 'kind' => RecurringKind::Fixed, 'title' => 'Internet', 'notes' => null,
+            'kind' => RecurringKind::Fixed, 'title' => 'Internet', 'notes' => null,
             'amount_cents' => 10_000, 'due_day' => 10,
             'start_month' => Month::current(), 'end_month' => null, 'total_months' => null,
         ]);

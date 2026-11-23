@@ -5,7 +5,6 @@ namespace Tests\Feature\Bank;
 use App\Enums\BankAccountType;
 use App\Enums\BankCatalogType;
 use App\Enums\BankRuleAction;
-use App\Enums\ExpenseScope;
 use App\Enums\OccurrenceStatus;
 use App\Enums\PaymentEventType;
 use App\Models\BankAccount;
@@ -60,7 +59,6 @@ class BankSettlementTest extends TestCase
     private function expense(User $creator, string $title, int $cents, string $due): ExpenseOccurrence
     {
         return app(ExpenseService::class)->create($this->household, $creator, [
-            'scope' => ExpenseScope::Household,
             'title' => $title,
             'notes' => null,
             'amount_cents' => $cents,
@@ -248,7 +246,7 @@ class BankSettlementTest extends TestCase
     {
         [$rent, $internet] = $this->brunosOctoberBills();
         app(PaymentService::class)->confirm($internet, $this->leticia);
-        $personal = $this->createExpense($this->bruno, 9_000, Month::parse('2026-10'), ExpenseScope::Personal);
+        $noAmount = $this->createExpense($this->bruno, 0, Month::parse('2026-10'));
         $pix = $this->pixFromLeticia();
 
         $this->actingAs($this->bruno)
@@ -260,7 +258,7 @@ class BankSettlementTest extends TestCase
             ->assertSessionHasErrors(['occurrence_ids' => '“Internet” já foi paga.']);
 
         $this->actingAs($this->bruno)
-            ->post(route('bank.transactions.catalog', $pix), ['action' => 'settlement', 'occurrence_ids' => [$rent->id, $personal->id]])
+            ->post(route('bank.transactions.catalog', $pix), ['action' => 'settlement', 'occurrence_ids' => [$rent->id, $noAmount->id]])
             ->assertSessionHasErrors('occurrence_ids');
 
         $this->assertSame(OccurrenceStatus::Pending, $rent->fresh()->status);

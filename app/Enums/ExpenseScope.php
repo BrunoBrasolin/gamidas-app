@@ -2,16 +2,17 @@
 
 namespace App\Enums;
 
+/**
+ * Every expense belongs to the household. Personal bills (the former
+ * "personal" scope) were merged into the personal ledger, Finanças pessoais
+ * › Despesas; the column stays so old rows keep a valid value.
+ */
 enum ExpenseScope: string
 {
     case Household = 'household';
-    case Personal = 'personal';
 
     public function label(): string
     {
-        return match ($this) {
-            self::Household => 'Casa',
-            self::Personal => 'Pessoal',
-        };
+        return 'Casa';
     }
 }

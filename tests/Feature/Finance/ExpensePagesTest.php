@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Enums\RecurringKind;
 use App\Models\RecurringExpense;
 use App\Models\User;
@@ -16,7 +15,7 @@ use Tests\TestCase;
 
 /**
  * Despesas da casa holds only the household (with a "Recorrentes" tab);
- * personal bills and their recurring ones live in Finanças pessoais.
+ * the former personal bills were merged into Finanças pessoais › Despesas.
  */
 class ExpensePagesTest extends TestCase
 {
@@ -37,10 +36,9 @@ class ExpensePagesTest extends TestCase
         parent::tearDown();
     }
 
-    private function template(User $user, ExpenseScope $scope, string $title): RecurringExpense
+    private function template(User $user, string $title): RecurringExpense
     {
         return app(RecurringExpenseService::class)->create($this->household, $user, [
-            'scope' => $scope,
             'kind' => RecurringKind::Fixed,
             'title' => $title,
             'notes' => null,
@@ -52,50 +50,37 @@ class ExpensePagesTest extends TestCase
         ]);
     }
 
-    public function test_personal_bills_are_a_page_of_personal_finances(): void
+    public function test_the_expenses_page_lists_the_household(): void
     {
         $this->actingAs($this->bruno)
-            ->get(route('personal.bills', ['month' => '2026-10']))
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('personal/bills')
-                ->where('filters.scope', 'personal')
-                ->where('filters.month', '2026-10'));
-
-        $this->actingAs($this->bruno)
-            ->get(route('expenses.index'))
+            ->get(route('expenses.index', ['month' => '2026-10']))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('expenses/index')
-                ->where('filters.scope', 'household'));
+                ->where('filters.month', '2026-10')
+                ->missing('filters.scope'));
     }
 
-    public function test_old_links_to_personal_expenses_land_on_the_personal_bills(): void
+    public function test_old_links_to_personal_bills_land_on_the_personal_expenses(): void
     {
-        $this->actingAs($this->bruno)
-            ->get('/expenses?scope=personal&month=2026-10&status=paid')
-            ->assertRedirect(route('personal.bills', ['month' => '2026-10', 'status' => 'paid']));
+        $expenses = route('personal.transactions.index', 'expenses');
+
+        $this->actingAs($this->bruno)->get('/expenses?scope=personal&month=2026-10&status=paid')->assertRedirect($expenses);
+        $this->actingAs($this->bruno)->get('/personal/bills')->assertRedirect('/personal/expenses');
+        $this->actingAs($this->bruno)->get('/personal/bills/recurring')->assertRedirect('/personal/expenses');
     }
 
-    public function test_recurring_expenses_are_split_by_scope(): void
+    public function test_the_recurring_tab_lists_the_household_templates(): void
     {
-        $internet = $this->template($this->bruno, ExpenseScope::Household, 'Internet');
-        $gym = $this->template($this->bruno, ExpenseScope::Personal, 'Academia');
-        $this->template($this->leticia, ExpenseScope::Personal, 'Curso da Letícia');
+        $internet = $this->template($this->bruno, 'Internet');
+        $gym = $this->template($this->leticia, 'Academia');
 
         $this->actingAs($this->bruno)
             ->get(route('expenses.recurring'))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('recurring-expenses/index')
-                ->where('scope', 'household')
-                ->has('templates.data', 1)
-                ->where('templates.data.0.id', $internet->id));
-
-        $this->actingAs($this->bruno)
-            ->get(route('personal.bills.recurring'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('personal/recurring')
-                ->where('scope', 'personal')
-                ->has('templates.data', 1)
-                ->where('templates.data.0.id', $gym->id));
+                ->has('templates.data', 2)
+                ->where('templates.data.0.id', $gym->id)
+                ->where('templates.data.1.id', $internet->id));
     }
 
     public function test_the_old_recurring_page_redirects_to_the_household_tab(): void

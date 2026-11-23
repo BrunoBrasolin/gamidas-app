@@ -14,7 +14,6 @@ import {
 } from '@/components/finance/month-navigator';
 import { PageHeader } from '@/components/finance/page-header';
 import { StatCard } from '@/components/finance/stat-card';
-import { StatusBadge } from '@/components/finance/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,14 +32,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { capitalize, formatDate, formatMonth } from '@/lib/format';
+import { capitalize, formatMonth } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import personal from '@/routes/personal';
-import type {
-    OccurrenceStatus,
-    PersonalMonthSummary,
-    PersonalYearSummary,
-} from '@/types';
+import type { PersonalMonthSummary, PersonalYearSummary } from '@/types';
 
 type Props = {
     view: 'month' | 'year';
@@ -48,13 +43,6 @@ type Props = {
     year: number;
     summary: PersonalMonthSummary | null;
     yearly: PersonalYearSummary | null;
-    bills: {
-        id: number;
-        title: string;
-        due_date: string;
-        amount_cents: number;
-        status: OccurrenceStatus;
-    }[];
 };
 
 export default function PersonalIndex({
@@ -63,7 +51,6 @@ export default function PersonalIndex({
     year,
     summary,
     yearly,
-    bills,
 }: Props) {
     const visit = (query: Record<string, string | number>) =>
         router.get(personal.index.url(), query, {
@@ -194,8 +181,7 @@ export default function PersonalIndex({
                     <AlertDescription>
                         <p>
                             <strong>Despesas</strong> somam seus lançamentos de
-                            despesa, suas contas pessoais (recorrentes e
-                            avulsas) e{' '}
+                            despesa e{' '}
                             <strong>sua parte nas despesas da casa</strong>,
                             calculada automaticamente pela proporção dos
                             salários — não lance a contribuição para a casa
@@ -224,10 +210,6 @@ export default function PersonalIndex({
                                         cents={summary.ledger_expense_cents}
                                     />
                                     <BreakdownRow
-                                        label="Contas pessoais"
-                                        cents={summary.personal_bills_cents}
-                                    />
-                                    <BreakdownRow
                                         label="Sua parte da casa"
                                         cents={summary.household_share_cents}
                                     />
@@ -238,61 +220,6 @@ export default function PersonalIndex({
                                         />
                                     </div>
                                 </dl>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Contas pessoais do mês</CardTitle>
-                                <CardDescription>
-                                    Suas despesas com vencimento e pagamento
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {bills.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Nenhuma conta pessoal neste mês.
-                                    </p>
-                                ) : (
-                                    <ul className="divide-y text-sm">
-                                        {bills.map((bill) => (
-                                            <li
-                                                key={bill.id}
-                                                className="flex items-center justify-between gap-2 py-2"
-                                            >
-                                                <div>
-                                                    <div className="font-medium">
-                                                        {bill.title}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        vence{' '}
-                                                        {formatDate(
-                                                            bill.due_date,
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Money
-                                                        cents={
-                                                            bill.amount_cents
-                                                        }
-                                                    />
-                                                    <StatusBadge
-                                                        status={bill.status}
-                                                    />
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                                <Link
-                                    href={personal.bills({
-                                        query: { month },
-                                    })}
-                                    className="mt-3 inline-block text-sm font-medium underline underline-offset-4"
-                                >
-                                    Gerenciar contas pessoais
-                                </Link>
                             </CardContent>
                         </Card>
                     </div>

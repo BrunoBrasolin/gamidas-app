@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Finance;
 
-use App\Enums\ExpenseScope;
 use App\Models\AuditLog;
 use App\Services\PaymentService;
 use App\Services\SalaryService;
@@ -41,14 +40,6 @@ class SalaryRecalculationTest extends TestCase
 
         $this->assertSame(33_333, array_sum($this->sharesOf($expense)));
         $this->assertSame([$this->bruno->id => 26_666, $this->leticia->id => 6_667], $this->sharesOf($expense));
-    }
-
-    public function test_personal_expenses_are_not_split(): void
-    {
-        $expense = $this->createExpense($this->bruno, 15_000, scope: ExpenseScope::Personal);
-
-        $this->assertSame([], $this->sharesOf($expense));
-        $this->assertSame($this->bruno->id, $expense->owner_user_id);
     }
 
     public function test_updating_salaries_recalculates_unpaid_occurrences(): void

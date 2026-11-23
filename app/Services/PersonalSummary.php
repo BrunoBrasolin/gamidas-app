@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\ExpenseScope;
 use App\Enums\TransactionType;
-use App\Models\ExpenseOccurrence;
 use App\Models\ExpenseShare;
 use App\Models\PersonalTransaction;
 use App\Models\User;
@@ -16,7 +15,6 @@ use Illuminate\Database\Eloquent\Builder;
  *
  * Model (accrual by month):
  *   expenses   = personal ledger expenses
- *              + the member's personal bills (expense occurrences they own)
  *              + the member's share of household expenses
  *   net flow   = income − expenses − investments
  *   balance    = cumulative net flow up to the end of the period
@@ -28,7 +26,7 @@ use Illuminate\Database\Eloquent\Builder;
 final class PersonalSummary
 {
     /**
-     * @return array{income_cents: int, ledger_expense_cents: int, personal_bills_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int, balance_cents: int}
+     * @return array{income_cents: int, ledger_expense_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int, balance_cents: int}
      */
     public function month(User $user, CarbonImmutable $month): array
     {
@@ -42,7 +40,7 @@ final class PersonalSummary
     }
 
     /**
-     * @return array{months: list<array{month: string, income_cents: int, ledger_expense_cents: int, personal_bills_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int, balance_cents: int}>, totals: array{income_cents: int, ledger_expense_cents: int, personal_bills_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}, opening_balance_cents: int, closing_balance_cents: int}
+     * @return array{months: list<array{month: string, income_cents: int, ledger_expense_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int, balance_cents: int}>, totals: array{income_cents: int, ledger_expense_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}, opening_balance_cents: int, closing_balance_cents: int}
      */
     public function year(User $user, int $year): array
     {
@@ -67,19 +65,6 @@ final class PersonalSummary
 
             if (isset($months[$key])) {
                 $months[$key][$this->transactionKey($row->type)] += (int) $row->getAttribute('aggregate_total');
-            }
-        }
-
-        $bills = $this->personalBillsQuery($user, $from, $to)
-            ->selectRaw('billing_month, SUM(amount_cents) as aggregate_total')
-            ->groupBy('billing_month')
-            ->get();
-
-        foreach ($bills as $row) {
-            $key = $row->billing_month->format('Y-m');
-
-            if (isset($months[$key])) {
-                $months[$key]['personal_bills_cents'] += (int) $row->getAttribute('aggregate_total');
             }
         }
 
@@ -128,7 +113,7 @@ final class PersonalSummary
     }
 
     /**
-     * @return array{income_cents: int, ledger_expense_cents: int, personal_bills_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}
+     * @return array{income_cents: int, ledger_expense_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}
      */
     private function flows(User $user, ?CarbonImmutable $from, CarbonImmutable $to): array
     {
@@ -146,23 +131,9 @@ final class PersonalSummary
             $flows[$this->transactionKey($row->type)] += (int) $row->getAttribute('aggregate_total');
         }
 
-        $flows['personal_bills_cents'] = (int) $this->personalBillsQuery($user, $from, $to)->sum('amount_cents');
         $flows['household_share_cents'] = (int) $this->householdShareQuery($user, $from, $to)->sum('expense_shares.amount_cents');
 
         return $this->finalize($flows);
-    }
-
-    /**
-     * @return Builder<ExpenseOccurrence>
-     */
-    private function personalBillsQuery(User $user, ?CarbonImmutable $from, CarbonImmutable $to): Builder
-    {
-        return ExpenseOccurrence::query()
-            ->where('household_id', $user->householdId())
-            ->where('scope', ExpenseScope::Personal)
-            ->where('owner_user_id', $user->id)
-            ->when($from, fn ($query) => $query->where('billing_month', '>=', $from->startOfMonth()->toDateString()))
-            ->where('billing_month', '<=', $to->startOfMonth()->toDateString());
     }
 
     /**
@@ -193,14 +164,13 @@ final class PersonalSummary
     }
 
     /**
-     * @return array{income_cents: int, ledger_expense_cents: int, personal_bills_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}
+     * @return array{income_cents: int, ledger_expense_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}
      */
     private function emptyFlows(): array
     {
         return [
             'income_cents' => 0,
             'ledger_expense_cents' => 0,
-            'personal_bills_cents' => 0,
             'household_share_cents' => 0,
             'expense_cents' => 0,
             'investment_cents' => 0,
@@ -209,12 +179,12 @@ final class PersonalSummary
     }
 
     /**
-     * @param  array{income_cents: int, ledger_expense_cents: int, personal_bills_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}  $flows
-     * @return array{income_cents: int, ledger_expense_cents: int, personal_bills_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}
+     * @param  array{income_cents: int, ledger_expense_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}  $flows
+     * @return array{income_cents: int, ledger_expense_cents: int, household_share_cents: int, expense_cents: int, investment_cents: int, net_cents: int}
      */
     private function finalize(array $flows): array
     {
-        $flows['expense_cents'] = $flows['ledger_expense_cents'] + $flows['personal_bills_cents'] + $flows['household_share_cents'];
+        $flows['expense_cents'] = $flows['ledger_expense_cents'] + $flows['household_share_cents'];
         $flows['net_cents'] = $flows['income_cents'] - $flows['expense_cents'] - $flows['investment_cents'];
 
         return $flows;

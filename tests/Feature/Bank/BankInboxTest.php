@@ -223,7 +223,6 @@ class BankInboxTest extends TestCase
     public function test_linking_fills_the_real_amount_of_a_variable_bill(): void
     {
         $template = app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household,
             'kind' => RecurringKind::Fixed,
             'title' => 'Conta de luz',
             'notes' => null,
@@ -339,7 +338,6 @@ class BankInboxTest extends TestCase
     public function test_an_expense_with_the_same_amount_and_installment_is_suggested(): void
     {
         $typed = app(ExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household,
             'title' => 'Sofá',
             'notes' => null,
             'amount_cents' => 30000,
@@ -526,10 +524,25 @@ class BankInboxTest extends TestCase
         $this->assertTrue($rent->fresh()->isPaid());
     }
 
+    /**
+     * A pending expense of another household, never visible here.
+     */
+    private function foreignExpense(): ExpenseOccurrence
+    {
+        $outsider = $this->createOutsider();
+
+        return app(ExpenseService::class)->create($outsider->household(), $outsider, [
+            'title' => 'Conta de outra casa',
+            'notes' => null,
+            'amount_cents' => 5_000,
+            'due_date' => Month::current()->addDays(9),
+        ]);
+    }
+
     public function test_an_expense_can_be_linked_to_one_transaction_only_and_must_be_visible(): void
     {
         $rent = $this->createExpense($this->leticia, 180_000);
-        $leticiaPrivate = $this->createExpense($this->leticia, 5_000, null, ExpenseScope::Personal);
+        $foreign = $this->foreignExpense();
 
         $this->actingAs($this->bruno)->post(route('bank.transactions.catalog', $this->pix()), ['action' => 'link', 'occurrence_id' => $rent->id]);
 
@@ -538,7 +551,7 @@ class BankInboxTest extends TestCase
             ->assertSessionHasErrors('occurrence_id');
 
         $this->actingAs($this->bruno)
-            ->post(route('bank.transactions.catalog', $this->pix(date: '2026-11-07')), ['action' => 'link', 'occurrence_id' => $leticiaPrivate->id])
+            ->post(route('bank.transactions.catalog', $this->pix(date: '2026-11-07')), ['action' => 'link', 'occurrence_id' => $foreign->id])
             ->assertSessionHasErrors('occurrence_id');
     }
 
@@ -563,7 +576,6 @@ class BankInboxTest extends TestCase
     public function test_rules_by_value_tell_apart_payments_to_the_same_person(): void
     {
         $house = app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household,
             'kind' => RecurringKind::Fixed,
             'title' => 'Parcela da casa',
             'notes' => null,
@@ -614,8 +626,8 @@ class BankInboxTest extends TestCase
     public function test_any_pending_expense_can_be_picked_even_without_suggestions(): void
     {
         $rent = $this->createExpense($this->leticia, 180_000);
-        $leticiaPrivate = $this->createExpense($this->leticia, 5_000, null, ExpenseScope::Personal);
-        $mine = $this->createExpense($this->bruno, 7_000, null, ExpenseScope::Personal);
+        $mine = $this->createExpense($this->bruno, 7_000);
+        $foreign = $this->foreignExpense();
         $transaction = $this->pix('MARIA EXEMPLO', -1500);
 
         $this->actingAs($this->bruno)
@@ -630,7 +642,7 @@ class BankInboxTest extends TestCase
 
         $this->assertSame($rent->id, $transaction->fresh()->expense_occurrence_id);
         $this->assertSame(150_000, $rent->fresh()->amount_cents);
-        $this->assertNotSame($leticiaPrivate->id, $transaction->fresh()->expense_occurrence_id);
+        $this->assertNotSame($foreign->id, $transaction->fresh()->expense_occurrence_id);
     }
 
     public function test_an_old_purchase_is_suggested_for_the_expense_paid_by_hand_and_keeps_its_payment(): void
@@ -703,7 +715,6 @@ class BankInboxTest extends TestCase
     public function test_a_recurring_rule_links_an_old_payment_to_its_month_paid_by_hand(): void
     {
         $rent = app(RecurringExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household,
             'kind' => RecurringKind::Fixed,
             'title' => 'Aluguel',
             'notes' => null,
@@ -737,7 +748,6 @@ class BankInboxTest extends TestCase
     private function createPaidExpense(string $title, int $amountCents, string $dueDate): ExpenseOccurrence
     {
         $occurrence = app(ExpenseService::class)->create($this->household, $this->leticia, [
-            'scope' => ExpenseScope::Household,
             'title' => $title,
             'notes' => null,
             'amount_cents' => $amountCents,

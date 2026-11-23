@@ -1,5 +1,3 @@
-export type Scope = 'household' | 'personal';
-
 export type OccurrenceStatus = 'pending' | 'paid';
 
 export type OccurrenceSource = 'one_off' | 'recurring';
@@ -37,7 +35,6 @@ export type Occurrence = {
     id: number;
     title: string;
     notes: string | null;
-    scope: Scope;
     source: OccurrenceSource;
     source_label: string;
     recurring_expense_id: number | null;
@@ -108,7 +105,6 @@ export type HouseholdMonthSummary = {
 export type PersonalFlows = {
     income_cents: number;
     ledger_expense_cents: number;
-    personal_bills_cents: number;
     household_share_cents: number;
     expense_cents: number;
     investment_cents: number;

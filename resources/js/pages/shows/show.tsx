@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Calendar,
     Images,
@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/finance/confirm-dialog';
 import { PageHeader } from '@/components/finance/page-header';
 import { Setlist, showTitle } from '@/components/shows/setlist';
 import { ShowChecklist } from '@/components/shows/show-checklist';
+import { TierPicker } from '@/components/tiers/tier-picker';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -21,14 +22,19 @@ import {
 } from '@/components/ui/card';
 import { formatDate, today } from '@/lib/format';
 import shows from '@/routes/shows';
-import type { Show, ShowChecklistItem } from '@/types';
+import type { Show, ShowChecklistItem, Tier } from '@/types';
 
 export default function ShowDetails({
     show,
     checklist,
+    tier,
+    canRank,
 }: {
     show: Show;
     checklist: ShowChecklistItem[];
+    /** The show's place on the user's tier list. */
+    tier: Tier | null;
+    canRank: boolean;
 }) {
     // The checklist only matters until the day of the show.
     const upcoming = show.date >= today();
@@ -101,6 +107,32 @@ export default function ShowDetails({
                         url={shows.destroy.url(show.id)}
                     />
                 </PageHeader>
+
+                {canRank && (
+                    <Card className="py-4">
+                        <CardContent className="flex flex-wrap items-center gap-2 px-4">
+                            <span className="text-sm text-muted-foreground">
+                                Tier
+                            </span>
+                            <TierPicker
+                                value={tier}
+                                onChange={(next) =>
+                                    router.put(
+                                        shows.tier.url(show.id),
+                                        { tier: next },
+                                        { preserveScroll: true },
+                                    )
+                                }
+                            />
+                            <Link
+                                href={shows.tiers()}
+                                className="text-xs text-muted-foreground hover:underline"
+                            >
+                                Ver tier list
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {upcoming && (
                     <ShowChecklist showId={show.id} items={checklist} />

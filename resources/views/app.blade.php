@@ -34,12 +34,26 @@
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
+        {{-- Link preview of a public page, e.g. a shared tier list; kept out of search engines. --}}
+        @isset($preview)
+            <meta name="robots" content="noindex">
+            <meta name="description" content="{{ $preview['description'] }}">
+            <meta property="og:type" content="website">
+            <meta property="og:title" content="{{ $preview['title'] }}">
+            <meta property="og:description" content="{{ $preview['description'] }}">
+            <meta property="og:url" content="{{ $preview['url'] }}">
+            @if ($preview['image'])
+                <meta property="og:image" content="{{ $preview['image'] }}">
+                <meta name="twitter:card" content="summary_large_image">
+            @endif
+        @endisset
+
         @fonts
 
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
         <x-inertia::head>
-            <title>{{ str_starts_with($page['component'], 'game/') ? 'Jogo da Atenção' : config('app.name', 'Laravel') }}</title>
+            <title>{{ $preview['title'] ?? (str_starts_with($page['component'], 'game/') ? 'Jogo da Atenção' : config('app.name', 'Laravel')) }}</title>
         </x-inertia::head>
     </head>
     <body class="font-sans antialiased">

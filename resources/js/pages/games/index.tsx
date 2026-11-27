@@ -16,7 +16,7 @@ import { StatCard } from '@/components/finance/stat-card';
 import { BarChart, MeterRow } from '@/components/games/bar-chart';
 import { GameImage } from '@/components/games/game-image';
 import { GamesTabs } from '@/components/games/games-tabs';
-import { TierBadge } from '@/components/games/tier-badge';
+import { TierBadge } from '@/components/tiers/tier-badge';
 import {
     SteamAccountCard,
     SteamConnectCard,
@@ -55,7 +55,7 @@ import { weekday } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import games from '@/routes/games';
 import type {
-    GameTier,
+    Tier,
     SteamAccount,
     SteamBans,
     SteamDay,
@@ -392,7 +392,7 @@ function TopAndPlatforms({
     );
 }
 
-function GameTile({ game, tier }: { game: SteamGame; tier: GameTier | null }) {
+function GameTile({ game, tier }: { game: SteamGame; tier: Tier | null }) {
     return (
         <Link
             href={games.show(game.id)}
@@ -429,7 +429,7 @@ function LibraryGrid({
     tiers,
 }: {
     games: SteamGame[];
-    tiers: Partial<Record<number, GameTier>>;
+    tiers: Partial<Record<number, Tier>>;
 }) {
     const [query, setQuery] = useState('');
     const [filter, setFilter] = useState<Filter>('all');
@@ -576,7 +576,7 @@ type ConnectedProps = {
     months: SteamMonth[];
     days: SteamDay[];
     history_since: string | null;
-    tiers: Partial<Record<number, GameTier>>;
+    tiers: Partial<Record<number, Tier>>;
 };
 
 export default function GamesIndex({

@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import {
     Calendar,
+    Crown,
     Images,
     ListChecks,
     ListMusic,
@@ -16,13 +17,14 @@ import { EmptyState } from '@/components/finance/empty-state';
 import { PageHeader } from '@/components/finance/page-header';
 import { StatCard } from '@/components/finance/stat-card';
 import { showTitle } from '@/components/shows/setlist';
+import { TierBadge } from '@/components/tiers/tier-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatDate } from '@/lib/format';
 import shows from '@/routes/shows';
-import type { Show, ShowStats } from '@/types';
+import type { Show, ShowStats, Tier } from '@/types';
 
 /** Lowercase without accents, for searching. */
 function normalize(text: string): string {
@@ -45,7 +47,7 @@ function matches(show: Show, query: string): boolean {
     return haystack.some((text) => normalize(text).includes(query));
 }
 
-function ShowCard({ show }: { show: Show }) {
+function ShowCard({ show, tier }: { show: Show; tier: Tier | null }) {
     return (
         <Card className="py-4 transition-colors hover:bg-accent/40">
             <CardContent className="flex flex-col gap-3 px-4 sm:flex-row sm:items-start sm:justify-between">
@@ -54,7 +56,10 @@ function ShowCard({ show }: { show: Show }) {
                     className="min-w-0 flex-1 space-y-1.5"
                     prefetch
                 >
-                    <p className="font-medium">{showTitle(show)}</p>
+                    <p className="flex items-center gap-2 font-medium">
+                        {tier && <TierBadge tier={tier} />}
+                        {showTitle(show)}
+                    </p>
                     <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1.5">
                             <Calendar className="size-3.5" aria-hidden />
@@ -125,9 +130,12 @@ function ShowCard({ show }: { show: Show }) {
 export default function ShowsIndex({
     shows: all,
     stats,
+    tiers,
 }: {
     shows: Show[];
     stats: ShowStats;
+    /** The user's tier of each ranked show, by show id. */
+    tiers: Partial<Record<number, Tier>>;
 }) {
     const [query, setQuery] = useState('');
 
@@ -155,6 +163,12 @@ export default function ShowsIndex({
                     title="Shows"
                     description="Os shows da casa, com setlist, aberturas e álbum de fotos."
                 >
+                    <Button variant="outline" asChild>
+                        <Link href={shows.tiers()}>
+                            <Crown />
+                            Tier list
+                        </Link>
+                    </Button>
                     <Button variant="outline" asChild>
                         <Link href={shows.checklist.edit()}>
                             <ListChecks />
@@ -233,7 +247,12 @@ export default function ShowsIndex({
                                     <ul className="grid gap-3">
                                         {items.map((show) => (
                                             <li key={show.id}>
-                                                <ShowCard show={show} />
+                                                <ShowCard
+                                                    show={show}
+                                                    tier={
+                                                        tiers[show.id] ?? null
+                                                    }
+                                                />
                                             </li>
                                         ))}
                                     </ul>

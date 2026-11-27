@@ -3,7 +3,7 @@
 namespace Tests\Feature\Games;
 
 use App\Enums\BacklogStatus;
-use App\Enums\GameTier;
+use App\Enums\Tier;
 use App\Models\SteamAccount;
 use App\Models\SteamBacklogEntry;
 use App\Models\SteamGame;
@@ -59,7 +59,7 @@ class GameListsTest extends TestCase
      */
     private function tierList(): array
     {
-        $tiers = array_fill_keys(GameTier::values(), []);
+        $tiers = array_fill_keys(Tier::values(), []);
 
         foreach (SteamTierEntry::query()->where('user_id', $this->bruno->id)->orderBy('position')->get() as $entry) {
             $tiers[$entry->tier->value][] = $entry->app_id;
@@ -70,8 +70,8 @@ class GameListsTest extends TestCase
 
     public function test_the_tier_list_page_shows_the_tiers_and_the_library(): void
     {
-        SteamTierEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 620, 'name' => 'Portal 2', 'tier' => GameTier::S, 'position' => 1]);
-        SteamTierEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 1145360, 'name' => 'Hades', 'tier' => GameTier::S, 'position' => 0]);
+        SteamTierEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 620, 'name' => 'Portal 2', 'tier' => Tier::S, 'position' => 1]);
+        SteamTierEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 1145360, 'name' => 'Hades', 'tier' => Tier::S, 'position' => 0]);
 
         $this->actingAs($this->bruno)
             ->get(route('games.tiers'))
@@ -91,7 +91,7 @@ class GameListsTest extends TestCase
 
     public function test_saving_the_tier_list_replaces_it_in_the_given_order(): void
     {
-        SteamTierEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 504230, 'name' => 'Celeste', 'tier' => GameTier::C, 'position' => 0]);
+        SteamTierEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 504230, 'name' => 'Celeste', 'tier' => Tier::C, 'position' => 0]);
 
         $this->actingAs($this->bruno)
             ->from(route('games.tiers'))
@@ -132,7 +132,7 @@ class GameListsTest extends TestCase
 
     public function test_each_user_has_their_own_tier_list(): void
     {
-        SteamTierEntry::query()->create(['user_id' => $this->leticia->id, 'app_id' => 620, 'name' => 'Portal 2', 'tier' => GameTier::F, 'position' => 0]);
+        SteamTierEntry::query()->create(['user_id' => $this->leticia->id, 'app_id' => 620, 'name' => 'Portal 2', 'tier' => Tier::F, 'position' => 0]);
 
         $this->actingAs($this->bruno)->put(route('games.tiers.update'), ['tiers' => ['S' => [620]]])->assertSessionHasNoErrors();
 
@@ -305,7 +305,7 @@ class GameListsTest extends TestCase
         $make($this->celeste, BacklogStatus::Queued, 3);
         $make($this->hades, BacklogStatus::Playing, 0);
         SteamBacklogEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 4000, 'name' => 'Fora da biblioteca', 'status' => BacklogStatus::Queued, 'position' => 1, 'added_at' => now()]);
-        SteamTierEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 620, 'name' => 'Portal 2', 'tier' => GameTier::A, 'position' => 0]);
+        SteamTierEntry::query()->create(['user_id' => $this->bruno->id, 'app_id' => 620, 'name' => 'Portal 2', 'tier' => Tier::A, 'position' => 0]);
 
         $this->actingAs($this->bruno)
             ->get(route('games.backlog'))

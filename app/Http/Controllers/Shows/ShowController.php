@@ -9,6 +9,7 @@ use App\Models\Show;
 use App\Models\ShowChecklistItem;
 use App\Models\ShowOpeningAct;
 use App\Services\ShowService;
+use App\Services\ShowTierService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -21,8 +22,10 @@ class ShowController extends Controller
 {
     use InteractsWithHousehold;
 
-    public function __construct(private readonly ShowService $shows)
-    {
+    public function __construct(
+        private readonly ShowService $shows,
+        private readonly ShowTierService $tiers,
+    ) {
         //
     }
 
@@ -37,6 +40,7 @@ class ShowController extends Controller
         return Inertia::render('shows/index', [
             'shows' => $shows->map(fn (Show $show) => $this->present($show))->values(),
             'stats' => $this->stats($shows),
+            'tiers' => (object) $this->tiers->tierByShow($this->user($request)),
         ]);
     }
 
@@ -54,14 +58,18 @@ class ShowController extends Controller
         return to_route('shows.show', $show);
     }
 
-    public function show(Show $show): Response
+    public function show(Request $request, Show $show): Response
     {
         Gate::authorize('view', $show);
         $show->load('creator:id,name');
         $checked = $show->checkedItems()->pluck('show_checklist_items.id')->flip();
+        $tier = $this->tiers->tierByShow($this->user($request))[$show->id] ?? null;
 
         return Inertia::render('shows/show', [
             'show' => $this->present($show),
+            'tier' => $tier,
+            // The user's tier list takes shows from their day on.
+            'canRank' => $tier !== null || $this->tiers->happened($show),
             'checklist' => $show->household->showChecklistItems()->get()
                 ->map(fn (ShowChecklistItem $item) => [
                     'id' => $item->id,

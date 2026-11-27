@@ -43,6 +43,12 @@ class AppServiceProvider extends ServiceProvider
         // Arranging the tier list and the "para zerar" list saves on every move.
         RateLimiter::for('games-writes', fn (Request $request) => Limit::perMinute(240)->by($request->user()?->id ?: $request->ip()));
 
+        // The shows tier list saves on every move too.
+        RateLimiter::for('tier-writes', fn (Request $request) => Limit::perMinute(240)->by($request->user()?->id ?: $request->ip()));
+
+        // Public pages of shared tier lists.
+        RateLimiter::for('public-reads', fn (Request $request) => Limit::perMinute(120)->by($request->ip()));
+
         // The knowledge editor autosaves, uploads files and records the reading position.
         RateLimiter::for('knowledge-writes', fn (Request $request) => Limit::perMinute(240)->by($request->user()?->id ?: $request->ip()));
 

@@ -3,18 +3,20 @@
 namespace App\Http\Controllers\Games;
 
 use App\Enums\BacklogStatus;
+use App\Enums\TierListKind;
 use App\Http\Controllers\Concerns\InteractsWithHousehold;
 use App\Http\Controllers\Controller;
 use App\Http\Presenters\SteamPresenter;
 use App\Http\Requests\Games\BacklogAddRequest;
 use App\Http\Requests\Games\BacklogOrderRequest;
 use App\Http\Requests\Games\BacklogStatusRequest;
-use App\Http\Requests\Games\GameTierRequest;
-use App\Http\Requests\Games\TierListRequest;
+use App\Http\Requests\Tiers\TierListRequest;
+use App\Http\Requests\Tiers\TierRequest;
 use App\Models\SteamBacklogEntry;
 use App\Models\SteamGame;
 use App\Services\Steam\SteamListsService;
 use App\Services\Steam\SteamStats;
+use App\Services\TierListShareService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -36,7 +38,7 @@ class GameListsController extends Controller
         //
     }
 
-    public function tiers(Request $request, SteamStats $stats): Response|RedirectResponse
+    public function tiers(Request $request, SteamStats $stats, TierListShareService $shares): Response|RedirectResponse
     {
         $user = $this->user($request);
         $account = $user->steamAccount;
@@ -48,6 +50,7 @@ class GameListsController extends Controller
         return Inertia::render('games/tiers', [
             'tiers' => $this->lists->tiers($user),
             'library' => $stats->library($account)->map(fn (array $game) => SteamPresenter::libraryGame($game))->values(),
+            'shareUrl' => $shares->url($user, TierListKind::Games),
         ]);
     }
 
@@ -61,7 +64,7 @@ class GameListsController extends Controller
     /**
      * Put one game in a tier (at the end) or take it off the tier list.
      */
-    public function tier(GameTierRequest $request, SteamGame $game): RedirectResponse
+    public function tier(TierRequest $request, SteamGame $game): RedirectResponse
     {
         Gate::authorize('view', $game);
 

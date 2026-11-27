@@ -1,3 +1,5 @@
+import type { Tier } from './tiers';
+
 /** A user's Steam account, as the last sync saw it. */
 export type SteamAccount = {
     steam_id: string;
@@ -206,8 +208,6 @@ export type SteamFriendList = {
     error: string | null;
 };
 
-export type GameTier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
-
 /** A game on one of the user's lists; library data is null when it left the library. */
 export type ListGame = {
     app_id: number;
@@ -232,12 +232,12 @@ export type BacklogEntry = ListGame & {
     added_at: string;
     started_at: string | null;
     completed_at: string | null;
-    tier: GameTier | null;
+    tier: Tier | null;
 };
 
 /** Where a game is on the user's lists. */
 export type GameLists = {
-    tier: GameTier | null;
+    tier: Tier | null;
     backlog: {
         id: number;
         status: BacklogStatus;

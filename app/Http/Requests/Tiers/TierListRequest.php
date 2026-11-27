@@ -1,16 +1,21 @@
 <?php
 
-namespace App\Http\Requests\Games;
+namespace App\Http\Requests\Tiers;
 
-use App\Enums\GameTier;
-use App\Services\Steam\SteamListsService;
+use App\Enums\Tier;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * The whole tier list: the app ids of each tier, in order.
+ * A whole tier list: the ids of each tier, in order (Steam app ids for
+ * games, show ids for shows).
  */
 class TierListRequest extends FormRequest
 {
+    /**
+     * Entries a tier can receive at once.
+     */
+    private const MAX_PER_TIER = 5_000;
+
     public function authorize(): bool
     {
         return true;
@@ -22,8 +27,8 @@ class TierListRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tiers' => ['present', 'array:'.implode(',', GameTier::values())],
-            'tiers.*' => ['array', 'max:'.SteamListsService::MAX_TIERED],
+            'tiers' => ['present', 'array:'.implode(',', Tier::values())],
+            'tiers.*' => ['array', 'max:'.self::MAX_PER_TIER],
             'tiers.*.*' => ['integer', 'min:1', 'max:4294967295'],
         ];
     }
@@ -35,7 +40,7 @@ class TierListRequest extends FormRequest
     {
         $tiers = [];
 
-        foreach (GameTier::values() as $tier) {
+        foreach (Tier::values() as $tier) {
             $tiers[$tier] = array_values(array_map('intval', (array) ($this->validated('tiers')[$tier] ?? [])));
         }
 

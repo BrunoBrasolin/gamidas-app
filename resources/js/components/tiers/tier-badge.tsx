@@ -1,13 +1,13 @@
-import { tierClass } from '@/lib/games';
+import { tierClass } from '@/lib/tiers';
 import { cn } from '@/lib/utils';
-import type { GameTier } from '@/types';
+import type { Tier } from '@/types';
 
 /** A tier letter in its color. */
 export function TierBadge({
     tier,
     className,
 }: {
-    tier: GameTier;
+    tier: Tier;
     className?: string;
 }) {
     return (

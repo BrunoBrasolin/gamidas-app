@@ -18,12 +18,18 @@ void createInertiaApp({
             return title || 'Jogo da Atenção';
         }
 
+        // Neither do shared tier lists.
+        if (page?.component.startsWith('tier-list/')) {
+            return title;
+        }
+
         return title ? `${title} - ${appName}` : appName;
     },
     layout: (name) => {
         switch (true) {
             case name.startsWith('errors/'):
             case name.startsWith('game/'):
+            case name.startsWith('tier-list/'):
             case name === 'attention/present':
                 return null;
             case name.startsWith('auth/'):

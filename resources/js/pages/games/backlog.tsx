@@ -20,7 +20,7 @@ import { PageHeader } from '@/components/finance/page-header';
 import { StatCard } from '@/components/finance/stat-card';
 import { GameImage } from '@/components/games/game-image';
 import { GamesTabs } from '@/components/games/games-tabs';
-import { TierBadge } from '@/components/games/tier-badge';
+import { TierBadge } from '@/components/tiers/tier-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';

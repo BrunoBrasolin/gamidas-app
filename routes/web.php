@@ -28,6 +28,9 @@ use App\Http\Controllers\Knowledge\KnowledgeSubjectController;
 use App\Http\Controllers\Roulette\RoulettePlaceController;
 use App\Http\Controllers\Shows\ShowChecklistController;
 use App\Http\Controllers\Shows\ShowController;
+use App\Http\Controllers\Shows\ShowTierController;
+use App\Http\Controllers\TierLists\PublicTierListController;
+use App\Http\Controllers\TierLists\TierListShareController;
 use App\Http\Controllers\Time\TimeCategoryController;
 use App\Http\Controllers\Time\TimeLogController;
 use App\Http\Controllers\Time\TimeReportController;
@@ -62,6 +65,13 @@ Route::prefix('jogo')->name('game.')
             Route::post('{game:code}/rounds', [PlayController::class, 'round'])->name('rounds.store');
         });
     });
+
+// The public page of a tier list (games or shows) whose owner created a link
+// for it. Read only and without session, like the public game pages.
+Route::get('tier-list/{token}', PublicTierListController::class)
+    ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
+    ->middleware('throttle:public-reads')
+    ->name('tier-lists.public');
 
 Route::middleware(['auth', 'verified', 'household'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
@@ -168,8 +178,21 @@ Route::middleware(['auth', 'verified', 'household'])->group(function () {
     Route::get('shows', [ShowController::class, 'index'])->name('shows.index');
     Route::get('shows/create', [ShowController::class, 'create'])->name('shows.create');
     Route::get('shows/checklist', [ShowChecklistController::class, 'edit'])->name('shows.checklist.edit');
+    Route::get('shows/tiers', [ShowTierController::class, 'index'])->name('shows.tiers');
     Route::get('shows/{show}', [ShowController::class, 'show'])->name('shows.show');
     Route::get('shows/{show}/edit', [ShowController::class, 'edit'])->name('shows.edit');
+
+    // Each member's tier list of the shows saves on every move.
+    Route::middleware('throttle:tier-writes')->group(function () {
+        Route::put('shows/tiers', [ShowTierController::class, 'update'])->name('shows.tiers.update');
+        Route::put('shows/{show}/tier', [ShowTierController::class, 'tier'])->name('shows.tier');
+    });
+
+    // The public link of the user's own tier lists.
+    Route::middleware('throttle:finance-writes')->group(function () {
+        Route::post('tier-lists/{kind}/share', [TierListShareController::class, 'store'])->name('tier-lists.share.store');
+        Route::delete('tier-lists/{kind}/share', [TierListShareController::class, 'destroy'])->name('tier-lists.share.destroy');
+    });
 
     Route::middleware('throttle:finance-writes')->group(function () {
         Route::post('shows', [ShowController::class, 'store'])->name('shows.store');

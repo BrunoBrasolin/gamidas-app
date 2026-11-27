@@ -3,7 +3,7 @@
 namespace App\Services\Steam;
 
 use App\Enums\BacklogStatus;
-use App\Enums\GameTier;
+use App\Enums\Tier;
 use App\Models\SteamBacklogEntry;
 use App\Models\SteamGame;
 use App\Models\SteamTierEntry;
@@ -25,11 +25,6 @@ use Illuminate\Validation\ValidationException;
 class SteamListsService
 {
     /**
-     * Games of a whole tier list sent at once.
-     */
-    public const MAX_TIERED = 5_000;
-
-    /**
      * The tier list: each tier's games, in order.
      *
      * @return array<string, list<ListGame>>
@@ -38,7 +33,7 @@ class SteamListsService
     {
         $entries = SteamTierEntry::query()->where('user_id', $user->id)->orderBy('position')->orderBy('id')->get();
         $games = $this->libraryGames($user, array_values($entries->map(fn (SteamTierEntry $entry) => $entry->app_id)->all()));
-        $tiers = array_fill_keys(GameTier::values(), []);
+        $tiers = array_fill_keys(Tier::values(), []);
 
         foreach ($entries as $entry) {
             $tiers[$entry->tier->value][] = $this->listGame($entry->app_id, $entry->name, $games->get($entry->app_id));
@@ -84,7 +79,7 @@ class SteamListsService
             $existing = SteamTierEntry::query()->where('user_id', $user->id)->get()->keyBy('app_id');
             $kept = [];
 
-            foreach (GameTier::cases() as $tier) {
+            foreach (Tier::cases() as $tier) {
                 foreach ($tiers[$tier->value] ?? [] as $position => $appId) {
                     $kept[$appId] = true;
                     $entry = $existing->get($appId) ?? new SteamTierEntry(['user_id' => $user->id, 'app_id' => $appId]);
@@ -104,7 +99,7 @@ class SteamListsService
      * Put a game at the end of a tier, or take it off the list (null). A
      * game already in that tier keeps its place.
      */
-    public function setTier(User $user, SteamGame $game, ?GameTier $tier): void
+    public function setTier(User $user, SteamGame $game, ?Tier $tier): void
     {
         $entry = SteamTierEntry::query()->where('user_id', $user->id)->where('app_id', $game->app_id)->first();
 

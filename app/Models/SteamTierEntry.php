@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\GameTier;
+use App\Enums\Tier;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property int $app_id
  * @property string $name The game's name when last placed.
- * @property GameTier $tier
+ * @property Tier $tier
  * @property int $position Order within the tier, from 0.
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -28,7 +28,7 @@ class SteamTierEntry extends Model
      */
     protected function casts(): array
     {
-        return ['app_id' => 'integer', 'tier' => GameTier::class, 'position' => 'integer'];
+        return ['app_id' => 'integer', 'tier' => Tier::class, 'position' => 'integer'];
     }
 
     /**

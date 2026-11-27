@@ -3,9 +3,9 @@
 namespace App\Enums;
 
 /**
- * Tiers of the tier list, best first.
+ * Tiers of a tier list (games or shows), best first.
  */
-enum GameTier: string
+enum Tier: string
 {
     case S = 'S';
     case A = 'A';

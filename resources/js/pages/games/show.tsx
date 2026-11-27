@@ -18,6 +18,7 @@ import {
 import { useState } from 'react';
 import { BarChart, MeterRow } from '@/components/games/bar-chart';
 import { GameImage } from '@/components/games/game-image';
+import { TierPicker } from '@/components/tiers/tier-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,7 +41,6 @@ import {
     formatDay,
     formatPlaytime,
     headerUrl,
-    TIERS,
     formatShare,
     formatStat,
     statLabel,
@@ -50,7 +50,7 @@ import games from '@/routes/games';
 import type {
     BacklogStatus,
     GameLists,
-    GameTier,
+    Tier,
     SteamAchievement,
     SteamGameDetails,
     SteamGameProgress,
@@ -484,7 +484,7 @@ function ListsCard({
 }) {
     const backlog = lists.backlog;
 
-    function setTier(tier: GameTier | null) {
+    function setTier(tier: Tier | null) {
         router.put(games.tier.url(game.id), { tier }, { preserveScroll: true });
     }
 
@@ -503,33 +503,7 @@ function ListsCard({
             <CardContent className="flex flex-col gap-4 px-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm text-muted-foreground">Tier</span>
-                    <div
-                        className="flex flex-wrap gap-1"
-                        role="group"
-                        aria-label="Tier"
-                    >
-                        {TIERS.map(({ tier, className }) => (
-                            <button
-                                key={tier}
-                                type="button"
-                                aria-pressed={lists.tier === tier}
-                                onClick={() =>
-                                    setTier(lists.tier === tier ? null : tier)
-                                }
-                                className={cn(
-                                    'size-8 rounded-md text-sm font-bold transition-opacity',
-                                    className,
-                                    lists.tier === null || lists.tier === tier
-                                        ? 'opacity-100'
-                                        : 'opacity-40 hover:opacity-80',
-                                    lists.tier === tier &&
-                                        'ring-2 ring-foreground ring-offset-1 ring-offset-background',
-                                )}
-                            >
-                                {tier}
-                            </button>
-                        ))}
-                    </div>
+                    <TierPicker value={lists.tier} onChange={setTier} />
                     <Link
                         href={games.tiers()}
                         className="text-xs text-muted-foreground hover:underline"
